@@ -1,0 +1,716 @@
+// Este es un ejemplo de Prisma schema para EstetIA
+// Ubicación real: backend/prisma/schema.prisma
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ============================================
+// USUARIOS Y AUTENTICACIÓN
+// ============================================
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String   // bcrypt hash
+  nombre    String
+  apellido  String
+  rol       Role     @default(RECEPCIONISTA)
+  
+  // Para médicos
+  especialidad String?
+  numeroDocumento String?
+  
+  telefono  String?
+  activo    Boolean  @default(true)
+  
+  // Relaciones
+  pacientesCreados Paciente[]
+  procedimientosRealizados Procedimiento[]
+  historiasEditadas HistoriaClinica[]
+  citasAsignadas Cita[]
+  auditLogs AuditLog[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([email])
+  @@index([rol])
+}
+
+enum Role {
+  SUPER_ADMIN
+  MEDICO
+  AUXILIAR
+  RECEPCIONISTA
+  PACIENTE
+}
+
+// ============================================
+// PACIENTES (CORE)
+// ============================================
+
+model Paciente {
+  id                String   @id @default(cuid())
+  numeroDocumento   String
+  tipoDocumento     String   // CC, CE, PS, PEP
+  nombreCompleto    String
+  fechaNacimiento   DateTime
+  genero            String   // M, F, O
+  
+  telefonos         String[]
+  email             String?
+  whatsapp          String?
+  
+  direccion         String?
+  ciudad            String?
+  
+  alergias          Alergia[]
+  medicacionActual  Medicamento[]
+  antecedentes      AntecedentesQuirurgicos[]
+  
+  fotoPerfil        String?
+  estado            String   @default("ACTIVO") // ACTIVO, INACTIVO, FALLECIDO
+  
+  // Relaciones
+  procedimientos    Procedimiento[]
+  historiasClinicas HistoriaClinica[]
+  fotos             FotoClinica[]
+  citas             Cita[]
+  transacciones     Transaccion[]
+  alertas           Alerta[]
+  consentimientos   Consentimiento[]
+  mapaCorporal      MapaCorporal[]
+  seguimientos      SeguimientoPostOp[]
+  
+  creadoPor         String?
+  creadoBy          User?    @relation(fields: [creadoPor], references: [id])
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@unique([numeroDocumento, tipoDocumento])
+  @@index([nombreCompleto])
+  @@index([estado])
+}
+
+model Alergia {
+  id          String @id @default(cuid())
+  pacienteId  String
+  paciente    Paciente @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
+  
+  nombre      String
+  severidad   String // CRITICA, ALTA, MEDIA, LEVE
+  reaccion    String?
+  
+  @@index([pacienteId])
+}
+
+model Medicamento {
+  id          String @id @default(cuid())
+  pacienteId  String?
+  paciente    Paciente? @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
+  
+  nombre      String
+  dosis       String
+  frecuencia  String
+  indicacion  String
+  activo      Boolean @default(true)
+  
+  @@index([pacienteId])
+}
+
+model AntecedentesQuirurgicos {
+  id          String @id @default(cuid())
+  pacienteId  String
+  paciente    Paciente @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
+  
+  procedimiento String
+  fecha       DateTime
+  complicaciones String?
+  cirujano    String?
+  
+  @@index([pacienteId])
+}
+
+// ============================================
+// PROCEDIMIENTOS
+// ============================================
+
+model Procedimiento {
+  id                      String   @id @default(cuid())
+  pacienteId              String
+  paciente                Paciente @relation(fields: [pacienteId], references: [id])
+  
+  medicoId                String
+  medico                  User     @relation(fields: [medicoId], references: [id])
+  
+  // NUEVO: Vinculación con CUPS
+  codigoCUPS              String?
+  procedimientoCUPS       ProcedimientoCUPS? @relation(fields: [codigoCUPS], references: [codigoCUPS])
+  
+  tipoProcedimiento       String
+  nombreProcedimiento     String
+  descripcion             String?
+  
+  fechaProgramada         DateTime
+  fechaRealizada          DateTime?
+  
+  duracionEstimada        Int      // minutos
+  duracionReal            Int?
+  
+  estado                  String   @default("PENDIENTE") // PENDIENTE, EN_CURSO, COMPLETADO, CANCELADO
+  
+  notasPreoperatorio      String?
+  notasOperatorio         String?
+  complicaciones          String[]
+  
+  resultadoVisualEsperado String?
+  resultadoVisualActual   String?
+  
+  // Relaciones
+  historias               HistoriaClinica[]
+  fotos                   FotoClinica[]
+  consentimientos         Consentimiento[]
+  seguimientos            SeguimientoPostOp[]
+  alertas                 Alerta[]
+  mapaCorporal            MapaCorporal[]
+  checklistsCompletados   ChecklistCompletado[]
+  
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+  
+  @@index([pacienteId])
+  @@index([medicoId])
+  @@index([codigoCUPS])
+  @@index([estado])
+  @@index([fechaProgramada])
+}
+
+// ============================================
+// HISTORIA CLÍNICA DINÁMICA
+// ============================================
+
+model HistoriaClinica {
+  id                String   @id @default(cuid())
+  pacienteId        String
+  paciente          Paciente @relation(fields: [pacienteId], references: [id])
+  
+  procedimientoId   String?
+  procedimiento     Procedimiento? @relation(fields: [procedimientoId], references: [id])
+  
+  // NUEVO: Vinculación con plantilla
+  plantillaId       String?
+  plantilla         PlantillaTemplate? @relation(fields: [plantillaId], references: [id])
+  
+  tipoHistoria      String   // ANAMNESIS, EXAMEN_FISICO, DIAGNOSTICO, PLAN, SEGUIMIENTO
+  contenido         Json     // Campo flexible para datos dinámicos
+  version           Int      @default(1)
+  
+  editadoPor        String
+  usuario           User     @relation(fields: [editadoPor], references: [id])
+  
+  fechaCreacion     DateTime @default(now())
+  fechaUltimaEdicion DateTime @updatedAt
+  
+  firmadoPorMedico  Boolean  @default(false)
+  fechaFirma        DateTime?
+  
+  hashIntegridad    String   // SHA-256 para auditoría
+  
+  @@index([pacienteId])
+  @@index([procedimientoId])
+  @@index([plantillaId])
+  @@index([tipoHistoria])
+  @@index([fechaCreacion])
+}
+
+// ============================================
+// PLANTILLAS POR PROCEDIMIENTO
+// ============================================
+
+model PlantillaProcedimiento {
+  id                          String   @id @default(cuid())
+  codigoCups                  String   @unique
+  nombreProcedimiento         String
+  categoria                   String   // FACIAL, CORPORAL, NO_INVASIVO
+  descripcion                 String?
+  
+  camposObligatorios          Json     // Array de FormField
+  camposOpcionales            Json     // Array de FormField
+  
+  riesgosAuto                 String[] // Array de riesgos por defecto
+  complicacionesEsperadas     String[] // Array de complicaciones
+  medicacionRecomendada       Json     // Array de medicamentos
+  
+  postoperatorioPorDias       Json     // Estructura de seguimiento por días
+  
+  consentimientoTemplate      String   // HTML del consentimiento
+  
+  createdAt                   DateTime @default(now())
+  updatedAt                   DateTime @updatedAt
+  
+  @@index([categoria])
+}
+
+// ============================================
+// CONSENTIMIENTO INFORMADO
+// ============================================
+
+model Consentimiento {
+  id                String   @id @default(cuid())
+  pacienteId        String
+  paciente          Paciente @relation(fields: [pacienteId], references: [id])
+  
+  procedimientoId   String
+  procedimiento     Procedimiento @relation(fields: [procedimientoId], references: [id])
+  
+  plantillaId       String
+  
+  contenidoHtml     String
+  contenidoPdfUrl   String?
+  
+  firmaDigitalUrl   String?   // URL de imagen de firma
+  selfieUrl         String?   // URL de selfie
+  
+  fechaFirma        DateTime?
+  
+  ipDispositivo     String?
+  navegador         String?
+  sistemaOperativo  String?
+  geolocation       Json?     // {latitude, longitude}
+  
+  firmado           Boolean   @default(false)
+  hashIntegridad    String    // SHA-256
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  @@index([pacienteId])
+  @@index([procedimientoId])
+  @@index([firmado])
+}
+
+// ============================================
+// FOTOS CLÍNICAS
+// ============================================
+
+model FotoClinica {
+  id                String   @id @default(cuid())
+  pacienteId        String
+  paciente          Paciente @relation(fields: [pacienteId], references: [id])
+  
+  procedimientoId   String?
+  procedimiento     Procedimiento? @relation(fields: [procedimientoId], references: [id])
+  
+  tipo              String   // ANTES, DESPUES, SEGUIMIENTO
+  diasPostOperatorio Int?
+  
+  urlOriginal       String
+  urlComprimida     String
+  urlMiniatura      String
+  
+  metadatos         Json?    // {fecha, hora, dispositivo}
+  anotaciones       Json?    // Array de anotaciones clínicas
+  
+  visibleAlPaciente Boolean  @default(false)
+  
+  fechaCaptura      DateTime
+  createdAt         DateTime @default(now())
+  
+  @@index([pacienteId])
+  @@index([procedimientoId])
+  @@index([tipo])
+}
+
+// ============================================
+// MAPA CORPORAL INTERACTIVO
+// ============================================
+
+model MapaCorporal {
+  id                String   @id @default(cuid())
+  pacienteId        String
+  paciente          Paciente @relation(fields: [pacienteId], references: [id])
+  
+  procedimientoId   String
+  procedimiento     Procedimiento @relation(fields: [procedimientoId], references: [id])
+  
+  fechaEvaluacion   DateTime
+  
+  zonasMarcadas     Json     // GeoJSON de zonas
+  edemaZonas        Json     // {zona, severidad, colorCode}
+  fibrosisZonas     Json     // {zona, presente, descripcion}
+  dolorZonas        Json     // {zona, escala, tipo}
+  
+  colorIndicator    String?
+  anotacionesClinics String?
+  
+  evaluadoPor       String
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@index([pacienteId])
+  @@index([procedimientoId])
+}
+
+// ============================================
+// SEGUIMIENTO POSTOPERATORIO
+// ============================================
+
+model SeguimientoPostOp {
+  id                      String   @id @default(cuid())
+  pacienteId              String
+  paciente                Paciente @relation(fields: [pacienteId], references: [id])
+  
+  procedimientoId         String
+  procedimiento           Procedimiento @relation(fields: [procedimientoId], references: [id])
+  
+  diaPostOp               Int
+  fechaPrevista           DateTime
+  fechaCompletada         DateTime?
+  
+  tipoSeguimiento         String   // CHECKLIST, FOTOS, CONTROL, EVALUACION
+  
+  checklistPreguntas      Json     // Array de preguntas
+  checklistRespuestas     Json?    // Respuestas del paciente
+  
+  reportarComplicacion    Boolean  @default(false)
+  descripcionComplicacion String?
+  
+  alertasGeneradas        Json[]   // Array de alertas
+  
+  completado              Boolean  @default(false)
+  notificacionWhatsappEnviada Boolean @default(false)
+  
+  createdAt               DateTime @default(now())
+  
+  @@index([pacienteId])
+  @@index([procedimientoId])
+  @@index([diaPostOp])
+  @@index([completado])
+}
+
+// ============================================
+// ALERTAS CLÍNICAS
+// ============================================
+
+model Alerta {
+  id                  String   @id @default(cuid())
+  pacienteId          String
+  paciente            Paciente @relation(fields: [pacienteId], references: [id])
+  
+  procedimientoId     String?
+  procedimiento       Procedimiento? @relation(fields: [procedimientoId], references: [id])
+  
+  tipoAlerta          String   // RIESGO, COMPLICACION, CONTROL_PENDIENTE, MEDICACION
+  severidad           String   // CRITICA, ALTA, MEDIA, BAJA
+  
+  descripcion         String
+  accionRecomendada   String
+  
+  iaDetectada         Boolean  @default(false)
+  
+  resuelta            Boolean  @default(false)
+  fechaResolucion     DateTime?
+  
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  @@index([pacienteId])
+  @@index([severidad])
+  @@index([resuelta])
+}
+
+// ============================================
+// CITAS / AGENDA
+// ============================================
+
+model Cita {
+  id                String   @id @default(cuid())
+  pacienteId        String
+  paciente          Paciente @relation(fields: [pacienteId], references: [id])
+  
+  medicoId          String
+  medico            User     @relation(fields: [medicoId], references: [id])
+  
+  tipoCita          String   // CONSULTA, PREOPERATORIO, POSTOPERATORIO, CONTROL
+  
+  fechaHora         DateTime
+  duracionMinutos   Int      @default(60)
+  
+  estado            String   @default("PENDIENTE") // PENDIENTE, CONFIRMADA, COMPLETADA, CANCELADA
+  
+  motivo            String?
+  notas             String?
+  
+  recordatorioWhatsapp Boolean @default(false)
+  asistencia        Boolean?
+  
+  salaQuirofanoId   String?
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@index([pacienteId])
+  @@index([medicoId])
+  @@index([fechaHora])
+  @@index([estado])
+}
+
+// ============================================
+// TRANSACCIONES / FACTURACIÓN
+// ============================================
+
+model Transaccion {
+  id              String   @id @default(cuid())
+  pacienteId      String
+  paciente        Paciente @relation(fields: [pacienteId], references: [id])
+  
+  procedimientoId String?
+  
+  tipo            String   // CARGO, PAGO, ABONO
+  concepto        String
+  
+  monto           Float
+  moneda          String   @default("COP")
+  
+  metodoPago      String   // EFECTIVO, TARJETA, TRANSFER, OTRO
+  referenciaPago  String?
+  
+  estado          String   @default("PENDIENTE")
+  
+  reciboUrl       String?
+  
+  creadoPor       String
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@index([pacienteId])
+  @@index([estado])
+}
+
+// ============================================
+// LOGS DE AUDITORÍA
+// ============================================
+
+model AuditLog {
+  id              String   @id @default(cuid())
+  usuarioId       String
+  usuario         User     @relation(fields: [usuarioId], references: [id])
+  
+  tablaAfectada   String
+  registroId      String
+  
+  tipoOperacion   String   // CREATE, UPDATE, DELETE, VIEW
+  
+  datosAntes      Json?
+  datosDespues    Json?
+  
+  ipOrigen        String?
+  userAgent       String?
+  razon           String?
+  
+  timestamp       DateTime @default(now())
+  
+  @@index([usuarioId])
+  @@index([tablaAfectada])
+  @@index([timestamp])
+}
+
+// ============================================
+// INTEGRACIONES
+// ============================================
+
+model Integracion {
+  id              String   @id @default(cuid())
+  tipo            String   // WHATSAPP, GOOGLE_CALENDAR, STRIPE, OPENAI
+  
+  credencialesEncriptadas String
+  activa          Boolean  @default(true)
+  
+  fechaUltimaSincronizacion DateTime?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// ============================================
+// PROCEDIMIENTOS CUPS - MAESTRO PARAMETRIZABLE
+// ============================================
+
+model ProcedimientoCUPS {
+  id                  String    @id @default(cuid())
+  codigoCUPS          String    @unique
+  nombre              String    // "Rinoplastia", "Liposucción", etc
+  descripcion         String?
+  
+  tipoCategoria       String    // "Facial", "Corporal", "No-invasivo"
+  riesgoNivel         String    // "Bajo", "Medio", "Alto"
+  
+  diasSeguimiento     Int       @default(30)  // cuántos días seguimiento automático
+  
+  // Datos JSON para flexibilidad
+  datosAdicionales    Json?
+  
+  activo              Boolean   @default(true)
+  
+  // Relaciones
+  plantillas          PlantillaTemplate[]
+  checklistTemplates  ChecklistTemplate[]
+  consentimientosTemplate ConsentimientoTemplate[]
+  procedimientosClinica Procedimiento[]  // Procedimientos clínicos asociados
+  
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  
+  @@index([codigoCUPS])
+  @@index([tipoCategoria])
+  @@index([activo])
+}
+
+// ============================================
+// PLANTILLAS PARAMETRIZABLES POR CUPS
+// ============================================
+
+model PlantillaTemplate {
+  id                  String    @id @default(cuid())
+  codigoCUPS          String
+  procedimiento       ProcedimientoCUPS @relation(fields: [codigoCUPS], references: [codigoCUPS], onDelete: Cascade)
+  
+  nombre              String    // "Historia Clínica", "Evaluación Pre-op", etc
+  tipo                String    // "historia-clinica", "evaluacion", "seguimiento"
+  descripcion         String?
+  
+  // Estructura dinámica de secciones
+  seccionesJSON       Json      // Array de secciones: [{id, nombre, campos: []}]
+  
+  // Configuración
+  requiereSignatura   Boolean   @default(false)
+  requiereFoto        Boolean   @default(false)
+  requiereMapaCorporal Boolean  @default(false)
+  
+  ordenVisualizacion  Int       @default(1)
+  activa              Boolean   @default(true)
+  
+  // Auditoría
+  creadoPor           String?
+  actualizadoPor      String?
+  
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  
+  // Relaciones
+  historiasClinicas   HistoriaClinica[]
+  
+  @@unique([codigoCUPS, tipo])
+  @@index([codigoCUPS])
+  @@index([tipo])
+}
+
+// ============================================
+// CHECKLIST DINÁMICO POR FASES
+// ============================================
+
+model ChecklistTemplate {
+  id                  String    @id @default(cuid())
+  codigoCUPS          String
+  procedimiento       ProcedimientoCUPS @relation(fields: [codigoCUPS], references: [codigoCUPS], onDelete: Cascade)
+  
+  fase                String    // "pre-operatorio", "intra-operatorio", "post-operatorio"
+  nombre              String    // "Checklist Pre-op", etc
+  
+  // Array de items: [{id, label, requerido, orden, tipo}]
+  itemsJSON           Json
+  
+  // Alertas automáticas por día
+  // [{dia: 1, mensaje: "...", tipo: "info|warning|critical"}]
+  alertasAutomaticasJSON Json?
+  
+  activo              Boolean   @default(true)
+  
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  
+  @@unique([codigoCUPS, fase])
+  @@index([codigoCUPS])
+}
+
+// ============================================
+// CONSENTIMIENTO DINÁMICO
+// ============================================
+
+model ConsentimientoTemplate {
+  id                  String    @id @default(cuid())
+  codigoCUPS          String
+  procedimiento       ProcedimientoCUPS @relation(fields: [codigoCUPS], references: [codigoCUPS], onDelete: Cascade)
+  
+  titulo              String
+  
+  // Secciones dinámicas: [{id, titulo, contenido, requerido}]
+  seccionesJSON       Json
+  
+  // Riesgos por CUPS: [{riesgo, probabilidad, severidad, descripcion}]
+  riesgosJSON         Json
+  
+  // Recomendaciones pre/post: [{tipo, texto}]
+  recomendacionesJSON Json?
+  
+  activo              Boolean   @default(true)
+  
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  
+  @@unique([codigoCUPS])
+  @@index([codigoCUPS])
+}
+
+// ============================================
+// CONFIGURACIÓN DEL SISTEMA
+// ============================================
+
+model ConfiguracionSistema {
+  id                  String    @id @default(cuid())
+  clave               String    @unique
+  valor               Json
+  descripcion         String?
+  
+  // Ejemplo:
+  // clave: "whatsapp_token", valor: "{token: ...}"
+  // clave: "dias_seguimiento_default", valor: "{dias: 30}"
+  
+  updatedAt           DateTime  @updatedAt
+  
+  @@index([clave])
+}
+
+// ============================================
+// INSTANCIAS DE CHECKLISTS COMPLETADOS
+// ============================================
+
+model ChecklistCompletado {
+  id                  String    @id @default(cuid())
+  procedimientoId     String
+  procedimiento       Procedimiento @relation(fields: [procedimientoId], references: [id], onDelete: Cascade)
+  
+  templateId          String
+  
+  fase                String    // copia de fase del template
+  
+  // Respuestas: [{itemId, respuesta, comentario}]
+  respuestasJSON      Json?
+  
+  completadoEn        DateTime?
+  completadoPor       String?   // User ID
+  
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  
+  @@index([procedimientoId])
+  @@index([completadoEn])
+}

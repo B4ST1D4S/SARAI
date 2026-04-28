@@ -1,0 +1,66 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: estegia-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: estegia_user
+      POSTGRES_PASSWORD: secure_password_123
+      POSTGRES_DB: estegia
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U estegia_user -d estegia"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - estegia-network
+
+  mongodb:
+    image: mongo:7.0
+    container_name: estegia-mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password
+      MONGO_INITDB_DATABASE: estegia
+    volumes:
+      - mongodb_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - estegia-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: estegia-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - estegia-network
+
+volumes:
+  postgres_data:
+    driver: local
+  mongodb_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  estegia-network:
+    driver: bridge

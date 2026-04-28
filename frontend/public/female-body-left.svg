@@ -1,0 +1,33 @@
+<svg viewBox="0 0 100 200" xmlns="http://www.w3.org/2000/svg">
+  <!-- Silueta Lateral Izquierda Femenina en Púrpura -->
+  <defs>
+    <linearGradient id="femaleSideGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#c084fc;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#a855f7;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Cabeza -->
+  <circle cx="35" cy="20" r="12" fill="url(#femaleSideGradient)" />
+  
+  <!-- Cuello -->
+  <path d="M 35 31 Q 40 32 42 36 Q 40 40 35 40 Q 32 40 30 36 Z" fill="url(#femaleSideGradient)" />
+  
+  <!-- Tronco frontal (vista lateral) -->
+  <path d="M 30 40 Q 25 50 25 70 Q 28 85 32 95 L 38 95 Q 42 85 45 70 Q 45 50 40 40 Z" fill="url(#femaleSideGradient)" />
+  
+  <!-- Brazo (vista lateral) -->
+  <path d="M 40 45 Q 55 45 65 55 L 62 62 Q 52 55 42 55 Z" fill="url(#femaleSideGradient)" />
+  
+  <!-- Cadera y pelvis (vista lateral) -->
+  <path d="M 32 95 Q 30 105 30 120 L 45 120 Q 45 105 40 95 Z" fill="url(#femaleSideGradient)" />
+  
+  <!-- Muslo (vista lateral) -->
+  <path d="M 32 120 Q 30 140 28 170 L 40 170 Q 42 140 42 120 Z" fill="url(#femaleSideGradient)" />
+  
+  <!-- Pantorrilla (vista lateral) -->
+  <path d="M 32 170 Q 31 185 30 200 L 38 200 Q 40 185 40 170 Z" fill="url(#femaleSideGradient)" />
+  
+  <!-- Mama (vista lateral) -->
+  <ellipse cx="35" cy="58" rx="8" ry="10" fill="url(#femaleSideGradient)" opacity="0.8" />
+</svg>
