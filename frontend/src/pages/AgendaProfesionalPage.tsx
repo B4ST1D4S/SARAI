@@ -1,29 +1,64 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Calendar, Clock, User, CheckCircle, AlertCircle, Plus, Trash2 } from 'lucide-react';
+import { Calendar, Clock, User, CheckCircle, AlertCircle, Plus, Trash2, Stethoscope } from 'lucide-react';
 import { citasService, initializeMockData } from '../services/mockData';
+import { getCitasMedico, completarCita, cancelarCitaApi } from '../services/api';
 
 interface Cita {
   id: string;
   pacienteNombre: string;
+  pacienteId?: string;
   fecha: string;
   hora: string;
   duracion: number;
   procedimiento: string;
-  estado: 'CONFIRMADA' | 'PENDIENTE' | 'ATENDIDA' | 'CANCELADA';
+  estado: 'CONFIRMADA' | 'PENDIENTE' | 'ATENDIDA' | 'CANCELADA' | 'COMPLETADA';
   notas: string;
 }
 
-export default function AgendaProfesionalPage() {
+interface AgendaProfesionalProps {
+  onNavegar?: (pagina: string) => void;
+  onAbrirHistoriaPaciente?: (pacienteId: string, nombre: string) => void;
+}
+
+export default function AgendaProfesionalPage({ onNavegar, onAbrirHistoriaPaciente }: AgendaProfesionalProps = {}) {
   const hoy = new Date().toISOString().split('T')[0];
   
   const [citas, setCitas] = useState<Cita[]>([]);
   const [selectedDate, setSelectedDate] = useState(hoy);
 
-  // Cargar datos inicialmente
+  const getToken = () => localStorage.getItem('accessToken') || '';
+
+  // Cargar citas: API real primero, mock como fallback
   useEffect(() => {
     initializeMockData();
-    setCitas(citasService.getAll());
+    const cargarCitas = async () => {
+      const token = getToken();
+      if (token) {
+        const res = await getCitasMedico(token);
+        if (!res.error && res.data) {
+          const citasApi = ((res.data as any).citas || []).map((c: any) => {
+            const fecha = new Date(c.fechaHora);
+            return {
+              id: c.id,
+              pacienteId: c.paciente?.id || c.pacienteId,
+              pacienteNombre: c.paciente?.nombreCompleto || 'Paciente',
+              fecha: fecha.toISOString().split('T')[0],
+              hora: fecha.toTimeString().slice(0, 5),
+              duracion: c.duracionMinutos || 60,
+              procedimiento: c.tipoCita || c.motivo || 'Consulta',
+              estado: c.estado === 'COMPLETADA' ? 'ATENDIDA' : c.estado,
+              notas: c.notas || '',
+            } as Cita;
+          });
+          setCitas(citasApi);
+          return;
+        }
+      }
+      // Fallback a mock
+      setCitas(citasService.getAll());
+    };
+    cargarCitas();
   }, []);
   const [showNewCita, setShowNewCita] = useState(false);
   const [showAssignCita, setShowAssignCita] = useState(false);
@@ -58,13 +93,26 @@ export default function AgendaProfesionalPage() {
   };
 
   // Cambiar estado de cita
-  const handleCambiarEstado = (id: string, nuevoEstado: Cita['estado']) => {
-    citasService.update(id, {
-      estado: nuevoEstado,
-      notas: nuevoEstado === 'ATENDIDA' 
-        ? `${formData.notas}\n[ATENDIDA: ${new Date().toLocaleTimeString()}]` 
-        : formData.notas,
-    } as any);
+  const handleCambiarEstado = async (id: string, nuevoEstado: Cita['estado']) => {
+    // Si se marca como ATENDIDA → llamar API completar + navegar a Historia Clínica
+    if (nuevoEstado === 'ATENDIDA') {
+      const token = getToken();
+      const cita = citas.find((c) => c.id === id);
+      if (token && cita) {
+        await completarCita(id, token);
+      }
+      // Actualizar estado local
+      setCitas((prev) => prev.map((c) => c.id === id ? { ...c, estado: 'ATENDIDA' } : c));
+      // Navegar a Historia Clínica con el paciente pre-cargado
+      if (cita?.pacienteId && onAbrirHistoriaPaciente) {
+        onAbrirHistoriaPaciente(cita.pacienteId, cita.pacienteNombre);
+      } else if (onNavegar) {
+        onNavegar('historia');
+      }
+      return;
+    }
+    // Otros cambios de estado: solo actualizar local (mock)
+    citasService.update(id, { estado: nuevoEstado } as any);
     setCitas(citasService.getAll());
   };
 
@@ -280,9 +328,10 @@ export default function AgendaProfesionalPage() {
                     {cita.estado === 'CONFIRMADA' && (
                       <button
                         onClick={() => handleCambiarEstado(cita.id, 'ATENDIDA')}
-                        className="flex-1 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded transition"
+                        className="flex-1 px-3 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-sm font-semibold rounded transition flex items-center justify-center gap-2 shadow-lg shadow-blue-500/30"
                       >
-                        ✅ Atender Ahora
+                        <Stethoscope size={16} />
+                        Atender → Historia Clínica
                       </button>
                     )}
 

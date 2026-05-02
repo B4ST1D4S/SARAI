@@ -250,3 +250,23 @@ export async function updateHistoriaClinica(
     token,
   });
 }
+
+// ============================================
+// CITAS ENDPOINTS
+// ============================================
+
+export async function getCitasMedico(token: string) {
+  return apiCall('/citas/medico/agenda', { method: 'GET', token });
+}
+
+export async function completarCita(citaId: string, token: string) {
+  return apiCall(`/citas/${citaId}/completar`, { method: 'POST', token });
+}
+
+export async function cancelarCitaApi(citaId: string, token: string) {
+  return apiCall(`/citas/${citaId}`, { method: 'DELETE', token });
+}
+
+export async function updateCitaEstado(citaId: string, estado: string, token: string) {
+  return apiCall(`/citas/${citaId}`, { method: 'PUT', body: { estado }, token });
+}

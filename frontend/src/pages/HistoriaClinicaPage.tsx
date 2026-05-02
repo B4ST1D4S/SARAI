@@ -79,6 +79,7 @@ export default function HistoriaClinicaPage({
   seccionExterna,
   onSeccionChange,
   onRegisterCampos,
+  pacienteIdExterno,
 }: {
   onNavegar?: (pagina: string) => void;
   showFormExternal?: boolean;
@@ -86,6 +87,7 @@ export default function HistoriaClinicaPage({
   seccionExterna?: number;
   onSeccionChange?: (n: number) => void;
   onRegisterCampos?: (fn: ((c: Record<string, string>) => void) | null) => void;
+  pacienteIdExterno?: string;
 } = {}) {
   const [pacientes, setPacientes] = useState<any[]>([]);
   const [historias, setHistorias] = useState<any[]>([]);
@@ -127,6 +129,15 @@ export default function HistoriaClinicaPage({
   useEffect(() => {
     if (seccionExterna !== undefined) setSeccionActivaState(seccionExterna);
   }, [seccionExterna]);
+
+  // Cuando llega un paciente desde Agenda Profesional → pre-cargar y abrir formulario
+  useEffect(() => {
+    if (pacienteIdExterno) {
+      setForm((prev) => ({ ...prev, pacienteId: pacienteIdExterno }));
+      setShowForm(true);
+      setSeccionActiva(0);
+    }
+  }, [pacienteIdExterno]);
 
   const cargarHistorias = async () => {
     setLoading(true);

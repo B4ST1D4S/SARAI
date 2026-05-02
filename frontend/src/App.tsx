@@ -200,6 +200,7 @@ function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [historiaShowForm, setHistoriaShowForm] = useState(false);
   const [historiaSeccion, setHistoriaSeccion] = useState(0);
+  const [historiaPacienteId, setHistoriaPacienteId] = useState<string | undefined>(undefined);
   const camposHandlerRef = useRef<((c: Record<string, string>) => void) | null>(null);
   // Ref para currentPage — evita stale closure en callbacks de SARAI
   const currentPageRef = useRef(currentPage);
@@ -268,12 +269,23 @@ function App() {
               seccionExterna={historiaSeccion}
               onSeccionChange={setHistoriaSeccion}
               onRegisterCampos={(fn) => { camposHandlerRef.current = fn; }}
+              pacienteIdExterno={historiaPacienteId}
             />
           )}
           {currentPage === 'fotos'               && <FotosPage />}
           {currentPage === 'consentimiento'      && <ConsentimientoPage />}
           {currentPage === 'agenda'              && <AgendaPage />}
-          {currentPage === 'agendaProfesional'   && <AgendaProfesionalPage />}
+          {currentPage === 'agendaProfesional'   && (
+            <AgendaProfesionalPage
+              onNavegar={setCurrentPage}
+              onAbrirHistoriaPaciente={(pacienteId, _nombre) => {
+                setHistoriaPacienteId(pacienteId);
+                setHistoriaShowForm(true);
+                setHistoriaSeccion(0);
+                setCurrentPage('historia');
+              }}
+            />
+          )}
           {currentPage === 'vista-cirujano'      && <VistaCirujanoPage />}
           {currentPage === 'followup'            && <FollowUpPage />}
           {currentPage === 'crm'                 && <CRMPage />}
