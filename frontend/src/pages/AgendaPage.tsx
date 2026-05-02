@@ -93,8 +93,10 @@ export default function AgendaPage() {
         setErrorPaciente(response.error);
         console.error('Error al crear paciente:', response.error);
       } else {
+        // Usar la respuesta del servidor (tiene el id real del paciente)
+        const pacienteCreado = response.data || response;
         setMostrarFormularioPaciente(false);
-        setPacienteSeleccionado(pacienteMapeado);
+        setPacienteSeleccionado(pacienteCreado);
         setMostrarAgendarCita(true);
       }
     } catch (error: any) {

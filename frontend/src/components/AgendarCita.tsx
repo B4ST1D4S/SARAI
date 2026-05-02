@@ -27,10 +27,12 @@ export default function AgendarCita({
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
 
-  const token = localStorage.getItem('accessToken') || '';
-  const user = localStorage.getItem('user')
-    ? JSON.parse(localStorage.getItem('user') || '{}')
-    : {};
+  // Leer token y user en cada operación para que nunca sean stale
+  const getToken = () => localStorage.getItem('accessToken') || '';
+  const getUser = () => {
+    try { return JSON.parse(localStorage.getItem('user') || '{}'); }
+    catch { return {}; }
+  };
 
   const tiposConsulta = [
     { value: 'CONSULTA', label: 'Consulta Inicial' },
@@ -65,12 +67,27 @@ export default function AgendarCita({
         throw new Error('Por favor completa fecha y hora');
       }
 
+      if (!pacienteId) {
+        throw new Error('No se encontró el paciente. Cierra y vuelve a buscar el paciente.');
+      }
+
+      const token = getToken();
+      if (!token) {
+        throw new Error('Sesión expirada. Recarga la página e inicia sesión de nuevo.');
+      }
+
+      const user = getUser();
+      const medicoId = user.id || user.userId;
+      if (!medicoId) {
+        throw new Error('No se pudo identificar al médico. Recarga la página.');
+      }
+
       // Combinar fecha y hora en formato ISO
       const fechaHora = new Date(`${formData.fecha}T${formData.hora}:00`);
 
       const payload = {
-        pacienteId: pacienteId,
-        medicoId: user.id,
+        pacienteId,
+        medicoId,
         tipoCita: formData.tipoConsulta,
         fechaHora: fechaHora.toISOString(),
         duracionMinutos: 60,
@@ -87,9 +104,10 @@ export default function AgendarCita({
         body: JSON.stringify(payload),
       });
 
+      const responseData = await response.json();
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || errorData.error || 'Error al crear cita');
+        throw new Error(responseData.message || responseData.error || `Error ${response.status}: No se pudo crear la cita`);
       }
 
       setSuccess(true);
