@@ -205,7 +205,7 @@ export default function CrearCotizacion({
             className="p-3 hover:bg-yellow-500/10 rounded-full transition-colors"
           >
             <X className="text-gray-400" size={24} />
-          </button>
+          </motion.button>
         </div>
 
         {error && (

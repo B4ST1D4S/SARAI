@@ -1,0 +1,188 @@
+================================================================================
+   SARAI - LISTADO COMPLETO DE COMANDOS DE VOZ RECONOCIDOS
+   EstetIA · Sistema de Cirugía Estética
+   Actualizado: 1 de mayo de 2026
+================================================================================
+
+IMPORTANTE — PALABRA DE ACTIVACIÓN
+────────────────────────────────────────────────────────────────────────────────
+Todos los comandos del MODO COMANDOS (SpeechRecognition) deben comenzar con:
+
+   "Sarai ..."
+
+El sistema reconoce variantes fonéticas del STT en español:
+  Sarai / Sara / Saray / Sarah / Sarahi / Zarai / Sary / Sari / Sarahy
+  o precedido de: hey, oye, hola  →  "Hey Sarai ...", "Oye Sarai ..."
+
+Hay DOS canales de entrada:
+  [W] = Vía WHISPER  (grabar audio → se transcribe automáticamente)
+  [S] = Vía SPEECH   (SpeechRecognition continuo, ya activado)
+  [T] = Vía TEXTO    (escribir en el campo y pulsar Enter)
+
+
+================================================================================
+1. ACTIVAR / DESACTIVAR EL MODO COMANDOS
+================================================================================
+
+  [W]  activar comandos
+  [W]  activar voz
+  [W]  activar comando de voz
+  [W]  activar comandos de voz
+  [W]  comandos de voz
+  [W]  encender comandos
+       (también funciona precedido de "Sarai": "Sarai activar comandos")
+
+  → El sistema activa SpeechRecognition automáticamente sin clic adicional.
+  → El único clic obligatorio es el primero para iniciar la grabación Whisper.
+
+  [S]  Sarai desactivar comandos
+  [S]  Sarai desactivar voz
+  [S]  Sarai apagar comandos
+  [S]  Sarai detener comandos de voz
+  [S]  Sarai desactivar
+
+
+================================================================================
+2. CONTROL DE GRABACIÓN WHISPER
+================================================================================
+  (Requiere que SpeechRecognition esté activo)
+
+  [S]  Sarai grabar
+  [S]  Sarai graba
+  [S]  Sarai escuchar
+  [S]  Sarai escucha
+  [S]  Sarai iniciar
+  [S]  Sarai inicia
+  [S]  Sarai comienza
+  [S]  Sarai comenzar
+  [S]  Sarai rec
+
+  → Para DETENER la grabación (mientras está grabando):
+
+  [S]  Sarai parar
+  [S]  Sarai para
+  [S]  Sarai detener
+  [S]  Sarai stop
+
+
+================================================================================
+3. MODO TEXTO MANUAL
+================================================================================
+
+  [S]  Sarai escribir
+  [S]  Sarai escribe
+  [S]  Sarai texto
+  [S]  Sarai modo texto
+
+  → Abre el campo de texto para dictar comandos con teclado.
+  → Cualquier texto escrito funciona igual que un comando de voz.
+  → Ej: escribir "sarai ir a pacientes" y pulsar Enter.
+
+
+================================================================================
+4. NAVEGACIÓN POR MÓDULOS
+================================================================================
+  (Funciona con [S], [W] y [T])
+
+  Prefijos opcionales antes del módulo:
+    "ir a", "abrir", "navegar a", "mostrar", "ve a", "abre", "llevar a", "ir"
+  Ej: "Sarai ir a pacientes"  /  "Sarai abrir agenda"  /  "Sarai pacientes"
+
+  ┌─────────────────────────────────────────────────────────────────────────┐
+  │  COMANDO(S)                          → DESTINO                         │
+  ├─────────────────────────────────────────────────────────────────────────┤
+  │  dashboard / inicio / panel          → Dashboard Principal             │
+  │  principal / panel                                                      │
+  ├─────────────────────────────────────────────────────────────────────────┤
+  │  pacientes / lista pacientes         → Módulo Pacientes                │
+  ├─────────────────────────────────────────────────────────────────────────┤
+  │  historia clínica / historia clinica → Historia Clínica                │
+  │  historial / historia                                                   │
+  ├─────────────────────────────────────────────────────────────────────────┤
+  │  nueva historia / crear historia     → Nueva Historia Clínica          │
+  │  historia nueva / nuevo historia     (abre formulario directamente)    │
+  ├─────────────────────────────────────────────────────────────────────────┤
+  │  agenda profesional                  → Agenda Profesional              │
+  │  agenda del médico / agenda del medico                                  │
+  │  agenda medico                                                          │
+  ├─────────────────────────────────────────────────────────────────────────┤
+  │  agenda paciente / agenda del paciente → Agenda Paciente               │
+  │  agenda / citas                                                         │
+  ├─────────────────────────────────────────────────────────────────────────┤
+  │  quirófano / quirofano               → Vista Cirujano / Quirófano      │
+  │  cirujano / vista cirujano                                              │
+  ├─────────────────────────────────────────────────────────────────────────┤
+  │  seguimiento / follow up / followup  → Seguimiento / Follow-up         │
+  ├─────────────────────────────────────────────────────────────────────────┤
+  │  consentimiento / consentimientos    → Consentimiento                  │
+  ├─────────────────────────────────────────────────────────────────────────┤
+  │  crm / gestión / gestion             → CRM                             │
+  ├─────────────────────────────────────────────────────────────────────────┤
+  │  facturación / facturacion           → Facturación                     │
+  │  facturas / factura                                                     │
+  ├─────────────────────────────────────────────────────────────────────────┤
+  │  plantillas / plantilla              → Plantillas                      │
+  ├─────────────────────────────────────────────────────────────────────────┤
+  │  fotos / fotografías / fotografias   → Fotos                           │
+  ├─────────────────────────────────────────────────────────────────────────┤
+  │  mapa corporal / mapa / cuerpo       → Mapa Corporal                   │
+  └─────────────────────────────────────────────────────────────────────────┘
+
+
+================================================================================
+5. SECCIONES DEL FORMULARIO DE HISTORIA CLÍNICA
+================================================================================
+  (Solo disponibles dentro del formulario de Historia Clínica)
+
+  [S/W/T]  Sarai datos generales          → Sección 1: Datos Generales
+  [S/W/T]  Sarai anamnesis                → Sección 2: Anamnesis
+  [S/W/T]  Sarai motivo de consulta       → Sección 2: Anamnesis
+  [S/W/T]  Sarai queja principal          → Sección 2: Anamnesis
+  [S/W/T]  Sarai antecedentes             → Sección 3: Antecedentes
+  [S/W/T]  Sarai examen fisico            → Sección 4: Examen Físico
+  [S/W/T]  Sarai signos vitales           → Sección 4: Examen Físico
+  [S/W/T]  Sarai evaluacion estetica      → Sección 5: Evaluación Estética
+  [S/W/T]  Sarai procedimiento estetico   → Sección 5: Evaluación Estética
+  [S/W/T]  Sarai diagnostico y plan       → Sección 6: Diagnóstico y Plan
+  [S/W/T]  Sarai plan quirurgico          → Sección 6: Diagnóstico y Plan
+
+
+================================================================================
+6. RESUMEN RÁPIDO DE FLUJO
+================================================================================
+
+  PASO 1 → Clic en "Iniciar grabación" (único clic obligatorio)
+  PASO 2 → Di "activar comandos"  →  SpeechRecognition arranca solo
+  PASO 3 → A partir de aquí, todo por voz:
+
+    "Sarai ir a pacientes"          → navega a Pacientes
+    "Sarai grabar"                  → inicia grabación Whisper
+    "Sarai parar"                   → detiene grabación y transcribe
+    "Sarai nueva historia"          → abre formulario HC
+    "Sarai datos generales"         → va a sección 1 del formulario
+    "Sarai desactivar comandos"     → apaga SpeechRecognition
+
+
+================================================================================
+7. NOTAS TÉCNICAS
+================================================================================
+
+  • El sistema normaliza el texto: elimina tildes, convierte a minúsculas.
+    "Pacientes" / "PACIENTES" / "pácientes" se reconocen igual.
+
+  • SpeechRecognition usa lang='es' (cubre todos los dialectos hispanohablantes).
+
+  • Whisper usa modelo 'medium' — reconoce con alta precisión incluso con
+    acento colombiano u otros dialectos.
+
+  • Si el micrófono está bloqueado en Chrome:
+      → Clic en el candado 🔒 junto a la URL
+      → Micrófono → Permitir
+      → Recargar la página (F5)
+
+  • El campo de texto (fallback) acepta cualquier comando aunque el micrófono
+    esté deshabilitado.
+
+================================================================================
+   FIN DEL LISTADO
+================================================================================
