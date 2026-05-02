@@ -46,6 +46,20 @@ export async function apiCall<T>(
     const data = await response.json();
 
     if (!response.ok) {
+      // Token inválido/expirado: limpiar sesión y recargar para ir al login
+      if (response.status === 401 || response.status === 403) {
+        const isAuthError =
+          data.error?.toLowerCase().includes('token') ||
+          data.error?.toLowerCase().includes('no autenticado') ||
+          data.error?.toLowerCase().includes('expirado') ||
+          data.error?.toLowerCase().includes('inválido');
+        if (isAuthError) {
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('user');
+          window.location.reload();
+          return { error: 'Sesión expirada. Vuelve a iniciar sesión.', status: response.status };
+        }
+      }
       return {
         error: data.error || 'Error en la solicitud',
         status: response.status,

@@ -12,6 +12,7 @@ export default function AgendaPage() {
   const [mostrarFormularioPaciente, setMostrarFormularioPaciente] = useState(false);
   const [mostrarAgendarCita, setMostrarAgendarCita] = useState(false);
   const [pacienteSeleccionado, setPacienteSeleccionado] = useState<any>(null);
+  const [errorPaciente, setErrorPaciente] = useState<string>('');
   
   const [citas, setCitas] = useState<any[]>([
     {
@@ -59,9 +60,11 @@ export default function AgendaPage() {
     setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1));
   };
 
-  const token = localStorage.getItem('accessToken') || '';
+  // Leer token en cada operación (no en render) para que nunca sea stale
+  const getToken = () => localStorage.getItem('accessToken') || '';
 
   const handleCrearPaciente = async (formData: any) => {
+    setErrorPaciente('');
     try {
       const pacienteMapeado = {
         numeroDocumento: formData.numeroDocumento,
@@ -69,7 +72,7 @@ export default function AgendaPage() {
         nombreCompleto: `${formData.primerNombre} ${formData.apellidoPaterno}`.trim(),
         fechaNacimiento: formData.fechaNacimiento,
         genero: formData.generoBiologico,
-        telefonos: [formData.numeroCelular],
+        telefonos: [formData.numeroCelular].filter(Boolean),
         email: formData.correoElectronico,
         ciudad: formData.ciudadResidencia,
         direccion: formData.domicilioActual,
@@ -84,15 +87,18 @@ export default function AgendaPage() {
         observaciones: formData.notasPaciente,
       };
 
-      const response = await createPaciente(pacienteMapeado, token);
-      
-      if (!response.error) {
+      const response = await createPaciente(pacienteMapeado, getToken());
+
+      if (response.error) {
+        setErrorPaciente(response.error);
+        console.error('Error al crear paciente:', response.error);
+      } else {
         setMostrarFormularioPaciente(false);
         setPacienteSeleccionado(pacienteMapeado);
-      } else {
-        console.error('Error al crear paciente:', response.error);
+        setMostrarAgendarCita(true);
       }
-    } catch (error) {
+    } catch (error: any) {
+      setErrorPaciente(error.message || 'Error inesperado');
       console.error('Error al crear paciente:', error);
     }
   };
@@ -408,11 +414,18 @@ export default function AgendaPage() {
           />
         )}
         {mostrarFormularioPaciente && (
-          <FormularioPaciente
-            onClose={() => setMostrarFormularioPaciente(false)}
-            onSubmit={handleCrearPaciente}
-            titulo="Crear Nuevo Paciente - Agenda"
-          />
+          <>
+            {errorPaciente && (
+              <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[10001] bg-red-900/90 border border-red-500/50 text-red-200 px-5 py-3 rounded-xl text-sm shadow-xl backdrop-blur-sm max-w-md text-center">
+                ⚠️ {errorPaciente}
+              </div>
+            )}
+            <FormularioPaciente
+              onClose={() => { setMostrarFormularioPaciente(false); setErrorPaciente(''); }}
+              onSubmit={handleCrearPaciente}
+              titulo="Crear Nuevo Paciente - Agenda"
+            />
+          </>
         )}
         {mostrarAgendarCita && pacienteSeleccionado && (
           <AgendarCita

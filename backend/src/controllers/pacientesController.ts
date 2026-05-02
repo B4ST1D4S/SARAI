@@ -31,8 +31,8 @@ export async function create(req: Request, res: Response): Promise<void> {
       ciudad,
     } = req.body;
 
-    if (!numeroDocumento || !tipoDocumento || !nombreCompleto || !fechaNacimiento) {
-      res.status(400).json({ error: 'Datos incompletos' });
+    if (!numeroDocumento || !tipoDocumento || !nombreCompleto) {
+      res.status(400).json({ error: 'Datos incompletos: documento, tipo y nombre son requeridos' });
       return;
     }
 
