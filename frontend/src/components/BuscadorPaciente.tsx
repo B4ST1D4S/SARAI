@@ -15,7 +15,7 @@ export function BuscadorPaciente({ onPacienteEncontrado, onNuevoPaciente, onClos
   const [pacienteEncontrado, setPacienteEncontrado] = useState<any>(null);
   const [error, setError] = useState('');
 
-  const token = localStorage.getItem('accessToken') || '';
+  const getToken = () => localStorage.getItem('accessToken') || '';
 
   const handleBuscar = async () => {
     if (!numeroDocumento.trim()) {
@@ -32,7 +32,7 @@ export function BuscadorPaciente({ onPacienteEncontrado, onNuevoPaciente, onClos
       const response = await fetch(
         `/api/pacientes/search?documento=${numeroDocumento}&tipo=${tipoDocumento}`,
         {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { Authorization: `Bearer ${getToken()}` },
         }
       );
 

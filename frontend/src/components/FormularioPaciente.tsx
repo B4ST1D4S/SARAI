@@ -40,9 +40,11 @@ interface FormularioPacienteProps {
   onClose: () => void;
   onSubmit: (data: PacienteData) => void;
   titulo?: string;
+  pacienteInicial?: Partial<PacienteData>;
+  modoEdicion?: boolean;
 }
 
-export function FormularioPaciente({ onClose, onSubmit, titulo = 'Crear Nuevo Paciente' }: FormularioPacienteProps) {
+export function FormularioPaciente({ onClose, onSubmit, titulo = 'Crear Nuevo Paciente', pacienteInicial, modoEdicion = false }: FormularioPacienteProps) {
   const [formData, setFormData] = useState<PacienteData>({
     tipoDocumento: '',
     numeroDocumento: '',
@@ -75,6 +77,8 @@ export function FormularioPaciente({ onClose, onSubmit, titulo = 'Crear Nuevo Pa
     notasPaciente: '',
     formaAsignacion: '',
     observacionesAdicionales: '',
+    // Mezclar datos iniciales si vienen (modo edición/revisión)
+    ...pacienteInicial,
   });
 
   const calcularEdad = (fechaNac: string) => {
@@ -129,7 +133,11 @@ export function FormularioPaciente({ onClose, onSubmit, titulo = 'Crear Nuevo Pa
                 {titulo}
               </h2>
             </div>
-            <p className="text-slate-300 text-sm">Información completa y organizada para mejor seguimiento médico</p>
+            <p className="text-slate-300 text-sm">
+              {modoEdicion
+                ? '✏️ Revisa y corrige los datos antes de agendar'
+                : 'Información completa y organizada para mejor seguimiento médico'}
+            </p>
           </div>
           <motion.button
             whileHover={{ scale: 1.1 }}
@@ -545,7 +553,7 @@ export function FormularioPaciente({ onClose, onSubmit, titulo = 'Crear Nuevo Pa
                 type="submit"
                 className="flex-1 px-6 py-3 rounded-lg bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-semibold transition-all shadow-lg"
               >
-                Crear Paciente
+                {modoEdicion ? '✓ Confirmar y Agendar' : 'Crear Paciente'}
               </button>
             </div>
           </form>

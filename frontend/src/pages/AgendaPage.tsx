@@ -12,6 +12,7 @@ export default function AgendaPage() {
   const [mostrarFormularioPaciente, setMostrarFormularioPaciente] = useState(false);
   const [mostrarAgendarCita, setMostrarAgendarCita] = useState(false);
   const [pacienteSeleccionado, setPacienteSeleccionado] = useState<any>(null);
+  const [pacienteParaEditar, setPacienteParaEditar] = useState<any>(null); // paciente encontrado para revisar
   const [errorPaciente, setErrorPaciente] = useState<string>('');
   
   const [citas, setCitas] = useState<any[]>([
@@ -63,8 +64,50 @@ export default function AgendaPage() {
   // Leer token en cada operación (no en render) para que nunca sea stale
   const getToken = () => localStorage.getItem('accessToken') || '';
 
+  // Convierte el objeto paciente de la API a campos del FormularioPaciente
+  const mapPacienteApiAForm = (paciente: any) => {
+    const nombreParts = (paciente.nombreCompleto || '').trim().split(' ');
+    const primerNombre = nombreParts[0] || '';
+    const apellidoPaterno = nombreParts.length > 1 ? nombreParts[nombreParts.length - 1] : '';
+    const fechaIso = paciente.fechaNacimiento
+      ? new Date(paciente.fechaNacimiento).toISOString().split('T')[0]
+      : '';
+    return {
+      tipoDocumento: paciente.tipoDocumento || '',
+      numeroDocumento: paciente.numeroDocumento || '',
+      primerNombre,
+      apellidoPaterno,
+      fechaNacimiento: fechaIso,
+      numeroCelular: paciente.telefonos?.[0] || '',
+      telefonoFijo: paciente.telefonoFijo || '',
+      correoElectronico: paciente.email || '',
+      ciudadResidencia: paciente.ciudad || '',
+      domicilioActual: paciente.direccion || '',
+      barrioSector: paciente.barrio || '',
+      profesionOcupacion: paciente.ocupacion || '',
+      estadoCivil: paciente.estadoCivil || '',
+      grupoEtnico: paciente.etnia || '',
+      nivelEducacion: paciente.nivelEducacion || '',
+      discapacidadDiagnosticada: paciente.discapacidad || '',
+      entidadSalud: paciente.entidadSalud || '',
+      notasPaciente: paciente.observaciones || '',
+      generoBiologico: paciente.genero || '',
+    };
+  };
+
   const handleCrearPaciente = async (formData: any) => {
     setErrorPaciente('');
+
+    // MODO EDICIÓN: paciente ya existe, sólo confirmar y pasar a agendar
+    if (pacienteParaEditar) {
+      setMostrarFormularioPaciente(false);
+      setPacienteSeleccionado(pacienteParaEditar);
+      setPacienteParaEditar(null);
+      setMostrarAgendarCita(true);
+      return;
+    }
+
+    // MODO CREACIÓN: paciente nuevo, llamar a la API
     try {
       const pacienteMapeado = {
         numeroDocumento: formData.numeroDocumento,
@@ -105,13 +148,16 @@ export default function AgendaPage() {
     }
   };
 
+  // Paciente encontrado en búsqueda → mostrar formulario PRE-LLENADO para revisar
   const handlePacienteEncontrado = (paciente: any) => {
-    setPacienteSeleccionado(paciente);
+    setPacienteParaEditar(paciente);
     setMostrarBuscador(false);
-    setMostrarAgendarCita(true);
+    setMostrarFormularioPaciente(true);
   };
 
+  // Paciente no encontrado → mostrar formulario VACIÓ para crear
   const handleNuevoPaciente = () => {
+    setPacienteParaEditar(null);
     setMostrarBuscador(false);
     setMostrarFormularioPaciente(true);
   };
@@ -423,9 +469,11 @@ export default function AgendaPage() {
               </div>
             )}
             <FormularioPaciente
-              onClose={() => { setMostrarFormularioPaciente(false); setErrorPaciente(''); }}
+              onClose={() => { setMostrarFormularioPaciente(false); setErrorPaciente(''); setPacienteParaEditar(null); setMostrarBuscador(true); }}
               onSubmit={handleCrearPaciente}
-              titulo="Crear Nuevo Paciente - Agenda"
+              titulo={pacienteParaEditar ? 'Revisar Datos del Paciente' : 'Crear Nuevo Paciente - Agenda'}
+              pacienteInicial={pacienteParaEditar ? mapPacienteApiAForm(pacienteParaEditar) : undefined}
+              modoEdicion={!!pacienteParaEditar}
             />
           </>
         )}
