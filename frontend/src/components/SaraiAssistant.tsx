@@ -792,9 +792,7 @@ export default function SaraiAssistant({ onCamposDetectados, token, contexto, on
         cursor: dragging ? 'grabbing' : minimizado ? 'grab' : 'default',
         zIndex: 9999,
         filter: minimizado
-          ? (whisperStatus === 'online' || estado !== 'esperando' || escuchandoComandos
-              ? 'drop-shadow(0 0 10px rgba(99,102,241,0.55))'
-              : 'drop-shadow(0 0 6px rgba(239,68,68,0.35))')
+          ? 'none'
           : 'drop-shadow(0 0 8px rgba(212,175,55,0.35))',
       }}
       className="select-none"
@@ -803,151 +801,204 @@ export default function SaraiAssistant({ onCamposDetectados, token, contexto, on
       {/* ══ CONTRAÍDO — ícono fiel al logo (arrastrable + clic para expandir) ══ */}
       {minimizado && (
         <motion.div
-          initial={{ scale: 0.6, opacity: 0 }}
+          initial={{ scale: 0.5, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          transition={{ type: 'spring', stiffness: 340, damping: 24 }}
+          transition={{ type: 'spring', stiffness: 360, damping: 26 }}
           style={{ cursor: dragging ? 'grabbing' : 'grab' }}
           className="relative select-none"
           title="SARAI — clic para expandir · arrastrar para mover"
         >
+          {/* Halo neon exterior animado */}
+          <div
+            className="absolute inset-0 rounded-full pointer-events-none"
+            style={{
+              boxShadow: estado === 'grabando'
+                ? '0 0 0 3px rgba(239,68,68,0.5), 0 0 18px 6px rgba(239,68,68,0.35), 0 0 40px 10px rgba(239,68,68,0.15)'
+                : estado === 'transcribiendo' || estado === 'procesando'
+                ? '0 0 0 3px rgba(168,85,247,0.5), 0 0 18px 6px rgba(168,85,247,0.35), 0 0 40px 10px rgba(168,85,247,0.15)'
+                : escuchandoComandos
+                ? '0 0 0 3px rgba(99,102,241,0.55), 0 0 18px 6px rgba(99,102,241,0.35), 0 0 40px 10px rgba(99,102,241,0.15)'
+                : whisperStatus === 'online'
+                ? '0 0 0 3px rgba(59,130,246,0.5), 0 0 20px 8px rgba(59,130,246,0.3), 0 0 45px 12px rgba(59,130,246,0.12)'
+                : '0 0 0 3px rgba(239,68,68,0.4), 0 0 14px 4px rgba(239,68,68,0.2)',
+            }}
+          />
+
           <svg
-            viewBox="0 0 72 72"
+            viewBox="0 0 80 80"
             fill="none"
             xmlns="http://www.w3.org/2000/svg"
-            className="w-[72px] h-[72px]"
+            width="80"
+            height="80"
             style={{ display: 'block' }}
           >
             <defs>
-              {/* Gradiente fondo interior igual al logo */}
-              <radialGradient id="bgGrad" cx="40%" cy="35%" r="65%">
+              {/* Gradiente radial fondo — igual al logo: centro más claro, bordes oscuros */}
+              <radialGradient id="saraiCircleBg" cx="42%" cy="36%" r="62%">
                 <stop offset="0%"   stopColor={
-                  estado === 'grabando' ? '#3b0000' :
-                  estado === 'transcribiendo' || estado === 'procesando' ? '#2d0050' :
-                  escuchandoComandos ? '#1e1b4b' : '#1a1f4e'
+                  estado === 'grabando' ? '#450a0a' :
+                  estado === 'transcribiendo' || estado === 'procesando' ? '#3b0764' :
+                  escuchandoComandos ? '#1e1b4b' : '#1e3a5f'
                 }/>
-                <stop offset="100%" stopColor={
-                  estado === 'grabando' ? '#1a0000' :
-                  estado === 'transcribiendo' || estado === 'procesando' ? '#0f0020' :
-                  escuchandoComandos ? '#0d0b2e' : '#0b0e2a'
+                <stop offset="55%"  stopColor={
+                  estado === 'grabando' ? '#1c0a0a' :
+                  estado === 'transcribiendo' || estado === 'procesando' ? '#1a0030' :
+                  escuchandoComandos ? '#0f0e27' : '#0c1a2e'
                 }/>
+                <stop offset="100%" stopColor="#050810"/>
               </radialGradient>
-              {/* Gradiente del badge */}
-              <radialGradient id="badgeGrad" cx="35%" cy="30%" r="70%">
-                <stop offset="0%" stopColor={
-                  estado === 'grabando' ? '#f87171' :
-                  estado === 'transcribiendo' || estado === 'procesando' ? '#c084fc' :
-                  escuchandoComandos ? '#818cf8' : '#60a5fa'
+              {/* Highlight interior superior (efecto brillo como en el logo) */}
+              <radialGradient id="saraiInnerGlow" cx="50%" cy="15%" r="50%">
+                <stop offset="0%"   stopColor={
+                  estado === 'grabando' ? 'rgba(239,68,68,0.18)' :
+                  whisperStatus === 'online' ? 'rgba(96,165,250,0.2)' : 'rgba(96,165,250,0.05)'
                 }/>
-                <stop offset="100%" stopColor={
-                  estado === 'grabando' ? '#dc2626' :
-                  estado === 'transcribiendo' || estado === 'procesando' ? '#7c3aed' :
-                  escuchandoComandos ? '#4338ca' : '#2563eb'
-                }/>
+                <stop offset="100%" stopColor="rgba(0,0,0,0)"/>
               </radialGradient>
+              {/* Gradiente para el micrófono */}
+              <linearGradient id="saraiMicGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%"   stopColor={whisperStatus === 'online' ? '#2563eb' : '#4b5563'}/>
+                <stop offset="100%" stopColor={whisperStatus === 'online' ? '#1d4ed8' : '#374151'}/>
+              </linearGradient>
+              {/* Gradiente badge azul */}
+              <radialGradient id="saraiBadgeBlue" cx="35%" cy="30%" r="70%">
+                <stop offset="0%"   stopColor="#60a5fa"/>
+                <stop offset="100%" stopColor="#1d4ed8"/>
+              </radialGradient>
+              {/* Gradiente badge rojo */}
+              <radialGradient id="saraiBadgeRed" cx="35%" cy="30%" r="70%">
+                <stop offset="0%"   stopColor="#f87171"/>
+                <stop offset="100%" stopColor="#b91c1c"/>
+              </radialGradient>
+              {/* Filtro blur para el glow del círculo principal */}
+              <filter id="saraiGlow" x="-30%" y="-30%" width="160%" height="160%">
+                <feGaussianBlur stdDeviation="2.5" result="blur"/>
+                <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+              </filter>
             </defs>
 
-            {/* Halo exterior difuso */}
-            <circle cx="33" cy="33" r="31" fill="none"
-              stroke={
-                estado === 'grabando'       ? 'rgba(239,68,68,0.3)' :
-                estado === 'transcribiendo' || estado === 'procesando' ? 'rgba(168,85,247,0.3)' :
-                escuchandoComandos          ? 'rgba(99,102,241,0.3)' :
-                whisperStatus === 'online'  ? 'rgba(59,130,246,0.25)' : 'rgba(239,68,68,0.2)'
-              }
-              strokeWidth="3"
-            />
-            {/* Borde principal del círculo */}
-            <circle cx="33" cy="33" r="28" fill="url(#bgGrad)"
+            {/* ── Círculo base con fondo gradiente ── */}
+            <circle cx="38" cy="38" r="34" fill="url(#saraiCircleBg)"/>
+            {/* Capa highlight interior */}
+            <circle cx="38" cy="38" r="34" fill="url(#saraiInnerGlow)"/>
+            {/* Borde neon principal */}
+            <circle cx="38" cy="38" r="34"
+              fill="none"
               stroke={
                 estado === 'grabando'       ? '#ef4444' :
                 estado === 'transcribiendo' || estado === 'procesando' ? '#a855f7' :
                 escuchandoComandos          ? '#818cf8' :
                 whisperStatus === 'online'  ? '#3b82f6' : '#dc2626'
               }
-              strokeWidth="1.8"
+              strokeWidth="2"
+            />
+            {/* Borde interior sutil para profundidad */}
+            <circle cx="38" cy="38" r="31"
+              fill="none"
+              stroke={
+                whisperStatus === 'online' ? 'rgba(147,197,253,0.12)' : 'rgba(255,255,255,0.04)'
+              }
+              strokeWidth="1"
             />
 
-            {/* Ondas izquierda */}
-            <path d="M12 27 Q9.5 33 12 39"
+            {/* ── Ondas izquierda — 3 arcos como el logo ── */}
+            <path d="M16 32 Q14 38 16 44"
               stroke={whisperStatus === 'online' ? '#93c5fd' : '#4b5563'}
-              strokeWidth="2.2" strokeLinecap="round" fill="none"/>
-            <path d="M7 23.5 Q3.5 33 7 42.5"
+              strokeWidth="2.4" strokeLinecap="round" fill="none"/>
+            <path d="M11.5 27.5 Q8.5 38 11.5 48.5"
               stroke={whisperStatus === 'online' ? '#60a5fa' : '#374151'}
               strokeWidth="2.2" strokeLinecap="round" fill="none"/>
-            {/* Ondas derecha */}
-            <path d="M54 27 Q56.5 33 54 39"
+            <path d="M7.5 23 Q3.5 38 7.5 53"
+              stroke={whisperStatus === 'online' ? '#3b82f6' : '#1f2937'}
+              strokeWidth="2" strokeLinecap="round" fill="none"/>
+
+            {/* ── Ondas derecha — 3 arcos ── */}
+            <path d="M60 32 Q62 38 60 44"
               stroke={whisperStatus === 'online' ? '#93c5fd' : '#4b5563'}
-              strokeWidth="2.2" strokeLinecap="round" fill="none"/>
-            <path d="M59 23.5 Q62.5 33 59 42.5"
+              strokeWidth="2.4" strokeLinecap="round" fill="none"/>
+            <path d="M64.5 27.5 Q67.5 38 64.5 48.5"
               stroke={whisperStatus === 'online' ? '#60a5fa' : '#374151'}
               strokeWidth="2.2" strokeLinecap="round" fill="none"/>
+            <path d="M68.5 23 Q72.5 38 68.5 53"
+              stroke={whisperStatus === 'online' ? '#3b82f6' : '#1f2937'}
+              strokeWidth="2" strokeLinecap="round" fill="none"/>
 
             {/* ── Micrófono / estado activo ── */}
             {estado === 'grabando' ? (
-              /* Cuadrado STOP */
               <>
-                <circle cx="33" cy="33" r="9" fill="rgba(239,68,68,0.2)"/>
-                <rect x="28" y="28" width="10" height="10" rx="2" fill="#ef4444"/>
+                <circle cx="38" cy="35" r="10" fill="rgba(239,68,68,0.15)"/>
+                <rect x="32.5" y="29.5" width="11" height="11" rx="2.5" fill="#ef4444"/>
+                <rect x="34.5" y="31.5" width="7" height="7" rx="1.5" fill="#fca5a5"/>
               </>
             ) : estado === 'transcribiendo' || estado === 'procesando' ? (
-              /* Spinner */
-              <circle cx="33" cy="33" r="9"
-                stroke={estado === 'transcribiendo' ? '#a855f7' : '#eab308'}
-                strokeWidth="3" strokeLinecap="round"
-                strokeDasharray="40" strokeDashoffset="15" fill="none"/>
+              <>
+                <circle cx="38" cy="35" r="10"
+                  fill={estado === 'transcribiendo' ? 'rgba(168,85,247,0.1)' : 'rgba(234,179,8,0.1)'}/>
+                <circle cx="38" cy="35" r="8"
+                  stroke={estado === 'transcribiendo' ? '#a855f7' : '#eab308'}
+                  strokeWidth="3" strokeLinecap="round"
+                  strokeDasharray="38" strokeDashoffset="14" fill="none"/>
+              </>
             ) : (
               <>
-                {/* Cuerpo del micrófono — relleno azul oscuro + borde azul claro */}
-                <rect x="27" y="18" width="12" height="18" rx="6"
-                  fill={whisperStatus === 'online' ? '#1e40af' : '#374151'}
+                {/* Cuerpo micrófono con gradiente */}
+                <rect x="31" y="19" width="14" height="20" rx="7"
+                  fill="url(#saraiMicGrad)"
                   stroke={whisperStatus === 'online' ? '#93c5fd' : '#6b7280'}
-                  strokeWidth="1.6"
+                  strokeWidth="1.5"
+                />
+                {/* Highlight superior del mic */}
+                <rect x="33" y="21" width="5" height="6" rx="2.5"
+                  fill={whisperStatus === 'online' ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.07)'}
                 />
                 {/* Arco inferior del micrófono */}
-                <path d="M22 34 Q22 44 33 44 Q44 44 44 34"
+                <path d="M25 36 Q25 48 38 48 Q51 48 51 36"
                   stroke={whisperStatus === 'online' ? '#93c5fd' : '#6b7280'}
-                  strokeWidth="2" strokeLinecap="round" fill="none"/>
-                {/* Pie */}
-                <line x1="33" y1="44" x2="33" y2="49"
+                  strokeWidth="2.2" strokeLinecap="round" fill="none"/>
+                {/* Pie vertical */}
+                <line x1="38" y1="48" x2="38" y2="53"
                   stroke={whisperStatus === 'online' ? '#93c5fd' : '#6b7280'}
-                  strokeWidth="2" strokeLinecap="round"/>
-                <line x1="27" y1="49" x2="39" y2="49"
+                  strokeWidth="2.2" strokeLinecap="round"/>
+                {/* Base horizontal */}
+                <line x1="31" y1="53" x2="45" y2="53"
                   stroke={whisperStatus === 'online' ? '#93c5fd' : '#6b7280'}
-                  strokeWidth="2" strokeLinecap="round"/>
+                  strokeWidth="2.2" strokeLinecap="round"/>
               </>
             )}
 
-            {/* ── Badge ✓ / ✕ en esquina inferior derecha ── */}
-            {/* Sombra/halo del badge */}
-            <circle cx="55" cy="55" r="11" fill="rgba(0,0,0,0.5)"/>
-            {/* Badge relleno gradiente */}
-            <circle cx="55" cy="55" r="9" fill="url(#badgeGrad)"/>
-            {/* Borde blanco fino del badge */}
-            <circle cx="55" cy="55" r="9" fill="none" stroke="white" strokeWidth="1.2" opacity="0.6"/>
-            {/* Símbolo */}
-            {whisperStatus === 'online' || estado !== 'esperando' ? (
-              /* Chulo ✓ */
-              <path d="M50.5 55L53.5 58L59.5 51"
-                stroke="white" strokeWidth="2.2"
+            {/* ── Badge ✓ azul / ✕ rojo — SIEMPRE basado en whisperStatus ── */}
+            {/* Sombra badge */}
+            <circle cx="62" cy="62" r="13" fill="rgba(0,0,0,0.55)"/>
+            {/* Badge relleno */}
+            <circle cx="62" cy="62" r="11"
+              fill={whisperStatus === 'online' ? 'url(#saraiBadgeBlue)' : 'url(#saraiBadgeRed)'}
+            />
+            {/* Borde blanco badge */}
+            <circle cx="62" cy="62" r="11" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="1.2"/>
+            {/* Highlight superior badge */}
+            <ellipse cx="60" cy="58" rx="4" ry="2.5"
+              fill="rgba(255,255,255,0.2)" transform="rotate(-15 60 58)"/>
+            {/* Símbolo ✓ o ✕ */}
+            {whisperStatus === 'online' ? (
+              <path d="M57 62L60.5 65.5L67 58"
+                stroke="white" strokeWidth="2.4"
                 strokeLinecap="round" strokeLinejoin="round"/>
             ) : (
-              /* X roja */
               <>
-                <line x1="51" y1="51" x2="59" y2="59" stroke="white" strokeWidth="2.2" strokeLinecap="round"/>
-                <line x1="59" y1="51" x2="51" y2="59" stroke="white" strokeWidth="2.2" strokeLinecap="round"/>
+                <line x1="58" y1="58" x2="66" y2="66" stroke="white" strokeWidth="2.4" strokeLinecap="round"/>
+                <line x1="66" y1="58" x2="58" y2="66" stroke="white" strokeWidth="2.4" strokeLinecap="round"/>
               </>
             )}
           </svg>
 
           {/* Pulso animado mientras graba o escucha comandos de voz */}
           {(estado === 'grabando' || escuchandoComandos) && (
-            <motion.span
-              animate={{ scale: [1, 1.5, 1], opacity: [0.55, 0, 0.55] }}
-              transition={{ repeat: Infinity, duration: 1.5, ease: 'easeInOut' }}
-              className="absolute inset-0 rounded-full"
+            <motion.div
+              animate={{ scale: [1, 1.6, 1], opacity: [0.6, 0, 0.6] }}
+              transition={{ repeat: Infinity, duration: 1.4, ease: 'easeInOut' }}
+              className="absolute inset-0 rounded-full pointer-events-none"
               style={{
-                border: `2px solid ${estado === 'grabando' ? 'rgba(239,68,68,0.7)' : 'rgba(99,102,241,0.7)'}`,
-                borderRadius: '50%',
+                border: `2px solid ${estado === 'grabando' ? 'rgba(239,68,68,0.8)' : 'rgba(99,102,241,0.8)'}`,
               }}
             />
           )}
