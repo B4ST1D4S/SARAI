@@ -779,26 +779,119 @@ export default function SaraiAssistant({ onCamposDetectados, token, contexto, on
         position: 'fixed',
         top: `${posicion.y}px`,
         left: `${posicion.x}px`,
-        cursor: dragging ? 'grabbing' : 'grab',
+        cursor: minimizado
+          ? (dragging ? 'grabbing' : 'pointer')
+          : (dragging ? 'grabbing' : 'grab'),
         zIndex: 9999,
-        filter: 'drop-shadow(0 0 8px rgba(212,175,55,0.35))',
+        filter: minimizado
+          ? (whisperStatus === 'online' || estado !== 'esperando' || escuchandoComandos
+              ? 'drop-shadow(0 0 10px rgba(99,102,241,0.55))'
+              : 'drop-shadow(0 0 6px rgba(239,68,68,0.35))')
+          : 'drop-shadow(0 0 8px rgba(212,175,55,0.35))',
       }}
-      className={`
-        w-[92vw] max-w-[300px]
-        sm:w-72
-        select-none
-        transition-opacity duration-500
-        ${
-          estado === 'esperando' && !escuchandoComandos && !minimizado
-            ? 'opacity-70 hover:opacity-100'
-            : 'opacity-100'
-        }
-      `}
+      className="select-none"
     >
+
+      {/* ══ CONTRAÍDO — pastilla compacta estilo logo ══ */}
+      {minimizado && (
+        <motion.div
+          initial={{ scale: 0.85, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          exit={{ scale: 0.85, opacity: 0 }}
+          transition={{ duration: 0.18 }}
+          onClick={() => setMinimizado(false)}
+          className={`
+            flex items-center gap-2.5 px-3 py-1.5 rounded-full border-2 backdrop-blur-md
+            cursor-pointer transition-all duration-300
+            ${estado === 'grabando'
+              ? 'bg-red-950/80 border-red-500/80 shadow-[0_0_16px_rgba(239,68,68,0.5)]'
+              : estado === 'transcribiendo' || estado === 'procesando'
+              ? 'bg-purple-950/80 border-purple-400/80 shadow-[0_0_16px_rgba(168,85,247,0.5)]'
+              : escuchandoComandos
+              ? 'bg-indigo-950/80 border-indigo-400/70 shadow-[0_0_14px_rgba(129,140,248,0.45)]'
+              : whisperStatus === 'online'
+              ? 'bg-slate-900/90 border-blue-500/60 shadow-[0_0_12px_rgba(59,130,246,0.35)]'
+              : 'bg-slate-900/90 border-red-500/50 shadow-[0_0_8px_rgba(239,68,68,0.25)]'}
+          `}
+        >
+          {/* Icono circular con micrófono */}
+          <div className={`relative flex items-center justify-center w-8 h-8 rounded-full flex-shrink-0 ${
+            estado === 'grabando'
+              ? 'bg-gradient-to-br from-red-600/60 to-rose-700/60'
+              : escuchandoComandos
+              ? 'bg-gradient-to-br from-indigo-600/60 to-blue-700/60'
+              : 'bg-gradient-to-br from-blue-600/50 to-indigo-700/50'
+          }`}>
+            {estado === 'grabando' ? (
+              <motion.span animate={{ scale: [1, 1.4, 1] }} transition={{ repeat: Infinity, duration: 0.8 }}
+                className="text-red-300 text-base leading-none">⏺</motion.span>
+            ) : estado === 'transcribiendo' || estado === 'procesando' ? (
+              <motion.span animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
+                className={`text-base leading-none ${estado === 'transcribiendo' ? 'text-purple-300' : 'text-yellow-300'}`}>◌</motion.span>
+            ) : (
+              <svg viewBox="0 0 24 24" fill="none" strokeWidth={2.2} className="w-[18px] h-[18px]">
+                <rect x="9" y="2" width="6" height="11" rx="3"
+                  stroke={whisperStatus === 'online' ? '#93c5fd' : '#6b7280'} />
+                <path d="M5 10a7 7 0 0 0 14 0"
+                  stroke={whisperStatus === 'online' ? '#93c5fd' : '#6b7280'} />
+                <line x1="12" y1="17" x2="12" y2="20"
+                  stroke={whisperStatus === 'online' ? '#93c5fd' : '#6b7280'} />
+                <line x1="9" y1="20" x2="15" y2="20"
+                  stroke={whisperStatus === 'online' ? '#93c5fd' : '#6b7280'} />
+              </svg>
+            )}
+            {/* Badge ✓ activo / ✕ inactivo */}
+            <div className={`
+              absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-slate-900
+              flex items-center justify-center
+              ${estado === 'grabando' ? 'bg-red-500' :
+                estado === 'transcribiendo' || estado === 'procesando' ? 'bg-purple-500' :
+                escuchandoComandos ? 'bg-indigo-500' :
+                whisperStatus === 'online' ? 'bg-blue-500' : 'bg-red-600'}
+            `}>
+              {whisperStatus === 'online' || estado !== 'esperando'
+                ? <svg viewBox="0 0 10 10" fill="none" className="w-2.5 h-2.5">
+                    <path d="M1.5 5L4 7.5L8.5 2.5" stroke="white" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                : <svg viewBox="0 0 10 10" fill="none" className="w-2 h-2">
+                    <line x1="2" y1="2" x2="8" y2="8" stroke="white" strokeWidth={2} strokeLinecap="round"/>
+                    <line x1="8" y1="2" x2="2" y2="8" stroke="white" strokeWidth={2} strokeLinecap="round"/>
+                  </svg>
+              }
+            </div>
+          </div>
+
+          {/* Texto */}
+          <div className="flex flex-col leading-none min-w-0">
+            <span className="text-white font-bold text-xs tracking-wide">SARAI</span>
+            <span className={`text-[9px] font-mono mt-0.5 truncate ${
+              estado === 'grabando'       ? 'text-red-400' :
+              estado === 'transcribiendo' ? 'text-purple-400' :
+              estado === 'procesando'     ? 'text-yellow-400' :
+              escuchandoComandos          ? 'text-indigo-400' :
+              whisperStatus === 'online'  ? 'text-blue-400' : 'text-red-500'
+            }`}>
+              {estado === 'grabando'       ? `● REC ${fmt(segundos)}` :
+               estado === 'transcribiendo' ? 'Transcribiendo…' :
+               estado === 'procesando'     ? 'Analizando IA…' :
+               escuchandoComandos          ? '♥ escucha' :
+               whisperStatus === 'online'  ? 'Whisper activo' : 'Whisper offline'}
+            </span>
+          </div>
+
+          {/* Chevron expandir */}
+          <svg viewBox="0 0 12 12" fill="none" className="w-3 h-3 text-gray-500 flex-shrink-0 ml-0.5">
+            <path d="M2 4L6 8L10 4" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </motion.div>
+      )}
+
+      {/* ══ EXPANDIDO — panel completo ══ */}
+      {!minimizado && (
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        className={`rounded-2xl border-2 ${
+        className={`rounded-2xl border-2 w-[92vw] max-w-[300px] sm:w-72 ${
           estado === 'grabando'       ? 'border-red-500/80 shadow-[0_0_16px_rgba(239,68,68,0.4)]' :
           estado === 'transcribiendo' ? 'border-purple-500/80 shadow-[0_0_16px_rgba(168,85,247,0.4)]' :
           estado === 'procesando'     ? 'border-yellow-400/80 shadow-[0_0_16px_rgba(250,204,21,0.4)]' :
@@ -808,14 +901,7 @@ export default function SaraiAssistant({ onCamposDetectados, token, contexto, on
         } ${fondo} backdrop-blur-md transition-all duration-300`}
       >
       {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <div
-        className={`flex items-center justify-between px-3 py-2 cursor-move select-none ${minimizado ? 'py-1.5' : 'py-3'}`}
-        onClick={(e) => {
-          if (!(e.target as HTMLElement).closest('button')) {
-            setMinimizado(m => !m);
-          }
-        }}
-      >
+      <div className="flex items-center justify-between px-3 py-3 cursor-move select-none">
         <div className="flex items-center gap-2">
           <motion.div
             animate={{ scale: ['grabando','procesando','transcribiendo'].includes(estado) ? [1, 1.6, 1] : 1 }}
@@ -824,7 +910,7 @@ export default function SaraiAssistant({ onCamposDetectados, token, contexto, on
           />
           <div className="flex items-center gap-1.5">
             <span className="text-white font-bold text-xs tracking-wide">SARAI</span>
-            {!minimizado && <span className="text-gray-600 text-[10px]">Asistente · Whisper + IA</span>}
+            <span className="text-gray-600 text-[10px]">Asistente · Whisper + IA</span>
             {escuchandoComandos && (
               <motion.span
                 animate={{ opacity: [1, 0.4, 1] }}
@@ -838,17 +924,11 @@ export default function SaraiAssistant({ onCamposDetectados, token, contexto, on
         </div>
 
         <div className="flex items-center gap-1.5">
-          {etiqueta && !minimizado && (
+          {etiqueta && (
             <span className={`text-[10px] px-2 py-0.5 rounded-full border font-mono ${etiqueta.cls}`}>
               {etiqueta.text}
             </span>
           )}
-          {etiqueta && minimizado && (
-            <span className={`text-[9px] px-1.5 py-0.5 rounded-full border font-mono ${etiqueta.cls}`}>
-              {etiqueta.text}
-            </span>
-          )}
-          {/* Indicador Whisper */}
           <span className={`text-[9px] px-1.5 py-0.5 rounded border ${
             whisperStatus === 'online'  ? 'text-emerald-500 border-emerald-500/20' :
             whisperStatus === 'offline' ? 'text-red-500 border-red-500/20' :
@@ -856,20 +936,21 @@ export default function SaraiAssistant({ onCamposDetectados, token, contexto, on
           }`}>
             {whisperStatus === 'online' ? 'W✓' : whisperStatus === 'offline' ? 'W✗' : '…'}
           </span>
-          <span className="text-gray-600 text-[10px]">{minimizado ? '▼' : '▲'}</span>
+          {/* Botón colapsar */}
+          <button
+            onClick={() => setMinimizado(true)}
+            className="p-1 rounded-full hover:bg-white/10 transition-colors text-gray-500 hover:text-white"
+            title="Colapsar"
+          >
+            <svg viewBox="0 0 12 12" fill="none" className="w-3 h-3">
+              <path d="M2 8L6 4L10 8" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
         </div>
       </div>
 
       {/* ── Cuerpo ─────────────────────────────────────────────────────────── */}
-      <AnimatePresence>
-        {!minimizado && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className="overflow-hidden"
-          >
-            <div className="px-4 pb-4 space-y-3">
+      <div className="px-4 pb-4 space-y-3">
 
               {/* Último comando de voz reconocido */}
               {ultimoComando && (
@@ -1138,11 +1219,9 @@ export default function SaraiAssistant({ onCamposDetectados, token, contexto, on
                 </p>
               )}
 
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+        </div>
       </motion.div>
+      )}
     </div>
   );
 }
