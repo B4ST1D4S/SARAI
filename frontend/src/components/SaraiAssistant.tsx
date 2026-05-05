@@ -792,98 +792,112 @@ export default function SaraiAssistant({ onCamposDetectados, token, contexto, on
       className="select-none"
     >
 
-      {/* ══ CONTRAÍDO — pastilla compacta estilo logo ══ */}
+      {/* ══ CONTRAÍDO — ícono circular estilo logo ══ */}
       {minimizado && (
-        <motion.div
-          initial={{ scale: 0.85, opacity: 0 }}
+        <motion.button
+          initial={{ scale: 0.7, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          exit={{ scale: 0.85, opacity: 0 }}
-          transition={{ duration: 0.18 }}
+          exit={{ scale: 0.7, opacity: 0 }}
+          transition={{ type: 'spring', stiffness: 320, damping: 22 }}
           onClick={() => setMinimizado(false)}
-          className={`
-            flex items-center gap-2.5 px-3 py-1.5 rounded-full border-2 backdrop-blur-md
-            cursor-pointer transition-all duration-300
-            ${estado === 'grabando'
-              ? 'bg-red-950/80 border-red-500/80 shadow-[0_0_16px_rgba(239,68,68,0.5)]'
-              : estado === 'transcribiendo' || estado === 'procesando'
-              ? 'bg-purple-950/80 border-purple-400/80 shadow-[0_0_16px_rgba(168,85,247,0.5)]'
-              : escuchandoComandos
-              ? 'bg-indigo-950/80 border-indigo-400/70 shadow-[0_0_14px_rgba(129,140,248,0.45)]'
-              : whisperStatus === 'online'
-              ? 'bg-slate-900/90 border-blue-500/60 shadow-[0_0_12px_rgba(59,130,246,0.35)]'
-              : 'bg-slate-900/90 border-red-500/50 shadow-[0_0_8px_rgba(239,68,68,0.25)]'}
-          `}
+          title="Abrir SARAI"
+          className="relative flex items-center justify-center w-14 h-14 rounded-full cursor-pointer focus:outline-none"
+          style={{ background: 'transparent', border: 'none', padding: 0 }}
         >
-          {/* Icono circular con micrófono */}
-          <div className={`relative flex items-center justify-center w-8 h-8 rounded-full flex-shrink-0 ${
-            estado === 'grabando'
-              ? 'bg-gradient-to-br from-red-600/60 to-rose-700/60'
-              : escuchandoComandos
-              ? 'bg-gradient-to-br from-indigo-600/60 to-blue-700/60'
-              : 'bg-gradient-to-br from-blue-600/50 to-indigo-700/50'
-          }`}>
-            {estado === 'grabando' ? (
-              <motion.span animate={{ scale: [1, 1.4, 1] }} transition={{ repeat: Infinity, duration: 0.8 }}
-                className="text-red-300 text-base leading-none">⏺</motion.span>
-            ) : estado === 'transcribiendo' || estado === 'procesando' ? (
-              <motion.span animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
-                className={`text-base leading-none ${estado === 'transcribiendo' ? 'text-purple-300' : 'text-yellow-300'}`}>◌</motion.span>
-            ) : (
-              <svg viewBox="0 0 24 24" fill="none" strokeWidth={2.2} className="w-[18px] h-[18px]">
-                <rect x="9" y="2" width="6" height="11" rx="3"
-                  stroke={whisperStatus === 'online' ? '#93c5fd' : '#6b7280'} />
-                <path d="M5 10a7 7 0 0 0 14 0"
-                  stroke={whisperStatus === 'online' ? '#93c5fd' : '#6b7280'} />
-                <line x1="12" y1="17" x2="12" y2="20"
-                  stroke={whisperStatus === 'online' ? '#93c5fd' : '#6b7280'} />
-                <line x1="9" y1="20" x2="15" y2="20"
-                  stroke={whisperStatus === 'online' ? '#93c5fd' : '#6b7280'} />
-              </svg>
-            )}
-            {/* Badge ✓ activo / ✕ inactivo */}
-            <div className={`
-              absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-slate-900
-              flex items-center justify-center
-              ${estado === 'grabando' ? 'bg-red-500' :
-                estado === 'transcribiendo' || estado === 'procesando' ? 'bg-purple-500' :
-                escuchandoComandos ? 'bg-indigo-500' :
-                whisperStatus === 'online' ? 'bg-blue-500' : 'bg-red-600'}
-            `}>
-              {whisperStatus === 'online' || estado !== 'esperando'
-                ? <svg viewBox="0 0 10 10" fill="none" className="w-2.5 h-2.5">
-                    <path d="M1.5 5L4 7.5L8.5 2.5" stroke="white" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                : <svg viewBox="0 0 10 10" fill="none" className="w-2 h-2">
-                    <line x1="2" y1="2" x2="8" y2="8" stroke="white" strokeWidth={2} strokeLinecap="round"/>
-                    <line x1="8" y1="2" x2="2" y2="8" stroke="white" strokeWidth={2} strokeLinecap="round"/>
-                  </svg>
+          {/* SVG completo imitando el logo: círculo exterior + ondas + mic + badge */}
+          <svg viewBox="0 0 56 56" fill="none" className="w-14 h-14 drop-shadow-lg">
+            {/* Glow exterior */}
+            <circle cx="28" cy="28" r="27"
+              fill={
+                estado === 'grabando'       ? 'rgba(239,68,68,0.18)' :
+                estado === 'transcribiendo' || estado === 'procesando' ? 'rgba(168,85,247,0.18)' :
+                escuchandoComandos          ? 'rgba(99,102,241,0.18)' : 'rgba(30,41,80,0.15)'
               }
-            </div>
-          </div>
+              stroke={
+                estado === 'grabando'       ? '#ef4444' :
+                estado === 'transcribiendo' || estado === 'procesando' ? '#a855f7' :
+                escuchandoComandos          ? '#818cf8' :
+                whisperStatus === 'online'  ? '#3b82f6' : '#ef4444'
+              }
+              strokeWidth="1.4"
+            />
+            {/* Fondo principal del círculo */}
+            <circle cx="28" cy="28" r="22"
+              fill={
+                estado === 'grabando'       ? '#3b0000' :
+                estado === 'transcribiendo' || estado === 'procesando' ? '#1e0030' :
+                escuchandoComandos          ? '#1e1b4b' : '#0f172a'
+              }
+            />
 
-          {/* Texto */}
-          <div className="flex flex-col leading-none min-w-0">
-            <span className="text-white font-bold text-xs tracking-wide">SARAI</span>
-            <span className={`text-[9px] font-mono mt-0.5 truncate ${
-              estado === 'grabando'       ? 'text-red-400' :
-              estado === 'transcribiendo' ? 'text-purple-400' :
-              estado === 'procesando'     ? 'text-yellow-400' :
-              escuchandoComandos          ? 'text-indigo-400' :
-              whisperStatus === 'online'  ? 'text-blue-400' : 'text-red-500'
-            }`}>
-              {estado === 'grabando'       ? `● REC ${fmt(segundos)}` :
-               estado === 'transcribiendo' ? 'Transcribiendo…' :
-               estado === 'procesando'     ? 'Analizando IA…' :
-               escuchandoComandos          ? '♥ escucha' :
-               whisperStatus === 'online'  ? 'Whisper activo' : 'Whisper offline'}
-            </span>
-          </div>
+            {/* Ondas de sonido izquierda */}
+            <path d="M11 24 Q9 28 11 32" stroke={whisperStatus === 'online' ? '#60a5fa' : '#4b5563'} strokeWidth="2" strokeLinecap="round" fill="none"/>
+            <path d="M7.5 21 Q4.5 28 7.5 35"  stroke={whisperStatus === 'online' ? '#3b82f6' : '#374151'} strokeWidth="2" strokeLinecap="round" fill="none"/>
+            {/* Ondas de sonido derecha */}
+            <path d="M45 24 Q47 28 45 32" stroke={whisperStatus === 'online' ? '#60a5fa' : '#4b5563'} strokeWidth="2" strokeLinecap="round" fill="none"/>
+            <path d="M48.5 21 Q51.5 28 48.5 35" stroke={whisperStatus === 'online' ? '#3b82f6' : '#374151'} strokeWidth="2" strokeLinecap="round" fill="none"/>
 
-          {/* Chevron expandir */}
-          <svg viewBox="0 0 12 12" fill="none" className="w-3 h-3 text-gray-500 flex-shrink-0 ml-0.5">
-            <path d="M2 4L6 8L10 4" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"/>
+            {/* Micrófono */}
+            {estado === 'grabando' ? (
+              <>
+                {/* Punto REC parpadeante */}
+                <circle cx="28" cy="28" r="7" fill="#ef4444" opacity="0.9"/>
+                <rect x="25" y="25" width="6" height="6" rx="1" fill="white"/>
+              </>
+            ) : estado === 'transcribiendo' || estado === 'procesando' ? (
+              /* Spinner */
+              <circle cx="28" cy="28" r="7" stroke={estado === 'transcribiendo' ? '#a855f7' : '#eab308'}
+                strokeWidth="2.5" strokeLinecap="round" strokeDasharray="32" strokeDashoffset="10" fill="none"/>
+            ) : (
+              <>
+                {/* Cuerpo mic */}
+                <rect x="23" y="16" width="10" height="14" rx="5"
+                  fill={whisperStatus === 'online' ? '#1d4ed8' : '#374151'}
+                  stroke={whisperStatus === 'online' ? '#93c5fd' : '#6b7280'}
+                  strokeWidth="1.5"
+                />
+                {/* Arco mic */}
+                <path d="M19 29 Q19 37 28 37 Q37 37 37 29"
+                  stroke={whisperStatus === 'online' ? '#93c5fd' : '#6b7280'}
+                  strokeWidth="1.8" strokeLinecap="round" fill="none"/>
+                {/* Pie mic */}
+                <line x1="28" y1="37" x2="28" y2="41"
+                  stroke={whisperStatus === 'online' ? '#93c5fd' : '#6b7280'} strokeWidth="1.8" strokeLinecap="round"/>
+                <line x1="23" y1="41" x2="33" y2="41"
+                  stroke={whisperStatus === 'online' ? '#93c5fd' : '#6b7280'} strokeWidth="1.8" strokeLinecap="round"/>
+              </>
+            )}
+
+            {/* Badge ✓ / ✕ en esquina inferior derecha */}
+            <circle cx="43" cy="43" r="7"
+              fill={
+                estado === 'grabando'       ? '#ef4444' :
+                estado === 'transcribiendo' || estado === 'procesando' ? '#a855f7' :
+                escuchandoComandos          ? '#4f46e5' :
+                whisperStatus === 'online'  ? '#2563eb' : '#dc2626'
+              }
+            />
+            <circle cx="43" cy="43" r="7" fill="none" stroke="#0f172a" strokeWidth="2"/>
+            {/* Chulo ✓ o X */}
+            {whisperStatus === 'online' || estado !== 'esperando' ? (
+              <path d="M39.5 43L42 45.5L46.5 40" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+            ) : (
+              <>
+                <line x1="40.5" y1="40.5" x2="45.5" y2="45.5" stroke="white" strokeWidth="1.8" strokeLinecap="round"/>
+                <line x1="45.5" y1="40.5" x2="40.5" y2="45.5" stroke="white" strokeWidth="1.8" strokeLinecap="round"/>
+              </>
+            )}
           </svg>
-        </motion.div>
+
+          {/* Pulso animado mientras graba o escucha comandos */}
+          {(estado === 'grabando' || escuchandoComandos) && (
+            <motion.span
+              animate={{ scale: [1, 1.45, 1], opacity: [0.6, 0, 0.6] }}
+              transition={{ repeat: Infinity, duration: 1.4 }}
+              className="absolute inset-0 rounded-full border-2 border-blue-400/50"
+            />
+          )}
+        </motion.button>
       )}
 
       {/* ══ EXPANDIDO — panel completo ══ */}
