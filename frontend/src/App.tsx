@@ -83,8 +83,8 @@ function Sidebar({
               transition={{ duration: 0.2 }}
               className="text-xl font-black tracking-tight whitespace-nowrap"
             >
-              <span className="bg-gradient-to-r from-yellow-400 to-amber-500 bg-clip-text text-transparent">Estet</span>
-              <span className="text-white">IA</span>
+              <span className="bg-gradient-to-r from-yellow-400 to-amber-500 bg-clip-text text-transparent">SAR</span>
+              <span className="text-white">AI</span>
             </motion.span>
           )}
         </AnimatePresence>
