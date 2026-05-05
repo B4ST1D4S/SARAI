@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Calendar, Clock, User, CheckCircle, AlertCircle, Plus, Trash2, Stethoscope } from 'lucide-react';
+import { Calendar, Clock, User, CheckCircle, AlertCircle, Plus, Trash2, Stethoscope, Bell } from 'lucide-react';
 import { citasService, initializeMockData } from '../services/mockData';
 import { getCitasMedico, completarCita, cancelarCitaApi } from '../services/api';
 
@@ -12,7 +12,7 @@ interface Cita {
   hora: string;
   duracion: number;
   procedimiento: string;
-  estado: 'CONFIRMADA' | 'PENDIENTE' | 'ATENDIDA' | 'CANCELADA' | 'COMPLETADA';
+  estado: 'CONFIRMADA' | 'PENDIENTE' | 'ATENDIDA' | 'CANCELADA' | 'COMPLETADA' | 'EN_SALA';
   notas: string;
 }
 
@@ -127,14 +127,12 @@ export default function AgendaProfesionalPage({ onNavegar, onAbrirHistoriaPacien
 
   const getStatusColor = (estado: Cita['estado']) => {
     switch (estado) {
-      case 'CONFIRMADA':
-        return 'bg-emerald-500/20 border-emerald-500 text-emerald-400';
-      case 'ATENDIDA':
-        return 'bg-blue-500/20 border-blue-500 text-blue-400';
-      case 'PENDIENTE':
-        return 'bg-yellow-500/20 border-yellow-500 text-yellow-400';
-      case 'CANCELADA':
-        return 'bg-red-500/20 border-red-500 text-red-400';
+      case 'CONFIRMADA': return 'bg-emerald-500/20 border-emerald-500 text-emerald-400';
+      case 'EN_SALA':    return 'bg-cyan-500/20 border-cyan-500 text-cyan-400';
+      case 'ATENDIDA':   return 'bg-blue-500/20 border-blue-500 text-blue-400';
+      case 'PENDIENTE':  return 'bg-yellow-500/20 border-yellow-500 text-yellow-400';
+      case 'CANCELADA':  return 'bg-red-500/20 border-red-500 text-red-400';
+      default:           return 'bg-slate-500/20 border-slate-500 text-slate-400';
     }
   };
 
@@ -325,7 +323,25 @@ export default function AgendaProfesionalPage({ onNavegar, onAbrirHistoriaPacien
                       </button>
                     )}
 
+                    {/* CU-03: Paciente llega → EN_SALA */}
                     {cita.estado === 'CONFIRMADA' && (
+                      <button
+                        onClick={async () => {
+                          const token = getToken();
+                          const res = await fetch(`/api/citas/${cita.id}/admision`, {
+                            method: 'POST',
+                            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+                          });
+                          if (res.ok) setCitas(prev => prev.map(c => c.id === cita.id ? { ...c, estado: 'EN_SALA' } : c));
+                        }}
+                        className="flex-1 px-3 py-2 bg-cyan-600 hover:bg-cyan-700 text-white text-sm font-semibold rounded transition flex items-center justify-center gap-2"
+                      >
+                        <Bell size={14} /> Paciente Llegó
+                      </button>
+                    )}
+
+                    {/* CU-04: Llamar paciente → Atender → Historia Clínica */}
+                    {cita.estado === 'EN_SALA' && (
                       <button
                         onClick={() => handleCambiarEstado(cita.id, 'ATENDIDA')}
                         className="flex-1 px-3 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-sm font-semibold rounded transition flex items-center justify-center gap-2 shadow-lg shadow-blue-500/30"

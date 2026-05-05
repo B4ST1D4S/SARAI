@@ -10,6 +10,7 @@ import cupsRoutes from './routes/cups.js';
 import citasRoutes from './routes/citas.js';
 import cotizacionesRoutes from './routes/cotizaciones.js';
 import saraiRoutes from './routes/sarai.js';
+import disponibilidadRoutes from './routes/disponibilidad.js';
 
 dotenv.config();
 
@@ -55,6 +56,7 @@ app.use('/api/cups', cupsRoutes);
 app.use('/api/citas', citasRoutes);
 app.use('/api/cotizaciones', cotizacionesRoutes);
 app.use('/api/sarai', saraiRoutes);
+app.use('/api/disponibilidad', disponibilidadRoutes);
 
 // ============================================
 // MANEJO DE ERRORES

@@ -49,7 +49,7 @@ const CITAS_MOCK = [
     duracionMinutos: 60,
     tipoCita: 'CONSULTA',
     motivo: 'Consulta inicial',
-    estado: 'CONFIRMADA',
+    estado: 'EN_SALA',
     notas: '',
   },
   {
@@ -88,7 +88,7 @@ describe('AgendaProfesionalPage — Visualización', () => {
     });
   });
 
-  it('Muestra botón "Atender → Historia Clínica" para citas CONFIRMADAS', async () => {
+  it('Muestra botón "Atender → Historia Clínica" para citas EN_SALA', async () => {
     render(<AgendaProfesionalPage />);
 
     await waitFor(() => {

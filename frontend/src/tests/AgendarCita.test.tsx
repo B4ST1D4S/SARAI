@@ -1,12 +1,13 @@
 /**
  * Tests del Módulo 1 — AgendarCita
- * Verifica el formulario de agendamiento y validaciones
+ * Verifica el formulario de agendamiento y validaciones.
+ * El componente usa grilla de slots (botones) en lugar de <select name="hora">.
  */
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import AgendarCita from '../components/AgendarCita';
 
-// Mock framer-motion para que AnimatePresence renderice inmediatamente en jsdom
+// Mock framer-motion
 vi.mock('framer-motion', () => ({
   motion: new Proxy({}, {
     get: (_target: any, tag: string) =>
@@ -19,7 +20,7 @@ vi.mock('framer-motion', () => ({
 }));
 
 const mockFetch = vi.fn();
-global.fetch = mockFetch;
+(window as any).fetch = mockFetch;
 
 const mockLocalStorage = (() => {
   let store: Record<string, string> = {
@@ -35,12 +36,42 @@ const mockLocalStorage = (() => {
 })();
 Object.defineProperty(window, 'localStorage', { value: mockLocalStorage });
 
+/** Helpers de respuesta mock */
+const makeSlotsResponse = (slots: string[] = ['09:00', '10:00', '11:00']) =>
+  ({ ok: true, json: async () => ({ success: true, slots }) });
+const makeErrorCitasResponse = (errorMsg: string) =>
+  ({ ok: false, json: async () => ({ error: errorMsg }) });
+const makeSuccessCitasResponse = () =>
+  ({ ok: true, json: async () => ({ success: true, cita: { id: 'cita-001', estado: 'PENDIENTE' } }) });
+
+/** Mock de fetch que despacha según la URL */
+function setupFetchMock(options: {
+  slotsSlots?: string[];
+  citasOk?: boolean;
+  citasError?: string;
+}) {
+  mockFetch.mockImplementation(async (url: string) => {
+    if (url.includes('disponibilidad/slots')) {
+      return makeSlotsResponse(options.slotsSlots ?? ['09:00', '10:00', '11:00']);
+    }
+    if (url.includes('/api/citas')) {
+      if (options.citasOk === false) {
+        return makeErrorCitasResponse(options.citasError ?? 'Error');
+      }
+      return makeSuccessCitasResponse();
+    }
+    return { ok: true, json: async () => ({}) };
+  });
+}
+
 describe('AgendarCita — Formulario', () => {
   const onClose = vi.fn();
   const onSuccess = vi.fn();
 
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
+    // Re-assign fetch mock after reset
+    (window as any).fetch = mockFetch;
   });
 
   it('Renderiza con nombre del paciente', () => {
@@ -53,9 +84,21 @@ describe('AgendarCita — Formulario', () => {
       />
     );
 
-    // Tanto el h2 como el botón contienen "Agendar Cita"
     expect(screen.getAllByText('Agendar Cita').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText(/Juan Pérez/)).toBeInTheDocument();
+  });
+
+  it('Muestra mensaje "Selecciona una fecha" antes de elegir fecha', () => {
+    render(
+      <AgendarCita
+        pacienteId="pac-001"
+        pacienteNombre="Juan Pérez"
+        onClose={onClose}
+        onSuccess={onSuccess}
+      />
+    );
+
+    expect(screen.getByText(/Selecciona una fecha para ver los horarios/i)).toBeInTheDocument();
   });
 
   it('Muestra error si se intenta agendar sin fecha/hora', async () => {
@@ -68,7 +111,6 @@ describe('AgendarCita — Formulario', () => {
       />
     );
 
-    // Disparar submit directamente en el form para evitar que HTML5 required bloquee
     const form = container.querySelector('form') as HTMLFormElement;
     fireEvent.submit(form);
 
@@ -77,8 +119,22 @@ describe('AgendarCita — Formulario', () => {
     });
   });
 
+  it('Muestra grilla de slots tras seleccionar fecha', async () => {
+    setupFetchMock({});
+
+    const { container: c } = render(<AgendarCita pacienteId="pac-001" pacienteNombre="Juan Pérez" onClose={onClose} onSuccess={onSuccess} />);
+    const dateInput = c.querySelector('input[type="date"]') as HTMLInputElement;
+    fireEvent.change(dateInput, { target: { value: '2026-06-10', name: 'fecha' } });
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: '09:00' })).toBeInTheDocument();
+    });
+  });
+
   it('Muestra error si pacienteId está vacío', async () => {
-    render(
+    setupFetchMock({});
+
+    const { container } = render(
       <AgendarCita
         pacienteId=""
         pacienteNombre="Sin ID"
@@ -87,33 +143,27 @@ describe('AgendarCita — Formulario', () => {
       />
     );
 
-    // Llenar fecha y hora para pasar esa validación
-    const dateInput = document.querySelector('input[type="date"]') as HTMLInputElement;
+    const dateInput = container.querySelector('input[type="date"]') as HTMLInputElement;
     fireEvent.change(dateInput, { target: { value: '2026-06-01', name: 'fecha' } });
 
-    const horaSelect = document.querySelector('select[name="hora"]') as HTMLSelectElement;
-    fireEvent.change(horaSelect, { target: { value: '09:00', name: 'hora' } });
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: '09:00' })).toBeInTheDocument();
+    });
 
-    const submitBtn = screen.getByRole('button', { name: /Agendar Cita/i });
-    fireEvent.click(submitBtn);
+    fireEvent.click(screen.getByRole('button', { name: '09:00' }));
+
+    const form = container.querySelector('form') as HTMLFormElement;
+    fireEvent.submit(form);
 
     await waitFor(() => {
-      expect(
-        screen.getByText(/No se encontró el paciente/i)
-      ).toBeInTheDocument();
+      expect(screen.getByText(/No se encontró el paciente/i)).toBeInTheDocument();
     });
   });
 
   it('Muestra pantalla de éxito al agendar correctamente', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        success: true,
-        cita: { id: 'cita-001', estado: 'PENDIENTE' },
-      }),
-    });
+    setupFetchMock({ citasOk: true });
 
-    render(
+    const { container } = render(
       <AgendarCita
         pacienteId="pac-001"
         pacienteNombre="Juan Pérez"
@@ -122,27 +172,27 @@ describe('AgendarCita — Formulario', () => {
       />
     );
 
-    const dateInput = document.querySelector('input[type="date"]') as HTMLInputElement;
+    const dateInput = container.querySelector('input[type="date"]') as HTMLInputElement;
     fireEvent.change(dateInput, { target: { value: '2026-06-10', name: 'fecha' } });
 
-    const horaSelect = document.querySelector('select[name="hora"]') as HTMLSelectElement;
-    fireEvent.change(horaSelect, { target: { value: '10:00', name: 'hora' } });
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: '10:00' })).toBeInTheDocument();
+    });
 
-    const submitBtn = screen.getByRole('button', { name: /Agendar Cita/i });
-    fireEvent.click(submitBtn);
+    fireEvent.click(screen.getByRole('button', { name: '10:00' }));
+
+    const form = container.querySelector('form') as HTMLFormElement;
+    fireEvent.submit(form);
 
     await waitFor(() => {
       expect(screen.getByText('¡Cita Agendada!')).toBeInTheDocument();
     }, { timeout: 3000 });
   });
 
-  it('Muestra error del servidor si la API falla', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: false,
-      json: async () => ({ error: 'Horario no disponible' }),
-    });
+  it('Muestra error del servidor si la API de citas falla', async () => {
+    setupFetchMock({ citasOk: false, citasError: 'Horario no disponible' });
 
-    render(
+    const { container } = render(
       <AgendarCita
         pacienteId="pac-001"
         pacienteNombre="Juan Pérez"
@@ -151,14 +201,17 @@ describe('AgendarCita — Formulario', () => {
       />
     );
 
-    const dateInput = document.querySelector('input[type="date"]') as HTMLInputElement;
+    const dateInput = container.querySelector('input[type="date"]') as HTMLInputElement;
     fireEvent.change(dateInput, { target: { value: '2026-06-10', name: 'fecha' } });
 
-    const horaSelect = document.querySelector('select[name="hora"]') as HTMLSelectElement;
-    fireEvent.change(horaSelect, { target: { value: '10:00', name: 'hora' } });
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: '10:00' })).toBeInTheDocument();
+    });
 
-    const submitBtn = screen.getByRole('button', { name: /Agendar Cita/i });
-    fireEvent.click(submitBtn);
+    fireEvent.click(screen.getByRole('button', { name: '10:00' }));
+
+    const form = container.querySelector('form') as HTMLFormElement;
+    fireEvent.submit(form);
 
     await waitFor(() => {
       expect(screen.getByText('Horario no disponible')).toBeInTheDocument();
@@ -177,5 +230,25 @@ describe('AgendarCita — Formulario', () => {
 
     fireEvent.click(screen.getByText('Cancelar'));
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('Muestra fallback genérico cuando no hay slots configurados', async () => {
+    setupFetchMock({ slotsSlots: [] });
+
+    const { container } = render(
+      <AgendarCita
+        pacienteId="pac-001"
+        pacienteNombre="Juan Pérez"
+        onClose={onClose}
+        onSuccess={onSuccess}
+      />
+    );
+
+    const dateInput = container.querySelector('input[type="date"]') as HTMLInputElement;
+    fireEvent.change(dateInput, { target: { value: '2026-06-10', name: 'fecha' } });
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: '09:00' })).toBeInTheDocument();
+    });
   });
 });

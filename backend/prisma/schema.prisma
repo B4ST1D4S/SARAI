@@ -35,6 +35,8 @@ model User {
   historiasEditadas HistoriaClinica[]
   citasAsignadas Cita[]
   auditLogs AuditLog[]
+  disponibilidades DisponibilidadMedico[]
+  bloqueosAgenda  BloqueDisponibilidad[]
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -443,7 +445,7 @@ model Cita {
   fechaHora         DateTime
   duracionMinutos   Int      @default(60)
   
-  estado            String   @default("PENDIENTE") // PENDIENTE, CONFIRMADA, COMPLETADA, CANCELADA
+  estado            String   @default("PENDIENTE") // PENDIENTE, CONFIRMADA, EN_SALA, COMPLETADA, CANCELADA
   
   motivo            String?
   notas             String?
@@ -713,4 +715,51 @@ model ChecklistCompletado {
   
   @@index([procedimientoId])
   @@index([completadoEn])
+}
+
+// ============================================
+// DISPONIBILIDAD DEL MÉDICO (CU-01)
+// ============================================
+
+model DisponibilidadMedico {
+  id           String   @id @default(cuid())
+  medicoId     String
+  medico       User     @relation(fields: [medicoId], references: [id], onDelete: Cascade)
+
+  diaSemana    Int      // 0=Dom, 1=Lun, 2=Mar, 3=Mié, 4=Jue, 5=Vie, 6=Sáb
+  horaInicio   String   // "08:00"
+  horaFin      String   // "18:00"
+  duracionSlot Int      @default(60) // minutos por cita
+
+  sede         String?  @default("Principal")
+  tipoAtencion String?  @default("CONSULTA") // CONSULTA | PREOPERATORIO | POSTOPERATORIO | CONTROL
+  consultorio  String?
+
+  activo       Boolean  @default(true)
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([medicoId])
+  @@index([diaSemana])
+}
+
+// ============================================
+// BLOQUEOS DE AGENDA (vacaciones, festivos)
+// ============================================
+
+model BloqueDisponibilidad {
+  id        String   @id @default(cuid())
+  medicoId  String
+  medico    User     @relation(fields: [medicoId], references: [id], onDelete: Cascade)
+
+  fechaInicio DateTime
+  fechaFin    DateTime
+  motivo      String?  @default("Bloqueo")
+  todoElDia   Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+
+  @@index([medicoId])
+  @@index([fechaInicio])
 }

@@ -251,3 +251,24 @@ export async function recordatorios(req: Request, res: Response): Promise<void> 
       .json({ error: error.message || 'Error al enviar recordatorios' });
   }
 }
+
+// CU-03: Admisión — Paciente llega, pasa a EN_SALA
+export async function admision(req: Request, res: Response): Promise<void> {
+  try {
+    const { id } = req.params;
+    if (!id) { res.status(400).json({ error: 'ID de cita requerido' }); return; }
+
+    const { PrismaClient } = await import('@prisma/client');
+    const prisma = new PrismaClient();
+    const cita = await prisma.cita.update({
+      where: { id },
+      data: { estado: 'EN_SALA', asistencia: true },
+      include: { paciente: true, medico: true },
+    });
+    res.json({ success: true, message: 'Paciente en sala de espera', cita });
+  } catch (error: any) {
+    console.error('Error en admision:', error);
+    res.status(500).json({ error: error.message || 'Error al registrar admisión' });
+  }
+}
+

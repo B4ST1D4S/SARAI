@@ -8,7 +8,7 @@ import { BuscadorPaciente } from '../components/BuscadorPaciente';
 
 // Mock fetch global
 const mockFetch = vi.fn();
-global.fetch = mockFetch;
+(window as any).fetch = mockFetch;
 
 // Mock localStorage
 const mockLocalStorage = (() => {

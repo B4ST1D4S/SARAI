@@ -8,6 +8,8 @@ import FotosPage from './pages/FotosPage';
 import ConsentimientoPage from './pages/ConsentimientoPage';
 import AgendaPage from './pages/AgendaPage';
 import AgendaProfesionalPage from './pages/AgendaProfesionalPage';
+import ConfigAgendaPage from './pages/ConfigAgendaPage';
+import AdmisionPage from './pages/AdmisionPage';
 import VistaCirujanoPage from './pages/VistaCirujanoPage';
 import FollowUpPage from './pages/FollowUpPage';
 import CRMPage from './pages/CRMPage';
@@ -32,7 +34,9 @@ const NAV_SECTIONS = [
     label: 'AGENDA',
     items: [
       { id: 'agenda',            label: 'Agenda Paciente',    sym: 'A' },
+      { id: 'admision',          label: 'Admisión',           sym: 'D' },
       { id: 'agendaProfesional', label: 'Agenda Profesional', sym: 'G' },
+      { id: 'config-agenda',     label: 'Config Agenda',      sym: 'Z' },
       { id: 'vista-cirujano',    label: 'Quirofano',          sym: 'Q' },
       { id: 'followup',          label: 'Follow-up',          sym: 'U' },
     ],
@@ -275,6 +279,8 @@ function App() {
           {currentPage === 'fotos'               && <FotosPage />}
           {currentPage === 'consentimiento'      && <ConsentimientoPage />}
           {currentPage === 'agenda'              && <AgendaPage />}
+          {currentPage === 'admision'            && <AdmisionPage />}
+          {currentPage === 'config-agenda'       && <ConfigAgendaPage />}
           {currentPage === 'agendaProfesional'   && (
             <AgendaProfesionalPage
               onNavegar={setCurrentPage}
