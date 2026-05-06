@@ -57,3 +57,15 @@ export const deletePreparacion  = (id: string) => req(`/preparaciones/${id}`, { 
 // ─── Reglas operativas ─────────────────────────────────────────
 export const getReglasOperativas  = (depId: string) => req(`/departamentos/${depId}/reglas`);
 export const upsertReglaOperativa = (depId: string, body: any) => req(`/departamentos/${depId}/reglas`, { method: 'POST', body: JSON.stringify(body) });
+
+// ─── Cargos de Consulta Externa ────────────────────────────────
+export const getCargos   = (params?: string) => req(`/cargos${params ? '?' + params : ''}`);
+export const createCargo = (body: any) => req('/cargos', { method: 'POST', body: JSON.stringify(body) });
+export const updateCargo = (id: string, body: any) => req(`/cargos/${id}`, { method: 'PUT', body: JSON.stringify(body) });
+export const deleteCargo = (id: string) => req(`/cargos/${id}`, { method: 'DELETE' });
+export const bulkCargos  = (items: any[]) => req('/cargos/bulk', { method: 'POST', body: JSON.stringify({ items }) });
+
+// ─── Cargue masivo genérico ────────────────────────────────────
+export const bulkEspecialidades = (items: any[]) => req('/especialidades/bulk', { method: 'POST', body: JSON.stringify({ items }) });
+export const bulkDepartamentos  = (items: any[]) => req('/departamentos/bulk',  { method: 'POST', body: JSON.stringify({ items }) });
+export const bulkTiposConsulta  = (items: any[]) => req('/tipos-consulta/bulk', { method: 'POST', body: JSON.stringify({ items }) });

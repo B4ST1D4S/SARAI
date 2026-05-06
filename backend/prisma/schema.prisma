@@ -974,3 +974,35 @@ model Preparacion {
   @@index([estado])
   @@index([tipoConsultaId])
 }
+
+// 9. CARGOS DE CONSULTA EXTERNA
+// Conceptos de cobro adicionales que se pueden aplicar en la consulta
+model Cargo {
+  id               String   @id @default(cuid())
+  codigo           String   @unique
+  nombre           String
+  descripcion      String?
+  // CONSULTA | PROCEDIMIENTO | CIRUGIA | ADMINISTRATIVO | HONORARIO | INSUMO
+  tipo             String   @default("CONSULTA")
+  // Valor base en COP
+  valor            Float    @default(0)
+  // Unidad de medida
+  unidad           String?  // unidad, sesion, hora, etc.
+  // Código CUPS o interno de referencia
+  codigoReferencia String?
+  // Si aplica IVA
+  aplicaIva        Boolean  @default(false)
+  tasaIva          Float    @default(0)
+  // Si es obligatorio o se agrega a elección
+  esObligatorio    Boolean  @default(false)
+  // Si aplica para paciente PyP
+  aplicaPYP        Boolean  @default(false)
+  estado           Boolean  @default(true)
+  usuarioCreacion  String?
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([estado])
+  @@index([tipo])
+}

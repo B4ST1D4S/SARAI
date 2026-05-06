@@ -586,3 +586,161 @@ export async function deletePreparacion(req: Request, res: Response) {
     res.status(500).json({ error: 'Error al eliminar preparación' });
   }
 }
+
+// ─────────────────────────────────────────
+// 9. CARGOS DE CONSULTA EXTERNA
+// ─────────────────────────────────────────
+
+export async function getCargos(req: Request, res: Response) {
+  try {
+    const { tipo, search } = req.query as Record<string, string>;
+    const where: any = {};
+    if (tipo) where.tipo = tipo;
+    if (search) {
+      where.OR = [
+        { nombre: { contains: search, mode: 'insensitive' } },
+        { codigo: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+    const items = await prisma.cargo.findMany({ where, orderBy: { nombre: 'asc' } });
+    res.json(items);
+  } catch {
+    res.status(500).json({ error: 'Error al obtener cargos' });
+  }
+}
+
+export async function createCargo(req: Request, res: Response) {
+  try {
+    const { codigo, nombre, descripcion, tipo, valor, unidad, codigoReferencia,
+            aplicaIva, tasaIva, esObligatorio, aplicaPYP } = req.body;
+    if (!codigo || !nombre) return res.status(400).json({ error: 'codigo y nombre son requeridos' });
+    const existe = await prisma.cargo.findFirst({ where: { codigo } });
+    if (existe) return res.status(400).json({ error: 'Ya existe un cargo con ese código' });
+    const item = await prisma.cargo.create({
+      data: {
+        codigo, nombre, descripcion, tipo: tipo || 'CONSULTA',
+        valor: Number(valor) || 0, unidad, codigoReferencia,
+        aplicaIva: Boolean(aplicaIva), tasaIva: Number(tasaIva) || 0,
+        esObligatorio: Boolean(esObligatorio), aplicaPYP: Boolean(aplicaPYP),
+        usuarioCreacion: (req as any).user?.userId,
+      },
+    });
+    res.status(201).json(item);
+  } catch {
+    res.status(500).json({ error: 'Error al crear cargo' });
+  }
+}
+
+export async function updateCargo(req: Request, res: Response) {
+  try {
+    const { id } = req.params;
+    const { codigo, nombre, descripcion, tipo, valor, unidad, codigoReferencia,
+            aplicaIva, tasaIva, esObligatorio, aplicaPYP, estado } = req.body;
+    const item = await prisma.cargo.update({
+      where: { id },
+      data: {
+        ...(codigo !== undefined && { codigo }),
+        ...(nombre !== undefined && { nombre }),
+        ...(descripcion !== undefined && { descripcion }),
+        ...(tipo !== undefined && { tipo }),
+        ...(valor !== undefined && { valor: Number(valor) }),
+        ...(unidad !== undefined && { unidad }),
+        ...(codigoReferencia !== undefined && { codigoReferencia }),
+        ...(aplicaIva !== undefined && { aplicaIva: Boolean(aplicaIva) }),
+        ...(tasaIva !== undefined && { tasaIva: Number(tasaIva) }),
+        ...(esObligatorio !== undefined && { esObligatorio: Boolean(esObligatorio) }),
+        ...(aplicaPYP !== undefined && { aplicaPYP: Boolean(aplicaPYP) }),
+        ...(estado !== undefined && { estado: Boolean(estado) }),
+      },
+    });
+    res.json(item);
+  } catch {
+    res.status(500).json({ error: 'Error al actualizar cargo' });
+  }
+}
+
+export async function deleteCargo(req: Request, res: Response) {
+  try {
+    const { id } = req.params;
+    await prisma.cargo.update({ where: { id }, data: { estado: false } });
+    res.json({ message: 'Cargo desactivado' });
+  } catch {
+    res.status(500).json({ error: 'Error al eliminar cargo' });
+  }
+}
+
+export async function bulkCreateCargos(req: Request, res: Response) {
+  try {
+    const { items } = req.body as { items: any[] };
+    if (!Array.isArray(items) || items.length === 0)
+      return res.status(400).json({ error: 'Se requiere un arreglo de items' });
+
+    const results = { created: 0, skipped: 0, errors: [] as string[] };
+    for (const row of items) {
+      if (!row.codigo || !row.nombre) { results.errors.push(`Fila sin codigo/nombre: ${JSON.stringify(row)}`); continue; }
+      const exists = await prisma.cargo.findFirst({ where: { codigo: row.codigo } });
+      if (exists) { results.skipped++; continue; }
+      await prisma.cargo.create({ data: { codigo: row.codigo, nombre: row.nombre, descripcion: row.descripcion, tipo: row.tipo || 'CONSULTA', valor: Number(row.valor) || 0, unidad: row.unidad, codigoReferencia: row.codigoReferencia, usuarioCreacion: (req as any).user?.userId } });
+      results.created++;
+    }
+    res.json(results);
+  } catch {
+    res.status(500).json({ error: 'Error en cargue masivo de cargos' });
+  }
+}
+
+// ─── Bulk genérico por entidad ──────────────────────────────
+export async function bulkCreateEspecialidades(req: Request, res: Response) {
+  try {
+    const { items } = req.body as { items: any[] };
+    if (!Array.isArray(items) || items.length === 0)
+      return res.status(400).json({ error: 'Se requiere arreglo items' });
+    const results = { created: 0, skipped: 0, errors: [] as string[] };
+    for (const row of items) {
+      if (!row.codigo || !row.nombre) { results.errors.push(`Sin codigo/nombre: ${JSON.stringify(row)}`); continue; }
+      const exists = await prisma.especialidad.findFirst({ where: { OR: [{ codigo: row.codigo }, { nombre: row.nombre }] } });
+      if (exists) { results.skipped++; continue; }
+      await prisma.especialidad.create({ data: { codigo: row.codigo, nombre: row.nombre, descripcion: row.descripcion, usuarioCreacion: (req as any).user?.userId } });
+      results.created++;
+    }
+    res.json(results);
+  } catch {
+    res.status(500).json({ error: 'Error en cargue masivo de especialidades' });
+  }
+}
+
+export async function bulkCreateDepartamentos(req: Request, res: Response) {
+  try {
+    const { items } = req.body as { items: any[] };
+    if (!Array.isArray(items) || items.length === 0)
+      return res.status(400).json({ error: 'Se requiere arreglo items' });
+    const results = { created: 0, skipped: 0, errors: [] as string[] };
+    for (const row of items) {
+      if (!row.codigo || !row.nombre) { results.errors.push(`Sin codigo/nombre: ${JSON.stringify(row)}`); continue; }
+      const exists = await prisma.departamento.findFirst({ where: { codigo: row.codigo } });
+      if (exists) { results.skipped++; continue; }
+      await prisma.departamento.create({ data: { codigo: row.codigo, nombre: row.nombre, descripcion: row.descripcion } });
+      results.created++;
+    }
+    res.json(results);
+  } catch {
+    res.status(500).json({ error: 'Error en cargue masivo de departamentos' });
+  }
+}
+
+export async function bulkCreateTiposConsulta(req: Request, res: Response) {
+  try {
+    const { items } = req.body as { items: any[] };
+    if (!Array.isArray(items) || items.length === 0)
+      return res.status(400).json({ error: 'Se requiere arreglo items' });
+    const results = { created: 0, skipped: 0, errors: [] as string[] };
+    for (const row of items) {
+      if (!row.nombre) { results.errors.push(`Sin nombre: ${JSON.stringify(row)}`); continue; }
+      await prisma.tipoConsulta.create({ data: { nombre: row.nombre, descripcion: row.descripcion, clasificacion: row.clasificacion || 'CONSULTA', duracionMinutos: Number(row.duracionMinutos) || 30, usuarioCreacion: (req as any).user?.userId } });
+      results.created++;
+    }
+    res.json(results);
+  } catch {
+    res.status(500).json({ error: 'Error en cargue masivo de tipos consulta' });
+  }
+}

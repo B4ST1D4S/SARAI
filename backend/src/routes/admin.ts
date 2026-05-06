@@ -2,21 +2,23 @@ import { Router } from 'express';
 import { authenticateToken, authorizeRole } from '../middleware/auth.js';
 import {
   // Especialidades
-  getEspecialidades, createEspecialidad, updateEspecialidad, deleteEspecialidad,
+  getEspecialidades, createEspecialidad, updateEspecialidad, deleteEspecialidad, bulkCreateEspecialidades,
   // HC Módulos
   getHCModulos, createHCModulo, updateHCModulo, deleteHCModulo,
   // Departamentos
-  getDepartamentos, createDepartamento, updateDepartamento, deleteDepartamento,
+  getDepartamentos, createDepartamento, updateDepartamento, deleteDepartamento, bulkCreateDepartamentos,
   // Servicios
   getServicios, createServicio, updateServicio, deleteServicio,
   // Tipos Consulta
-  getTiposConsulta, getTipoConsultaById, createTipoConsulta, updateTipoConsulta, deleteTipoConsulta,
+  getTiposConsulta, getTipoConsultaById, createTipoConsulta, updateTipoConsulta, deleteTipoConsulta, bulkCreateTiposConsulta,
   // Config Servicios
   getConfigServicios, addServicioAConsulta, removeServicioDeConsulta,
   // Reglas operativas
   getReglasOperativas, upsertReglaOperativa,
   // Preparaciones
   getPreparaciones, createPreparacion, updatePreparacion, deletePreparacion,
+  // Cargos
+  getCargos, createCargo, updateCargo, deleteCargo, bulkCreateCargos,
 } from '../controllers/adminController.js';
 
 const router = Router();
@@ -24,8 +26,8 @@ const router = Router();
 // ── Todos los endpoints requieren autenticación ──
 router.use(authenticateToken);
 
-// Sólo SUPER_ADMIN puede crear/editar/eliminar
-const onlyAdmin = authorizeRole('SUPER_ADMIN');
+// SUPER_ADMIN, MEDICO y AUXILIAR pueden crear/editar en parametrización
+const onlyAdmin = authorizeRole('SUPER_ADMIN', 'MEDICO', 'AUXILIAR');
 
 // ─────────────────────────────────────────
 // ESPECIALIDADES
@@ -88,5 +90,21 @@ router.get('/preparaciones', getPreparaciones);
 router.post('/preparaciones', onlyAdmin, createPreparacion);
 router.put('/preparaciones/:id', onlyAdmin, updatePreparacion);
 router.delete('/preparaciones/:id', onlyAdmin, deletePreparacion);
+
+// ─────────────────────────────────────────
+// CARGOS DE CONSULTA EXTERNA
+// ─────────────────────────────────────────
+router.get('/cargos', getCargos);
+router.post('/cargos', onlyAdmin, createCargo);
+router.post('/cargos/bulk', onlyAdmin, bulkCreateCargos);
+router.put('/cargos/:id', onlyAdmin, updateCargo);
+router.delete('/cargos/:id', onlyAdmin, deleteCargo);
+
+// ─────────────────────────────────────────
+// BULK (CARGUE MASIVO)
+// ─────────────────────────────────────────
+router.post('/especialidades/bulk', onlyAdmin, bulkCreateEspecialidades);
+router.post('/departamentos/bulk', onlyAdmin, bulkCreateDepartamentos);
+router.post('/tipos-consulta/bulk', onlyAdmin, bulkCreateTiposConsulta);
 
 export default router;
