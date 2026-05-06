@@ -16,8 +16,9 @@ generator client {
 
 model User {
   id        String   @id @default(cuid())
-  email     String   @unique
-  password  String   // bcrypt hash
+  username  String   @unique           // login por usuario (ej: "demo", "drlopez")
+  email     String?  @unique           // opcional, para notificaciones
+  password  String                     // bcrypt hash — nunca en texto plano
   nombre    String
   apellido  String
   rol       Role     @default(RECEPCIONISTA)
@@ -41,7 +42,7 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   
-  @@index([email])
+  @@index([username])
   @@index([rol])
 }
 

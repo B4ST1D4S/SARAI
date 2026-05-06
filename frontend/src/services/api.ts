@@ -83,16 +83,8 @@ export async function apiCall<T>(
 // ============================================
 
 export interface LoginRequest {
-  email: string;
+  username: string;
   password: string;
-}
-
-export interface RegisterRequest {
-  email: string;
-  password: string;
-  nombre: string;
-  apellido: string;
-  rol?: string;
 }
 
 export interface AuthResponse {
@@ -100,7 +92,7 @@ export interface AuthResponse {
   refreshToken: string;
   user: {
     id: string;
-    email: string;
+    username: string;
     nombre: string;
     apellido: string;
     rol: string;
@@ -111,13 +103,6 @@ export async function login(credentials: LoginRequest) {
   return apiCall<AuthResponse>('/auth/login', {
     method: 'POST',
     body: credentials,
-  });
-}
-
-export async function register(data: RegisterRequest) {
-  return apiCall<AuthResponse>('/auth/register', {
-    method: 'POST',
-    body: data,
   });
 }
 
