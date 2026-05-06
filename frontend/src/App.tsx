@@ -17,6 +17,7 @@ import FacturacionPage from './pages/FacturacionPage';
 import PlantillasPage from './pages/PlantillasPage';
 import MapaCorporalPage from './pages/MapaCorporalPage';
 import { Body3DTestPage } from './pages/Body3DTestPage';
+import UsuariosPage from './pages/UsuariosPage';
 import SaraiAssistant from './components/SaraiAssistant';
 
 const NAV_SECTIONS = [
@@ -48,6 +49,12 @@ const NAV_SECTIONS = [
       { id: 'crm',            label: 'CRM',            sym: 'R' },
       { id: 'facturacion',    label: 'Facturacion',    sym: 'B' },
       { id: 'plantillas',     label: 'Plantillas',     sym: 'L' },
+    ],
+  },
+  {
+    label: 'ADMINISTRACIÓN',
+    items: [
+      { id: 'usuarios', label: 'Usuarios', sym: 'V' },
     ],
   },
 ];
@@ -343,6 +350,7 @@ function App() {
           {currentPage === 'plantillas'          && <PlantillasPage />}
           {currentPage === 'mapa-corporal'       && <MapaCorporalPage />}
           {currentPage === 'body3d-test'         && <Body3DTestPage />}
+          {currentPage === 'usuarios'            && <UsuariosPage />}
         </div>
         </div>
       </main>

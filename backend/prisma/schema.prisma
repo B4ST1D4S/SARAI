@@ -23,9 +23,13 @@ model User {
   apellido  String
   rol       Role     @default(RECEPCIONISTA)
   
-  // Para médicos
-  especialidad String?
-  numeroDocumento String?
+  // Para médicos / profesionales
+  especialidad        String?
+  tipoDocumento       String?   // CC, CE, PS, TI
+  numeroDocumento     String?
+  registroProfesional String?   // número de tarjeta profesional
+  registroMedico      String?   // RETHUS / registro médico
+  firmaBase64         String?   @db.Text  // firma escaneada en base64
   
   telefono  String?
   activo    Boolean  @default(true)
