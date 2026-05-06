@@ -16,7 +16,7 @@ generator client {
 
 model User {
   id        String   @id @default(cuid())
-  email     String   @unique
+  email     String?  @unique
   password  String   // bcrypt hash
   nombre    String
   apellido  String
@@ -25,6 +25,13 @@ model User {
   // Para médicos
   especialidad String?
   numeroDocumento String?
+  
+  // Columnas extendidas (rama paralela)
+  username             String?  @unique
+  tipoDocumento        String?
+  registroMedico       String?
+  registroProfesional  String?
+  firmaBase64          String?
   
   telefono  String?
   activo    Boolean  @default(true)
@@ -762,4 +769,208 @@ model BloqueDisponibilidad {
 
   @@index([medicoId])
   @@index([fechaInicio])
+}
+
+// ============================================
+// MÓDULO: PARAMETRIZACIÓN DEL SISTEMA
+// Consulta Externa – SARAI Admin
+// ============================================
+
+// 1. ESPECIALIDADES
+model Especialidad {
+  id                    String   @id @default(cuid())
+  codigo                String   @unique
+  nombre                String   @unique
+  descripcion           String?
+  aplicaAnestesia       Boolean  @default(false)
+  aplicaPediatria       Boolean  @default(false)
+  aplicaCirugia         Boolean  @default(false)
+  aplicaInstrumentacion Boolean  @default(false)
+  aplicaMedicoFamiliar  Boolean  @default(false)
+  estado                Boolean  @default(true)
+  usuarioCreacion       String?
+
+  tiposConsulta         TipoConsulta[]
+  preparaciones         Preparacion[]
+
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([estado])
+}
+
+// 2. HC MÓDULOS (Tipos de Historia Clínica)
+model HCModulo {
+  id                      String   @id @default(cuid())
+  codigo                  String   @unique
+  nombre                  String
+  descripcion             String?
+  activo                  Boolean  @default(true)
+  tipoFinalidad           String?
+  tipoRips                String?
+  parametrosConfiguracion Json?
+  programaId              String?
+  usuarioCreacion         String?
+
+  tiposConsulta           TipoConsulta[]
+
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  @@index([activo])
+}
+
+// 3. DEPARTAMENTOS
+model Departamento {
+  id          String   @id @default(cuid())
+  codigo      String   @unique
+  nombre      String
+  descripcion String?
+  estado      Boolean  @default(true)
+
+  tiposConsulta  TipoConsulta[]
+  reglas         ReglaOperativa[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([estado])
+}
+
+// 4. SERVICIOS FACTURABLES (catálogo CUPS para facturación)
+model ServicioFacturable {
+  id               String   @id @default(cuid())
+  codigoCups       String   @unique
+  nombre           String
+  descripcion      String?
+  categoria        String?
+  subcategoria     String?
+  tipoServicio     String?
+  nivelComplejidad String?
+  conceptoRips     String?
+  precioBase       Float    @default(0)
+  requiereCantidad Boolean  @default(false)
+  esHonorario      Boolean  @default(false)
+  esPOS            Boolean  @default(false)
+  estado           Boolean  @default(true)
+
+  configConsultas  ConfigServicioConsulta[]
+  reglas           ReglaOperativa[]
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([estado])
+  @@index([categoria])
+}
+
+// 5. TIPOS DE CONSULTA (núcleo)
+model TipoConsulta {
+  id                       String   @id @default(cuid())
+  nombre                   String
+  descripcion              String?
+
+  especialidadId           String?
+  especialidad             Especialidad?       @relation(fields: [especialidadId], references: [id])
+
+  departamentoId           String?
+  departamento             Departamento?       @relation(fields: [departamentoId], references: [id])
+
+  hcModuloId               String?
+  hcModulo                 HCModulo?           @relation(fields: [hcModuloId], references: [id])
+
+  // Flags clínicos
+  requiereCaja             Boolean  @default(false)
+  manejaAnestesia          Boolean  @default(false)
+  permiteAgendamiento      Boolean  @default(true)
+  controlaTiempoCita       Boolean  @default(false)
+  abreHistoriaClinica      Boolean  @default(true)
+  permiteCargosAdicionales Boolean  @default(false)
+  esProgramaPYP            Boolean  @default(false)
+  manejaProtocolos         Boolean  @default(false)
+  clasificacion            String   @default("CONSULTA") // CONSULTA, PROCEDIMIENTO, CIRUGIA, CONTROL
+  esPsicologia             Boolean  @default(false)
+
+  // Operativo
+  duracionMinutos          Int      @default(30)
+  bodegaId                 String?
+
+  estado                   Boolean  @default(true)
+  usuarioCreacion          String?
+
+  serviciosConfig          ConfigServicioConsulta[]
+  preparaciones            Preparacion[]
+
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  @@index([especialidadId])
+  @@index([estado])
+}
+
+// 6. CONFIGURACIÓN DE SERVICIOS POR CONSULTA
+model ConfigServicioConsulta {
+  id                String   @id @default(cuid())
+  tipoConsultaId    String
+  tipoConsulta      TipoConsulta       @relation(fields: [tipoConsultaId], references: [id], onDelete: Cascade)
+  servicioId        String
+  servicio          ServicioFacturable @relation(fields: [servicioId], references: [id])
+
+  esPrincipal       Boolean  @default(false)
+  generaAutomatico  Boolean  @default(false)
+  requiereOrden     Boolean  @default(false)
+  centroOperacionId String?
+  cuentaContable    String?
+  hcModuloId        String?
+  usuarioCreacion   String?
+
+  createdAt         DateTime @default(now())
+
+  @@unique([tipoConsultaId, servicioId])
+  @@index([tipoConsultaId])
+  @@index([servicioId])
+}
+
+// 7. REGLAS OPERATIVAS (Departamento × Servicio)
+model ReglaOperativa {
+  id                     String   @id @default(cuid())
+  departamentoId         String
+  departamento           Departamento       @relation(fields: [departamentoId], references: [id], onDelete: Cascade)
+  servicioId             String
+  servicio               ServicioFacturable @relation(fields: [servicioId], references: [id])
+
+  permiteSeleccion       Boolean  @default(true)
+  manejaInsumos          Boolean  @default(false)
+  generaOrden            Boolean  @default(false)
+  liquidaHonorarios      Boolean  @default(false)
+  cumplimientoAutomatico Boolean  @default(false)
+  tomadoAutomatico       Boolean  @default(false)
+  cumplimientoParcial    Boolean  @default(false)
+  manejaCentroCosto      Boolean  @default(false)
+
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  @@unique([departamentoId, servicioId])
+  @@index([departamentoId])
+}
+
+// 8. PREPARACIONES / RECOMENDACIONES
+model Preparacion {
+  id               String   @id @default(cuid())
+  nombre           String
+  descripcion      String?
+  tipo             String   @default("consulta") // consulta | procedimiento
+  especialidadId   String?
+  especialidad     Especialidad?  @relation(fields: [especialidadId], references: [id])
+  tipoConsultaId   String?
+  tipoConsulta     TipoConsulta?  @relation(fields: [tipoConsultaId], references: [id])
+  estado           Boolean  @default(true)
+  usuarioCreacion  String?
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([estado])
+  @@index([tipoConsultaId])
 }
