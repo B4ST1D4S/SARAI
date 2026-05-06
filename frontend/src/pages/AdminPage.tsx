@@ -11,7 +11,7 @@ import {
   Settings, Plus, Edit2, Trash2, Save, X, Upload,
   Download, ChevronRight, Activity, Building2, Layers,
   DollarSign, ToggleLeft, ToggleRight, Search, CheckCircle,
-  AlertTriangle, ChevronDown, FolderOpen,
+  AlertTriangle, ChevronDown, FolderOpen, LayoutGrid, BookOpen, GitBranch,
 } from 'lucide-react';
 import * as svc from '../services/adminService';
 
@@ -280,15 +280,17 @@ function BulkModal({ title, headers, filename, onUpload, onClose }: {
   );
 }
 
-function SecHeader({ title, onNew, onBulk }: { title: string; onNew: () => void; onBulk: () => void }) {
+function SecHeader({ title, onNew, onBulk }: { title: string; onNew: () => void; onBulk?: () => void }) {
   return (
     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
       <h2 className="text-sm font-bold text-white">{title}</h2>
       <div className="flex gap-2">
-        <button onClick={onBulk}
-          className="flex items-center gap-1.5 px-3 py-2 bg-slate-700 hover:bg-slate-600 text-gray-300 hover:text-white rounded-lg text-xs font-semibold border border-white/10 transition">
-          <Upload size={13} /> Cargue Masivo
-        </button>
+        {onBulk && (
+          <button onClick={onBulk}
+            className="flex items-center gap-1.5 px-3 py-2 bg-slate-700 hover:bg-slate-600 text-gray-300 hover:text-white rounded-lg text-xs font-semibold border border-white/10 transition">
+            <Upload size={13} /> Cargue Masivo
+          </button>
+        )}
         <button onClick={onNew}
           className="flex items-center gap-1.5 px-3 py-2 bg-yellow-600 hover:bg-yellow-500 text-white rounded-lg text-xs font-semibold transition">
           <Plus size={13} /> Nuevo
@@ -421,7 +423,12 @@ function TabTiposConsulta() {
   });
 
   const openCreate = () => { setForm(blank()); setErr(''); setWiz(0); setModal('create'); };
-  const openEdit   = (r: any) => { setForm({...r, especialidadId:r.especialidadId||'', departamentoId:r.departamentoId||''}); setErr(''); setWiz(0); setModal('edit'); };
+  const openEdit   = (r: any) => {
+    // Strip nested relation objects para evitar errores en Prisma update
+    const { especialidad, departamento, hcModulo, serviciosConfig, preparaciones, ...rest } = r;
+    setForm({ ...rest, especialidadId: r.especialidadId || '', departamentoId: r.departamentoId || '', hcModuloId: r.hcModuloId || '' });
+    setErr(''); setWiz(0); setModal('edit');
+  };
 
   const save = async () => {
     setErr('');
@@ -751,13 +758,329 @@ function TabCargos() {
 }
 
 // ════════════════════════════════════════════════
+// TAB: TIPOS DE CONSULTORIO
+// ════════════════════════════════════════════════
+function TabTiposConsultorio() {
+  const [items, setItems] = useState<any[]>([]);
+  const [modal, setModal] = useState<null|'create'|'edit'>(null);
+  const [form,  setForm]  = useState<any>({});
+  const [err,   setErr]   = useState('');
+
+  const load = useCallback(async () => {
+    try { setItems(await svc.getTiposConsultorio() as any[]); } catch {}
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  const blank = () => ({ codigo: '', tipoConsultorio: '', descripcion: '', indiceAutomatico: '' });
+  const openCreate = () => { setForm(blank()); setErr(''); setModal('create'); };
+  const openEdit   = (r: any) => {
+    setForm({ ...r, indiceAutomatico: r.indiceAutomatico != null ? String(r.indiceAutomatico) : '' });
+    setErr(''); setModal('edit');
+  };
+
+  const save = async () => {
+    setErr('');
+    try {
+      if (modal === 'create') await svc.createTipoConsultorio(form);
+      else await svc.updateTipoConsultorio(form.id, form);
+      setModal(null); load();
+    } catch (e: any) { setErr(e.message); }
+  };
+
+  const del = async (r: any) => {
+    if (!confirm(`¿Desactivar consultorio "${r.codigo}"?`)) return;
+    try { await svc.deleteTipoConsultorio(r.id); load(); } catch (e: any) { alert(e.message); }
+  };
+
+  const f = (k: string) => (v: any) => setForm((p: any) => ({ ...p, [k]: v }));
+
+  return (
+    <>
+      <SecHeader title="Tipos de Consultorio" onNew={openCreate} />
+      <Table items={items}
+        cols={[
+          { key: 'codigo',           label: 'Código' },
+          { key: 'tipoConsultorio',  label: 'Tipo Consultorio' },
+          { key: 'descripcion',      label: 'Descripción' },
+          { key: 'indiceAutomatico', label: 'Índice Auto', render: r => r.indiceAutomatico ?? '—' },
+          { key: 'estado',           label: 'Estado', render: r => EBadge(r.estado) },
+        ]}
+        onEdit={openEdit} onDelete={del}
+      />
+      <AnimatePresence>
+        {(modal === 'create' || modal === 'edit') && (
+          <Modal title={modal === 'create' ? 'Nuevo Tipo Consultorio' : 'Editar Tipo Consultorio'} onClose={() => setModal(null)}>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="Código" value={form.codigo || ''} onChange={f('codigo')} required placeholder="Ej: C001" />
+                <Field label="Tipo Consultorio" value={form.tipoConsultorio || ''} onChange={f('tipoConsultorio')} required placeholder="Ej: CONS" />
+              </div>
+              <Field label="Descripción" value={form.descripcion || ''} onChange={f('descripcion')} type="textarea" />
+              <Field label="Índice Automático" value={String(form.indiceAutomatico ?? '')} onChange={f('indiceAutomatico')} type="number" placeholder="Ej: 1" />
+              {modal === 'edit' && <Sw value={!!form.estado} onChange={f('estado')} label="Activo" />}
+              {err && <ErrBox msg={err} />}
+              <FormFooter onCancel={() => setModal(null)} onSave={save} />
+            </div>
+          </Modal>
+        )}
+      </AnimatePresence>
+    </>
+  );
+}
+
+// ════════════════════════════════════════════════
+// TAB: DEPARTAMENTOS × CARGOS
+// ════════════════════════════════════════════════
+function TabDepartamentosCargos() {
+  const [departamentos, setDepartamentos] = useState<any[]>([]);
+  const [cargos,        setCargos]        = useState<any[]>([]);
+  const [selDep,        setSelDep]        = useState('');
+  const [items,         setItems]         = useState<any[]>([]);
+  const [modal,         setModal]         = useState<null|'create'|'edit'>(null);
+  const [form,          setForm]          = useState<any>({});
+  const [err,           setErr]           = useState('');
+  const [loading,       setLoading]       = useState(false);
+
+  useEffect(() => {
+    Promise.all([svc.getDepartamentos(), svc.getCargos()]).then(([d, c]) => {
+      setDepartamentos(d as any[]); setCargos(c as any[]);
+    });
+  }, []);
+
+  const loadItems = useCallback(async () => {
+    if (!selDep) { setItems([]); return; }
+    setLoading(true);
+    try { setItems(await svc.getDepartamentoCargos(selDep) as any[]); }
+    catch {} finally { setLoading(false); }
+  }, [selDep]);
+  useEffect(() => { loadItems(); }, [loadItems]);
+
+  const blankForm = () => ({
+    cargoId: '',
+    permiteSeleccion: true,  manejaInsumos: false,
+    cumplimientoAutomatico: false, tomadoAutomatico: false,
+    interfaceExterno: false,  generaOrden: false,
+    liquidaHonorarios: false, cumplimientoParcial: false, manejaCentroCosto: false,
+  });
+
+  const openCreate = () => { setForm(blankForm()); setErr(''); setModal('create'); };
+  const openEdit   = (r: any) => {
+    const { cargo, departamento, ...rest } = r;
+    setForm({ ...rest }); setErr(''); setModal('edit');
+  };
+
+  const save = async () => {
+    setErr('');
+    try {
+      if (modal === 'create') await svc.createDepartamentoCargo(selDep, form);
+      else await svc.updateDepartamentoCargo(form.id, form);
+      setModal(null); loadItems();
+    } catch (e: any) { setErr(e.message); }
+  };
+
+  const del = async (r: any) => {
+    if (!confirm(`¿Eliminar asignación de "${r.cargo?.nombre}"?`)) return;
+    try { await svc.deleteDepartamentoCargo(r.id); loadItems(); } catch (e: any) { alert(e.message); }
+  };
+
+  const f = (k: string) => (v: any) => setForm((p: any) => ({ ...p, [k]: v }));
+  const depNombre = departamentos.find(d => d.id === selDep)?.nombre || '';
+
+  return (
+    <>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+        <div>
+          <h2 className="text-sm font-bold text-white">Cargos por Departamento</h2>
+          <p className="text-[11px] text-gray-500 mt-0.5">Selecciona un departamento para gestionar sus cargos asignados</p>
+        </div>
+        {selDep && (
+          <button onClick={openCreate}
+            className="flex items-center gap-1.5 px-3 py-2 bg-yellow-600 hover:bg-yellow-500 text-white rounded-lg text-xs font-semibold transition">
+            <Plus size={13} /> Asignar Cargo
+          </button>
+        )}
+      </div>
+
+      <div className="mb-5">
+        <Sel label="Departamento" value={selDep} onChange={setSelDep}
+          options={[{ value: '', label: '— Selecciona un departamento —' },
+            ...departamentos.map(d => ({ value: d.id, label: `${d.codigo} – ${d.nombre}` }))]} />
+      </div>
+
+      {!selDep ? (
+        <p className="text-center text-gray-500 py-14 text-sm">Selecciona un departamento para ver sus cargos.</p>
+      ) : loading ? (
+        <p className="text-center text-gray-500 py-10 text-sm">Cargando...</p>
+      ) : (
+        <>
+          {depNombre && (
+            <p className="text-xs text-yellow-400 font-semibold mb-3">
+              Departamento: {depNombre} · <span className="text-gray-400">{items.length} cargo(s) asignado(s)</span>
+            </p>
+          )}
+          <Table items={items}
+            cols={[
+              { key: 'cargo',           label: 'Cargo',       render: r => r.cargo?.nombre || '—' },
+              { key: 'codigoCargo',     label: 'Código',      render: r => <span className="font-mono text-yellow-400/80">{r.cargo?.codigo || '—'}</span> },
+              { key: 'tipo',            label: 'Tipo',        render: r => <span className="px-2 py-0.5 rounded-full text-[10px] bg-purple-500/20 text-purple-300">{r.cargo?.tipo || '—'}</span> },
+              { key: 'permiteSeleccion',   label: 'Selección',  render: r => r.permiteSeleccion ? <span className="text-emerald-400">✓</span> : <span className="text-gray-600">—</span> },
+              { key: 'generaOrden',        label: 'Crea Orden', render: r => r.generaOrden ? <span className="text-yellow-400">✓</span> : <span className="text-gray-600">—</span> },
+              { key: 'liquidaHonorarios',  label: 'Honorarios', render: r => r.liquidaHonorarios ? <span className="text-blue-400">✓</span> : <span className="text-gray-600">—</span> },
+              { key: 'manejaCentroCosto',  label: 'Cto. Costo', render: r => r.manejaCentroCosto ? <span className="text-teal-400">✓</span> : <span className="text-gray-600">—</span> },
+            ]}
+            onEdit={openEdit} onDelete={del}
+          />
+        </>
+      )}
+
+      <AnimatePresence>
+        {(modal === 'create' || modal === 'edit') && (
+          <Modal title={modal === 'create' ? 'Asignar Cargo al Departamento' : 'Editar Reglas del Cargo'} onClose={() => setModal(null)} maxW="max-w-2xl">
+            <div className="space-y-4">
+              {modal === 'create' ? (
+                <Sel label="Cargo *" value={form.cargoId || ''} onChange={f('cargoId')}
+                  options={[{ value: '', label: '— Selecciona un cargo —' },
+                    ...cargos.map(c => ({ value: c.id, label: `${c.codigo} – ${c.nombre}` }))]} />
+              ) : (
+                <div className="p-3 bg-slate-800/60 rounded-xl border border-white/5 text-xs">
+                  <span className="text-gray-400">Cargo: </span>
+                  <span className="text-white font-semibold">{items.find(i => i.id === form.id)?.cargo?.nombre}</span>
+                </div>
+              )}
+              <p className="text-[10px] text-gray-500 font-semibold uppercase tracking-wider">Reglas Operativas</p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <Sw value={!!form.permiteSeleccion}       onChange={f('permiteSeleccion')}       label="Permite Selección" />
+                <Sw value={!!form.manejaInsumos}          onChange={f('manejaInsumos')}          label="Maneja Insumos" />
+                <Sw value={!!form.cumplimientoAutomatico} onChange={f('cumplimientoAutomatico')} label="Cumplido Automático" />
+                <Sw value={!!form.tomadoAutomatico}       onChange={f('tomadoAutomatico')}       label="Tomado Automático" />
+                <Sw value={!!form.interfaceExterno}       onChange={f('interfaceExterno')}       label="Interface Externo" />
+                <Sw value={!!form.generaOrden}            onChange={f('generaOrden')}            label="Genera Orden" />
+                <Sw value={!!form.liquidaHonorarios}      onChange={f('liquidaHonorarios')}      label="Liquida Honorarios" />
+                <Sw value={!!form.cumplimientoParcial}    onChange={f('cumplimientoParcial')}    label="Cumplimiento Parcial" />
+                <Sw value={!!form.manejaCentroCosto}      onChange={f('manejaCentroCosto')}      label="Centro de Costo" />
+              </div>
+              {err && <ErrBox msg={err} />}
+              <FormFooter onCancel={() => setModal(null)} onSave={save} />
+            </div>
+          </Modal>
+        )}
+      </AnimatePresence>
+    </>
+  );
+}
+
+// ════════════════════════════════════════════════
+// TAB: PREPARACIONES / RECOMENDACIONES MÉDICAS
+// ════════════════════════════════════════════════
+const TIPOS_PREP = [
+  { value: 'consulta',      label: 'Consulta'      },
+  { value: 'procedimiento', label: 'Procedimiento' },
+  { value: 'cirugia',       label: 'Cirugía'       },
+  { value: 'general',       label: 'General'       },
+];
+
+function TabPreparaciones() {
+  const [items,  setItems]  = useState<any[]>([]);
+  const [esps,   setEsps]   = useState<any[]>([]);
+  const [tcs,    setTcs]    = useState<any[]>([]);
+  const [modal,  setModal]  = useState<null|'create'|'edit'>(null);
+  const [form,   setForm]   = useState<any>({});
+  const [err,    setErr]    = useState('');
+  const [search, setSearch] = useState('');
+
+  const load = useCallback(async () => {
+    try {
+      const [preps, e, tc] = await Promise.all([
+        svc.getPreparaciones(),
+        svc.getEspecialidades(),
+        svc.getTiposConsulta(),
+      ]);
+      const all = preps as any[];
+      const filtered = search
+        ? all.filter(p => p.nombre.toLowerCase().includes(search.toLowerCase()))
+        : all;
+      setItems(filtered); setEsps(e as any[]); setTcs(tc as any[]);
+    } catch {}
+  }, [search]);
+  useEffect(() => { const t = setTimeout(load, 300); return () => clearTimeout(t); }, [load]);
+
+  const blank = () => ({ nombre: '', descripcion: '', tipo: 'consulta', especialidadId: '', tipoConsultaId: '' });
+  const openCreate = () => { setForm(blank()); setErr(''); setModal('create'); };
+  const openEdit   = (r: any) => {
+    const { especialidad, tipoConsulta, ...rest } = r;
+    setForm({ ...rest, especialidadId: r.especialidadId || '', tipoConsultaId: r.tipoConsultaId || '' });
+    setErr(''); setModal('edit');
+  };
+
+  const save = async () => {
+    setErr('');
+    try {
+      if (modal === 'create') await svc.createPreparacion(form);
+      else await svc.updatePreparacion(form.id, form);
+      setModal(null); load();
+    } catch (e: any) { setErr(e.message); }
+  };
+
+  const del = async (r: any) => {
+    if (!confirm(`¿Desactivar preparación "${r.nombre}"?`)) return;
+    try { await svc.deletePreparacion(r.id); load(); } catch (e: any) { alert(e.message); }
+  };
+
+  const f = (k: string) => (v: any) => setForm((p: any) => ({ ...p, [k]: v }));
+
+  return (
+    <>
+      <SecHeader title="Preparaciones / Recomendaciones Médicas" onNew={openCreate} />
+      <div className="relative mb-4 max-w-sm">
+        <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar por nombre..."
+          className="w-full pl-9 pr-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-xs text-white focus:border-yellow-500 focus:outline-none" />
+      </div>
+      <Table items={items}
+        cols={[
+          { key: 'nombre',       label: 'Nombre' },
+          { key: 'tipo',         label: 'Tipo',         render: r => <span className="px-2 py-0.5 rounded-full text-[10px] bg-indigo-500/20 text-indigo-300">{r.tipo}</span> },
+          { key: 'especialidad', label: 'Especialidad', render: r => r.especialidad?.nombre || '— Todas —' },
+          { key: 'tipoConsulta', label: 'Tipo Consulta',render: r => r.tipoConsulta?.nombre || '— Todas —' },
+          { key: 'descripcion',  label: 'Instrucciones',render: r => r.descripcion ? r.descripcion.slice(0, 60) + (r.descripcion.length > 60 ? '…' : '') : '—' },
+          { key: 'estado',       label: 'Estado',       render: r => EBadge(r.estado) },
+        ]}
+        onEdit={openEdit} onDelete={del}
+      />
+      <AnimatePresence>
+        {(modal === 'create' || modal === 'edit') && (
+          <Modal title={modal === 'create' ? 'Nueva Preparación / Recomendación' : 'Editar Preparación'} onClose={() => setModal(null)} maxW="max-w-xl">
+            <div className="space-y-4">
+              <Field label="Nombre *" value={form.nombre || ''} onChange={f('nombre')} required placeholder="Ej: Ayuno 8 horas previo al procedimiento" />
+              <Field label="Instrucciones detalladas" value={form.descripcion || ''} onChange={f('descripcion')} type="textarea" placeholder="Escriba las instrucciones completas para el paciente..." />
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <Sel label="Tipo" value={form.tipo || 'consulta'} onChange={f('tipo')} options={TIPOS_PREP} />
+                <Sel label="Especialidad" value={form.especialidadId || ''} onChange={f('especialidadId')}
+                  options={[{ value: '', label: '— Todas las especialidades —' }, ...esps.map(e => ({ value: e.id, label: e.nombre }))]} />
+                <Sel label="Tipo de Consulta" value={form.tipoConsultaId || ''} onChange={f('tipoConsultaId')}
+                  options={[{ value: '', label: '— Todos los tipos —' }, ...tcs.map(t => ({ value: t.id, label: t.nombre }))]} />
+              </div>
+              {modal === 'edit' && <Sw value={!!form.estado} onChange={f('estado')} label="Activo" />}
+              {err && <ErrBox msg={err} />}
+              <FormFooter onCancel={() => setModal(null)} onSave={save} />
+            </div>
+          </Modal>
+        )}
+      </AnimatePresence>
+    </>
+  );
+}
+
+// ════════════════════════════════════════════════
 // ESTRUCTURA DE MÓDULOS/SUBMÓDULOS
 // ════════════════════════════════════════════════
 const SUBMODULOS = [
-  { id:'especialidades', label:'Especialidades',    icon:Activity,   component:TabEspecialidades },
-  { id:'tipos-consulta', label:'Tipos de Consulta', icon:Layers,     component:TabTiposConsulta  },
-  { id:'departamentos',  label:'Departamentos',     icon:Building2,  component:TabDepartamentos  },
-  { id:'cargos',         label:'Cargos',            icon:DollarSign, component:TabCargos         },
+  { id:'especialidades',    label:'Especialidades',      icon:Activity,    component:TabEspecialidades    },
+  { id:'tipos-consulta',    label:'Tipos de Consulta',   icon:Layers,      component:TabTiposConsulta     },
+  { id:'tipos-consultorio', label:'Tipos Consultorio',   icon:LayoutGrid,  component:TabTiposConsultorio  },
+  { id:'departamentos',     label:'Departamentos',       icon:Building2,   component:TabDepartamentos     },
+  { id:'deptos-cargos',     label:'Depto × Cargos',      icon:GitBranch,   component:TabDepartamentosCargos },
+  { id:'preparaciones',     label:'Preparaciones',       icon:BookOpen,    component:TabPreparaciones     },
 ];
 
 const MODULOS = [

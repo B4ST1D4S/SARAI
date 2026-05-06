@@ -19,6 +19,10 @@ import {
   getPreparaciones, createPreparacion, updatePreparacion, deletePreparacion,
   // Cargos
   getCargos, createCargo, updateCargo, deleteCargo, bulkCreateCargos,
+  // Tipos Consultorio
+  getTiposConsultorio, createTipoConsultorio, updateTipoConsultorio, deleteTipoConsultorio,
+  // Departamento × Cargo
+  getDepartamentoCargos, createDepartamentoCargo, updateDepartamentoCargo, deleteDepartamentoCargo,
 } from '../controllers/adminController.js';
 
 const router = Router();
@@ -106,5 +110,21 @@ router.delete('/cargos/:id', onlyAdmin, deleteCargo);
 router.post('/especialidades/bulk', onlyAdmin, bulkCreateEspecialidades);
 router.post('/departamentos/bulk', onlyAdmin, bulkCreateDepartamentos);
 router.post('/tipos-consulta/bulk', onlyAdmin, bulkCreateTiposConsulta);
+
+// ─────────────────────────────────────────
+// TIPOS DE CONSULTORIO
+// ─────────────────────────────────────────
+router.get('/tipos-consultorio', getTiposConsultorio);
+router.post('/tipos-consultorio', onlyAdmin, createTipoConsultorio);
+router.put('/tipos-consultorio/:id', onlyAdmin, updateTipoConsultorio);
+router.delete('/tipos-consultorio/:id', onlyAdmin, deleteTipoConsultorio);
+
+// ─────────────────────────────────────────
+// DEPARTAMENTO × CARGO
+// ─────────────────────────────────────────
+router.get('/departamentos/:departamentoId/cargos', getDepartamentoCargos);
+router.post('/departamentos/:departamentoId/cargos', onlyAdmin, createDepartamentoCargo);
+router.put('/departamento-cargos/:id', onlyAdmin, updateDepartamentoCargo);
+router.delete('/departamento-cargos/:id', onlyAdmin, deleteDepartamentoCargo);
 
 export default router;

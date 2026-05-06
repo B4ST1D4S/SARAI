@@ -354,18 +354,32 @@ export async function createTipoConsulta(req: Request, res: Response) {
 export async function updateTipoConsulta(req: Request, res: Response) {
   try {
     const { id } = req.params;
-    const { servicios, ...data } = req.body;
-    delete data.id;
+    // Desestructurar solo campos escalares — descartar relaciones anidadas
+    const {
+      nombre, descripcion, especialidadId, departamentoId, hcModuloId,
+      requiereCaja, manejaAnestesia, permiteAgendamiento, controlaTiempoCita,
+      abreHistoriaClinica, permiteCargosAdicionales, esProgramaPYP,
+      manejaProtocolos, clasificacion, esPsicologia, duracionMinutos, bodegaId,
+      estado, servicios,
+    } = req.body;
 
-    // Normalizar FKs vacías
-    if (data.especialidadId === '') data.especialidadId = null;
-    if (data.departamentoId === '') data.departamentoId = null;
-    if (data.hcModuloId === '') data.hcModuloId = null;
-
-    await prisma.tipoConsulta.update({ where: { id }, data });
+    await prisma.tipoConsulta.update({
+      where: { id },
+      data: {
+        nombre, descripcion,
+        especialidadId: especialidadId || null,
+        departamentoId: departamentoId || null,
+        hcModuloId: hcModuloId || null,
+        requiereCaja, manejaAnestesia, permiteAgendamiento, controlaTiempoCita,
+        abreHistoriaClinica, permiteCargosAdicionales, esProgramaPYP,
+        manejaProtocolos, clasificacion, esPsicologia,
+        ...(duracionMinutos !== undefined && { duracionMinutos: Number(duracionMinutos) }),
+        ...(bodegaId !== undefined && { bodegaId: bodegaId || null }),
+        ...(estado !== undefined && { estado }),
+      },
+    });
 
     if (servicios && Array.isArray(servicios)) {
-      // Reemplazar configuración de servicios
       await prisma.configServicioConsulta.deleteMany({ where: { tipoConsultaId: id } });
       for (const svc of servicios) {
         await prisma.configServicioConsulta.create({
@@ -538,7 +552,14 @@ export async function getPreparaciones(req: Request, res: Response) {
     const where: any = { estado: true };
     if (tipoConsultaId) where.tipoConsultaId = tipoConsultaId;
     if (especialidadId) where.especialidadId = especialidadId;
-    const items = await prisma.preparacion.findMany({ where, orderBy: { nombre: 'asc' } });
+    const items = await prisma.preparacion.findMany({
+      where,
+      include: {
+        especialidad: { select: { id: true, nombre: true } },
+        tipoConsulta: { select: { id: true, nombre: true } },
+      },
+      orderBy: { nombre: 'asc' },
+    });
     res.json(items);
   } catch {
     res.status(500).json({ error: 'Error al obtener preparaciones' });
@@ -742,5 +763,156 @@ export async function bulkCreateTiposConsulta(req: Request, res: Response) {
     res.json(results);
   } catch {
     res.status(500).json({ error: 'Error en cargue masivo de tipos consulta' });
+  }
+}
+
+// ─────────────────────────────────────────
+// 10. TIPOS DE CONSULTORIO
+// ─────────────────────────────────────────
+
+export async function getTiposConsultorio(req: Request, res: Response) {
+  try {
+    const items = await prisma.tipoConsultorio.findMany({
+      where: { estado: true },
+      orderBy: { codigo: 'asc' },
+    });
+    res.json(items);
+  } catch {
+    res.status(500).json({ error: 'Error al obtener tipos de consultorio' });
+  }
+}
+
+export async function createTipoConsultorio(req: Request, res: Response) {
+  try {
+    const { codigo, tipoConsultorio, descripcion, indiceAutomatico } = req.body;
+    if (!codigo || !tipoConsultorio) return res.status(400).json({ error: 'codigo y tipoConsultorio son requeridos' });
+    const existe = await prisma.tipoConsultorio.findUnique({ where: { codigo } });
+    if (existe) return res.status(400).json({ error: 'Código ya existe' });
+    const item = await prisma.tipoConsultorio.create({
+      data: {
+        codigo, tipoConsultorio, descripcion,
+        indiceAutomatico: indiceAutomatico ? Number(indiceAutomatico) : null,
+        usuarioCreacion: (req as any).user?.id,
+      },
+    });
+    res.status(201).json(item);
+  } catch {
+    res.status(500).json({ error: 'Error al crear tipo de consultorio' });
+  }
+}
+
+export async function updateTipoConsultorio(req: Request, res: Response) {
+  try {
+    const { id } = req.params;
+    const { codigo, tipoConsultorio, descripcion, indiceAutomatico, estado } = req.body;
+    const item = await prisma.tipoConsultorio.update({
+      where: { id },
+      data: {
+        ...(codigo !== undefined && { codigo }),
+        ...(tipoConsultorio !== undefined && { tipoConsultorio }),
+        ...(descripcion !== undefined && { descripcion }),
+        ...(indiceAutomatico !== undefined && { indiceAutomatico: indiceAutomatico !== '' ? Number(indiceAutomatico) : null }),
+        ...(estado !== undefined && { estado: Boolean(estado) }),
+      },
+    });
+    res.json(item);
+  } catch {
+    res.status(500).json({ error: 'Error al actualizar tipo de consultorio' });
+  }
+}
+
+export async function deleteTipoConsultorio(req: Request, res: Response) {
+  try {
+    const { id } = req.params;
+    await prisma.tipoConsultorio.update({ where: { id }, data: { estado: false } });
+    res.json({ message: 'Tipo de consultorio desactivado' });
+  } catch {
+    res.status(500).json({ error: 'Error al eliminar tipo de consultorio' });
+  }
+}
+
+// ─────────────────────────────────────────
+// 11. DEPARTAMENTO × CARGO
+// ─────────────────────────────────────────
+
+export async function getDepartamentoCargos(req: Request, res: Response) {
+  try {
+    const { departamentoId } = req.params;
+    const items = await prisma.departamentoCargo.findMany({
+      where: { departamentoId },
+      include: {
+        cargo: { select: { id: true, codigo: true, nombre: true, tipo: true, valor: true } },
+      },
+      orderBy: { cargo: { nombre: 'asc' } },
+    });
+    res.json(items);
+  } catch {
+    res.status(500).json({ error: 'Error al obtener departamento-cargos' });
+  }
+}
+
+export async function createDepartamentoCargo(req: Request, res: Response) {
+  try {
+    const { departamentoId } = req.params;
+    const {
+      cargoId, permiteSeleccion, manejaInsumos, cumplimientoAutomatico,
+      tomadoAutomatico, interfaceExterno, generaOrden, liquidaHonorarios,
+      cumplimientoParcial, manejaCentroCosto,
+    } = req.body;
+    if (!cargoId) return res.status(400).json({ error: 'cargoId es requerido' });
+    const existe = await prisma.departamentoCargo.findFirst({ where: { departamentoId, cargoId } });
+    if (existe) return res.status(400).json({ error: 'El cargo ya está asignado a este departamento' });
+    const item = await prisma.departamentoCargo.create({
+      data: {
+        departamentoId, cargoId,
+        permiteSeleccion: permiteSeleccion ?? true,
+        manejaInsumos: manejaInsumos ?? false,
+        cumplimientoAutomatico: cumplimientoAutomatico ?? false,
+        tomadoAutomatico: tomadoAutomatico ?? false,
+        interfaceExterno: interfaceExterno ?? false,
+        generaOrden: generaOrden ?? false,
+        liquidaHonorarios: liquidaHonorarios ?? false,
+        cumplimientoParcial: cumplimientoParcial ?? false,
+        manejaCentroCosto: manejaCentroCosto ?? false,
+        usuarioCreacion: (req as any).user?.id,
+      },
+      include: { cargo: { select: { id: true, codigo: true, nombre: true, tipo: true } } },
+    });
+    res.status(201).json(item);
+  } catch {
+    res.status(500).json({ error: 'Error al crear departamento-cargo' });
+  }
+}
+
+export async function updateDepartamentoCargo(req: Request, res: Response) {
+  try {
+    const { id } = req.params;
+    const {
+      permiteSeleccion, manejaInsumos, cumplimientoAutomatico,
+      tomadoAutomatico, interfaceExterno, generaOrden, liquidaHonorarios,
+      cumplimientoParcial, manejaCentroCosto,
+    } = req.body;
+    const item = await prisma.departamentoCargo.update({
+      where: { id },
+      data: {
+        permiteSeleccion, manejaInsumos, cumplimientoAutomatico,
+        tomadoAutomatico, interfaceExterno, generaOrden, liquidaHonorarios,
+        cumplimientoParcial, manejaCentroCosto,
+      },
+      include: { cargo: { select: { id: true, codigo: true, nombre: true, tipo: true } } },
+    });
+    res.json(item);
+  } catch {
+    res.status(500).json({ error: 'Error al actualizar departamento-cargo' });
+  }
+}
+
+export async function deleteDepartamentoCargo(req: Request, res: Response) {
+  try {
+    const { id } = req.params;
+    await prisma.departamentoCargo.delete({ where: { id } });
+    res.json({ message: 'Asignación eliminada' });
+  } catch {
+    res.status(500).json({ error: 'Error al eliminar departamento-cargo' });
   }
 }

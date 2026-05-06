@@ -69,3 +69,15 @@ export const bulkCargos  = (items: any[]) => req('/cargos/bulk', { method: 'POST
 export const bulkEspecialidades = (items: any[]) => req('/especialidades/bulk', { method: 'POST', body: JSON.stringify({ items }) });
 export const bulkDepartamentos  = (items: any[]) => req('/departamentos/bulk',  { method: 'POST', body: JSON.stringify({ items }) });
 export const bulkTiposConsulta  = (items: any[]) => req('/tipos-consulta/bulk', { method: 'POST', body: JSON.stringify({ items }) });
+
+// ─── Tipos de Consultorio ──────────────────────────────────────
+export const getTiposConsultorio   = ()                => req('/tipos-consultorio');
+export const createTipoConsultorio = (body: any)       => req('/tipos-consultorio', { method: 'POST', body: JSON.stringify(body) });
+export const updateTipoConsultorio = (id: string, body: any) => req(`/tipos-consultorio/${id}`, { method: 'PUT', body: JSON.stringify(body) });
+export const deleteTipoConsultorio = (id: string)      => req(`/tipos-consultorio/${id}`, { method: 'DELETE' });
+
+// ─── Departamento × Cargo ──────────────────────────────────────
+export const getDepartamentoCargos   = (depId: string)        => req(`/departamentos/${depId}/cargos`);
+export const createDepartamentoCargo = (depId: string, body: any) => req(`/departamentos/${depId}/cargos`, { method: 'POST', body: JSON.stringify(body) });
+export const updateDepartamentoCargo = (id: string, body: any) => req(`/departamento-cargos/${id}`, { method: 'PUT', body: JSON.stringify(body) });
+export const deleteDepartamentoCargo = (id: string)           => req(`/departamento-cargos/${id}`, { method: 'DELETE' });

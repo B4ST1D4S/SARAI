@@ -830,6 +830,7 @@ model Departamento {
 
   tiposConsulta  TipoConsulta[]
   reglas         ReglaOperativa[]
+  departamentoCargos DepartamentoCargo[]
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -1000,9 +1001,48 @@ model Cargo {
   estado           Boolean  @default(true)
   usuarioCreacion  String?
 
+  departamentoCargos DepartamentoCargo[]
+
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
   @@index([estado])
   @@index([tipo])
+}
+
+// 10. TIPOS DE CONSULTORIO
+model TipoConsultorio {
+  id               String   @id @default(cuid())
+  codigo           String   @unique
+  tipoConsultorio  String
+  descripcion      String?
+  indiceAutomatico Int?
+  estado           Boolean  @default(true)
+  usuarioCreacion  String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  @@index([estado])
+}
+
+// 11. DEPARTAMENTO x CARGO (reglas operativas)
+model DepartamentoCargo {
+  id                     String       @id @default(cuid())
+  departamentoId         String
+  departamento           Departamento @relation(fields: [departamentoId], references: [id], onDelete: Cascade)
+  cargoId                String
+  cargo                  Cargo        @relation(fields: [cargoId], references: [id])
+  permiteSeleccion       Boolean      @default(true)
+  manejaInsumos          Boolean      @default(false)
+  cumplimientoAutomatico Boolean      @default(false)
+  tomadoAutomatico       Boolean      @default(false)
+  interfaceExterno       Boolean      @default(false)
+  generaOrden            Boolean      @default(false)
+  liquidaHonorarios      Boolean      @default(false)
+  cumplimientoParcial    Boolean      @default(false)
+  manejaCentroCosto      Boolean      @default(false)
+  usuarioCreacion        String?
+  createdAt              DateTime     @default(now())
+  updatedAt              DateTime     @updatedAt
+  @@unique([departamentoId, cargoId])
+  @@index([departamentoId])
 }
