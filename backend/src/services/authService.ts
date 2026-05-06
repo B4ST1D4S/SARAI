@@ -5,16 +5,8 @@ import { generateToken, generateRefreshToken, TokenPayload } from '../utils/jwt.
 const prisma = new PrismaClient();
 
 export interface LoginRequest {
-  email: string;
+  username: string;
   password: string;
-}
-
-export interface RegisterRequest {
-  email: string;
-  password: string;
-  nombre: string;
-  apellido: string;
-  rol?: string;
 }
 
 export interface AuthResponse {
@@ -22,7 +14,7 @@ export interface AuthResponse {
   refreshToken: string;
   user: {
     id: string;
-    email: string;
+    username: string;
     nombre: string;
     apellido: string;
     rol: string;
@@ -31,8 +23,11 @@ export interface AuthResponse {
 
 export async function loginUser(request: LoginRequest): Promise<AuthResponse | null> {
   try {
-    const user = await prisma.user.findUnique({
-      where: { email: request.email },
+    // Buscar por username (case-insensitive)
+    const user = await prisma.user.findFirst({
+      where: {
+        username: { equals: request.username.trim().toLowerCase(), mode: 'insensitive' },
+      },
     });
 
     if (!user) {
@@ -51,7 +46,7 @@ export async function loginUser(request: LoginRequest): Promise<AuthResponse | n
 
     const tokenPayload: TokenPayload = {
       userId: user.id,
-      email: user.email,
+      email: user.email ?? user.username,
       rol: user.rol,
     };
 
@@ -63,7 +58,7 @@ export async function loginUser(request: LoginRequest): Promise<AuthResponse | n
       refreshToken,
       user: {
         id: user.id,
-        email: user.email,
+        username: user.username,
         nombre: user.nombre,
         apellido: user.apellido,
         rol: user.rol,
