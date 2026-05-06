@@ -6,13 +6,6 @@ node_modules/
 # Python virtual environments
 .venv/
 venv/
-__pycache__/
-*.pyc
-*.pyo
-
-# Python virtual environments
-.venv/
-venv/
 env/
 __pycache__/
 *.pyc
