@@ -66,21 +66,21 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-3 sm:p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header Premium */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-10"
+          className="mb-5 sm:mb-10"
         >
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-5xl font-bold bg-gradient-to-r from-yellow-400 via-yellow-500 to-amber-600 bg-clip-text text-transparent mb-2">
-                Dashboard Premium
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <h1 className="text-2xl sm:text-4xl lg:text-5xl font-bold bg-gradient-to-r from-yellow-400 via-yellow-500 to-amber-600 bg-clip-text text-transparent mb-1 sm:mb-2">
+                Dashboard
               </h1>
-              <p className="text-gray-400 text-lg">
-                Bienvenido, {user.nombre} {user.apellido} • Especialidad: {user.especialidad}
+              <p className="text-gray-400 text-xs sm:text-base lg:text-lg truncate">
+                {user.nombre} {user.apellido} • {user.especialidad}
               </p>
             </div>
             <div className="hidden lg:block">
@@ -102,7 +102,7 @@ export default function DashboardPage() {
           variants={containerVariants}
           initial="hidden"
           animate="visible"
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10"
+          className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-5 sm:mb-10"
         >
           {/* Card 1: Citas Hoy */}
           <motion.div
@@ -197,19 +197,19 @@ export default function DashboardPage() {
           </motion.div>
         </motion.div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-6">
           {/* Citas Próximas */}
           <motion.div
             variants={cardVariants}
             initial="hidden"
             animate="visible"
             transition={{ delay: 0.4 }}
-            className="lg:col-span-2 bg-gradient-to-br from-slate-800/40 to-slate-900/40 border border-yellow-500/10 rounded-2xl p-8"
+            className="lg:col-span-2 bg-gradient-to-br from-slate-800/40 to-slate-900/40 border border-yellow-500/10 rounded-2xl p-4 sm:p-8"
           >
-            <div className="flex items-center justify-between mb-8">
-              <h2 className="text-2xl font-bold text-white">Próximas Citas</h2>
-              <button className="px-4 py-2 bg-gradient-to-r from-yellow-500 to-amber-600 text-white font-semibold rounded-lg hover:shadow-lg hover:shadow-yellow-500/30 transition-all duration-200">
-                Ver Agenda Completa
+            <div className="flex items-center justify-between mb-4 sm:mb-8 gap-2">
+              <h2 className="text-lg sm:text-2xl font-bold text-white">Próximas Citas</h2>
+              <button className="px-3 py-1.5 sm:px-4 sm:py-2 bg-gradient-to-r from-yellow-500 to-amber-600 text-white font-semibold text-xs sm:text-sm rounded-lg hover:shadow-lg hover:shadow-yellow-500/30 transition-all duration-200 whitespace-nowrap">
+                Ver Agenda
               </button>
             </div>
 
@@ -220,23 +220,23 @@ export default function DashboardPage() {
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.5 + index * 0.1 }}
-                  className="group bg-gradient-to-r from-slate-700/30 to-slate-800/20 border border-slate-700/50 rounded-xl p-5 hover:border-yellow-500/30 transition-all duration-200 hover:shadow-lg hover:shadow-yellow-500/5"
+                  className="group bg-gradient-to-r from-slate-700/30 to-slate-800/20 border border-slate-700/50 rounded-xl p-3 sm:p-5 hover:border-yellow-500/30 transition-all duration-200 hover:shadow-lg hover:shadow-yellow-500/5"
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <h3 className="text-white font-semibold text-lg mb-1">{cita.paciente}</h3>
-                      <div className="flex items-center gap-4 text-gray-400 text-sm">
-                        <span className="flex items-center gap-2">
-                          <Calendar size={16} className="text-yellow-400" />
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-white font-semibold text-sm sm:text-lg mb-0.5 sm:mb-1 truncate">{cita.paciente}</h3>
+                      <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-gray-400 text-xs sm:text-sm">
+                        <span className="flex items-center gap-1">
+                          <Calendar size={12} className="text-yellow-400" />
                           {cita.hora}
                         </span>
-                        <span className="text-gray-600">•</span>
-                        <span>{cita.procedimiento}</span>
+                        <span className="hidden sm:inline text-gray-600">•</span>
+                        <span className="truncate">{cita.procedimiento}</span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1 sm:gap-3 flex-shrink-0">
                       <span
-                        className={`px-4 py-2 rounded-full font-semibold text-sm ${
+                        className={`px-2 sm:px-4 py-1 sm:py-2 rounded-full font-semibold text-xs ${
                           cita.estado === 'Confirmada'
                             ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                             : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
@@ -260,9 +260,9 @@ export default function DashboardPage() {
             initial="hidden"
             animate="visible"
             transition={{ delay: 0.5 }}
-            className="bg-gradient-to-br from-slate-800/40 to-slate-900/40 border border-yellow-500/10 rounded-2xl p-8"
+            className="bg-gradient-to-br from-slate-800/40 to-slate-900/40 border border-yellow-500/10 rounded-2xl p-4 sm:p-8"
           >
-            <h2 className="text-2xl font-bold text-white mb-6">Acciones Rápidas</h2>
+            <h2 className="text-lg sm:text-2xl font-bold text-white mb-4 sm:mb-6">Acciones Rápidas</h2>
 
             <div className="space-y-3">
               <motion.button

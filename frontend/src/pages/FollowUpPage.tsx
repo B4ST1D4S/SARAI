@@ -77,16 +77,16 @@ export default function FollowUpPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 p-6">
+    <div className="min-h-screen bg-slate-900 p-3 sm:p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-white mb-2">📊 Seguimiento Postoperatorio Automático</h1>
-          <p className="text-gray-400">Control automático de evolución post-cirugía por días</p>
+        <div className="mb-5 sm:mb-8">
+          <h1 className="text-xl sm:text-3xl lg:text-4xl font-bold text-white mb-1 sm:mb-2">📊 Seguimiento Postop</h1>
+          <p className="text-gray-400 text-xs sm:text-sm">Control automático de evolución post-cirugía</p>
         </div>
 
         {/* KPI Cards */}
-        <div className="grid grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4 mb-4 sm:mb-6">
           <motion.div
             whileHover={{ scale: 1.05 }}
             className="bg-gradient-to-br from-blue-600 to-blue-800 rounded-lg p-4 border border-blue-500/30"

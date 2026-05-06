@@ -103,36 +103,36 @@ export default function PacientesPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-3 sm:p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="flex justify-between items-center mb-8"
+          className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-5 sm:mb-8"
         >
           <div>
-            <h1 className="text-4xl font-bold text-white mb-2">Gestión de Pacientes</h1>
-            <p className="text-slate-400">Administra la información de tus pacientes</p>
+            <h1 className="text-xl sm:text-3xl lg:text-4xl font-bold text-white mb-1 sm:mb-2">Pacientes</h1>
+            <p className="text-slate-400 text-xs sm:text-sm">Administra la información de tus pacientes</p>
           </div>
-          <div className="flex gap-3">
+          <div className="flex gap-2">
             <motion.button
               onClick={() => setMostrarCargaMasiva(true)}
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              className="flex items-center gap-2 px-6 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-semibold transition-all"
+              className="flex items-center gap-1.5 px-3 sm:px-6 py-2 sm:py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-semibold text-xs sm:text-sm transition-all"
             >
-              <Upload size={20} />
-              Carga Masiva
+              <Upload size={16} />
+              <span className="hidden sm:inline">Carga </span>Masiva
             </motion.button>
             <motion.button
               onClick={() => setMostrarFormulario(true)}
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white rounded-lg font-semibold transition-all shadow-lg"
+              className="flex items-center gap-1.5 px-3 sm:px-6 py-2 sm:py-3 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white rounded-lg font-semibold text-xs sm:text-sm transition-all shadow-lg"
             >
-              <Plus size={20} />
-              Nuevo Paciente
+              <Plus size={16} />
+              <span className="hidden sm:inline">Nuevo </span>Paciente
             </motion.button>
           </div>
         </motion.div>
@@ -142,7 +142,7 @@ export default function PacientesPage() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.1 }}
-          className="flex gap-3 mb-8"
+          className="flex gap-2 mb-5 sm:mb-8"
         >
           <div className="relative flex-1">
             <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400" size={20} />
@@ -201,14 +201,14 @@ export default function PacientesPage() {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -20 }}
                     transition={{ delay: index * 0.05 }}
-                    className="bg-gradient-to-r from-slate-800/40 to-slate-800/20 border border-slate-700 rounded-lg p-5 hover:border-slate-600 transition-all hover:shadow-lg hover:shadow-cyan-500/10"
+                    className="bg-gradient-to-r from-slate-800/40 to-slate-800/20 border border-slate-700 rounded-lg p-3 sm:p-5 hover:border-slate-600 transition-all hover:shadow-lg hover:shadow-cyan-500/10"
                   >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <h3 className="text-lg font-bold text-white mb-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-sm sm:text-lg font-bold text-white mb-1 truncate">
                           {paciente.nombreCompleto || 'Sin nombre'}
                         </h3>
-                        <div className="grid grid-cols-2 gap-4 text-sm text-slate-400 mb-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 sm:gap-4 text-xs sm:text-sm text-slate-400 mb-2 sm:mb-3">
                           <div>
                             <span className="text-slate-500">Documento:</span>
                             <span className="text-white ml-2">

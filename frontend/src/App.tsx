@@ -59,6 +59,8 @@ function Sidebar({
   handleLogout,
   collapsed,
   setCollapsed,
+  mobileOpen,
+  setMobileOpen,
 }: {
   currentPage: string;
   setCurrentPage: (p: string) => void;
@@ -66,12 +68,30 @@ function Sidebar({
   handleLogout: () => void;
   collapsed: boolean;
   setCollapsed: (v: boolean) => void;
+  mobileOpen: boolean;
+  setMobileOpen: (v: boolean) => void;
 }) {
+  const handleNavClick = (id: string) => {
+    setCurrentPage(id);
+    setMobileOpen(false); // cierra drawer en móvil al navegar
+  };
+
   return (
+    <>
+      {/* Overlay oscuro en móvil cuando el drawer está abierto */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 bg-black/60 z-40 lg:hidden"
+          onClick={() => setMobileOpen(false)}
+        />
+      )}
     <motion.aside
       animate={{ width: collapsed ? 68 : 236 }}
       transition={{ duration: 0.25, ease: 'easeInOut' }}
-      className="fixed top-0 left-0 h-full z-30 flex flex-col bg-[#0d0f14] border-r border-white/5 shadow-2xl overflow-hidden select-none"
+      className={`fixed top-0 left-0 h-full z-50 flex flex-col bg-[#0d0f14] border-r border-white/5 shadow-2xl overflow-hidden select-none
+        transition-transform duration-300
+        ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}
+        lg:translate-x-0`}
     >
       <div className="flex items-center justify-between px-4 h-14 border-b border-white/5 flex-shrink-0">
         <AnimatePresence>
@@ -110,7 +130,7 @@ function Sidebar({
               return (
                 <button
                   key={item.id}
-                  onClick={() => setCurrentPage(item.id)}
+                  onClick={() => handleNavClick(item.id)}
                   title={item.label}
                   className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium transition-all duration-150 relative group ${
                     active
@@ -195,6 +215,7 @@ function Sidebar({
         </div>
       </div>
     </motion.aside>
+    </>
   );
 }
 
@@ -202,6 +223,7 @@ function App() {
   const [currentPage, setCurrentPage] = useState('auth');
   const [user, setUser] = useState<any>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [historiaShowForm, setHistoriaShowForm] = useState(false);
   const [historiaSeccion, setHistoriaSeccion] = useState(0);
   const [historiaPacienteId, setHistoriaPacienteId] = useState<string | undefined>(undefined);
@@ -244,14 +266,36 @@ function App() {
         handleLogout={handleLogout}
         collapsed={sidebarCollapsed}
         setCollapsed={setSidebarCollapsed}
+        mobileOpen={mobileMenuOpen}
+        setMobileOpen={setMobileMenuOpen}
       />
-      <motion.main
-        animate={{ marginLeft: sidebarWidth }}
-        transition={{ duration: 0.25, ease: 'easeInOut' }}
+      {/* En lg+ → margin izquierdo dinámico; en móvil → sin margin (sidebar es overlay) */}
+      <main
         className="flex-1 min-h-screen overflow-auto"
+        style={{
+          marginLeft: mobileMenuOpen ? 0 : undefined,
+          transition: 'margin-left 0.25s ease-in-out',
+        }}
       >
-        <div className="sticky top-0 z-20 bg-[#080a0f]/90 backdrop-blur-md border-b border-white/5 px-6 h-14 flex items-center justify-between">
+        {/* Wrapper que en lg+ aplica el margin del sidebar */}
+        <div
+          className={`min-h-screen ${
+            sidebarCollapsed ? 'lg:ml-[68px]' : 'lg:ml-[236px]'
+          }`}
+          style={{ transition: 'margin-left 0.25s ease-in-out' }}
+        >
+        <div className="sticky top-0 z-20 bg-[#080a0f]/90 backdrop-blur-md border-b border-white/5 px-4 sm:px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-3">
+            {/* Hamburger — solo visible en móvil */}
+            <button
+              className="lg:hidden flex flex-col gap-1 p-1.5 mr-1 rounded-md text-gray-400 hover:text-yellow-400 hover:bg-yellow-500/10 transition-all"
+              onClick={() => setMobileMenuOpen(true)}
+              aria-label="Abrir menú"
+            >
+              <span className="block w-5 h-0.5 bg-current rounded" />
+              <span className="block w-5 h-0.5 bg-current rounded" />
+              <span className="block w-4 h-0.5 bg-current rounded" />
+            </button>
             <h2 className="text-white font-semibold text-sm">{currentLabel}</h2>
             <span className="text-gray-700 text-xs hidden sm:block">
               {new Date().toLocaleDateString('es-CO', { weekday: 'long', month: 'long', day: 'numeric' })}
@@ -259,7 +303,7 @@ function App() {
           </div>
           <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 rounded-full px-3 py-1">
             <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
-            <span className="text-emerald-400 text-[10px] font-medium tracking-wide">SUPABASE ONLINE</span>
+            <span className="text-emerald-400 text-[10px] font-medium tracking-wide">ONLINE</span>
           </div>
         </div>
         <div>
@@ -300,26 +344,25 @@ function App() {
           {currentPage === 'mapa-corporal'       && <MapaCorporalPage />}
           {currentPage === 'body3d-test'         && <Body3DTestPage />}
         </div>
-      </motion.main>
+        </div>
+      </main>
       {/* ── SARAI Global — flotante en todas las páginas ── */}
-      <div className="fixed bottom-4 right-4 z-50 w-72">
-        <SaraiAssistant
-          onCamposDetectados={(campos) => camposHandlerRef.current?.(campos)}
-          token={localStorage.getItem('accessToken') || ''}
-          contexto={currentPage === 'historia' ? 'Historia clinica' : undefined}
-          onNavegar={(pagina) => {
-            setCurrentPage(pagina);
-          }}
-          onAbrirNuevaHistoria={() => {
-            setHistoriaShowForm(true);
-            setHistoriaSeccion(0);
-            setCurrentPage('historia');
-          }}
-          onIrSeccion={(n) => {
-            if (currentPageRef.current === 'historia') setHistoriaSeccion(n);
-          }}
-        />
-      </div>
+      <SaraiAssistant
+        onCamposDetectados={(campos) => camposHandlerRef.current?.(campos)}
+        token={localStorage.getItem('accessToken') || ''}
+        contexto={currentPage === 'historia' ? 'Historia clinica' : undefined}
+        onNavegar={(pagina) => {
+          setCurrentPage(pagina);
+        }}
+        onAbrirNuevaHistoria={() => {
+          setHistoriaShowForm(true);
+          setHistoriaSeccion(0);
+          setCurrentPage('historia');
+        }}
+        onIrSeccion={(n) => {
+          if (currentPageRef.current === 'historia') setHistoriaSeccion(n);
+        }}
+      />
     </div>
   );
 }

@@ -174,21 +174,21 @@ export default function AgendaPage() {
   const citasPendientes = citas.filter(c => c.estado === 'PENDIENTE').length;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-3 sm:p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header Premium */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-8"
+          className="mb-5 sm:mb-8"
         >
-          <div className="flex items-center gap-4 mb-3">
-            <div className="w-2 h-10 bg-gradient-to-b from-yellow-400 to-amber-600 rounded-full"></div>
-            <h1 className="text-5xl font-bold bg-gradient-to-r from-yellow-300 via-yellow-400 to-amber-600 bg-clip-text text-transparent">
-              Agenda Inteligente
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-1.5 sm:w-2 h-8 sm:h-10 bg-gradient-to-b from-yellow-400 to-amber-600 rounded-full flex-shrink-0"></div>
+            <h1 className="text-2xl sm:text-4xl lg:text-5xl font-bold bg-gradient-to-r from-yellow-300 via-yellow-400 to-amber-600 bg-clip-text text-transparent">
+              Agenda
             </h1>
           </div>
-          <p className="text-gray-400 ml-6 text-lg">⚡ Control automático, rápido y elegante de tus citas</p>
+          <p className="text-gray-400 ml-5 sm:ml-6 text-xs sm:text-base">⚡ Control automático de tus citas</p>
         </motion.div>
 
         {/* Stats Premium - Acorde al Dashboard */}
@@ -196,23 +196,23 @@ export default function AgendaPage() {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1, staggerChildren: 0.05 }}
-          className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8"
+          className="grid grid-cols-3 gap-2 sm:gap-6 mb-5 sm:mb-8"
         >
           {/* Citas Hoy */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="group relative bg-gradient-to-br from-slate-800/50 to-slate-900/50 border border-yellow-500/20 rounded-2xl p-6 hover:border-yellow-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-yellow-500/10 overflow-hidden"
+            className="group relative bg-gradient-to-br from-slate-800/50 to-slate-900/50 border border-yellow-500/20 rounded-xl sm:rounded-2xl p-3 sm:p-6 hover:border-yellow-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-yellow-500/10 overflow-hidden"
           >
-            <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-yellow-500/10 to-transparent rounded-full -mr-12 -mt-12 group-hover:scale-150 transition-transform duration-300"></div>
+            <div className="absolute top-0 right-0 w-16 sm:w-24 h-16 sm:h-24 bg-gradient-to-br from-yellow-500/10 to-transparent rounded-full -mr-8 sm:-mr-12 -mt-8 sm:-mt-12 group-hover:scale-150 transition-transform duration-300"></div>
             <div className="relative">
-              <div className="flex items-start justify-between mb-4">
+              <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-yellow-400/80 text-sm font-semibold uppercase tracking-wider">Citas Hoy</p>
-                  <p className="text-4xl font-bold text-white mt-2">{citas.length}</p>
+                  <p className="text-yellow-400/80 text-[9px] sm:text-sm font-semibold uppercase tracking-wider">Hoy</p>
+                  <p className="text-2xl sm:text-4xl font-bold text-white mt-1">{citas.length}</p>
                 </div>
-                <div className="bg-gradient-to-br from-yellow-500/20 to-amber-600/20 p-3 rounded-xl">
-                  <Zap className="text-yellow-400" size={28} />
+                <div className="bg-gradient-to-br from-yellow-500/20 to-amber-600/20 p-1.5 sm:p-3 rounded-xl">
+                  <Zap className="text-yellow-400" size={18} />
                 </div>
               </div>
             </div>
@@ -223,17 +223,17 @@ export default function AgendaPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.05 }}
-            className="group relative bg-gradient-to-br from-slate-800/50 to-slate-900/50 border border-emerald-500/20 rounded-2xl p-6 hover:border-emerald-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-emerald-500/10 overflow-hidden"
+            className="group relative bg-gradient-to-br from-slate-800/50 to-slate-900/50 border border-emerald-500/20 rounded-xl sm:rounded-2xl p-3 sm:p-6 hover:border-emerald-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-emerald-500/10 overflow-hidden"
           >
-            <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-emerald-500/10 to-transparent rounded-full -mr-12 -mt-12 group-hover:scale-150 transition-transform duration-300"></div>
+            <div className="absolute top-0 right-0 w-16 sm:w-24 h-16 sm:h-24 bg-gradient-to-br from-emerald-500/10 to-transparent rounded-full -mr-8 sm:-mr-12 -mt-8 sm:-mt-12 group-hover:scale-150 transition-transform duration-300"></div>
             <div className="relative">
-              <div className="flex items-start justify-between mb-4">
+              <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-emerald-400/80 text-sm font-semibold uppercase tracking-wider">Confirmadas</p>
-                  <p className="text-4xl font-bold text-white mt-2">{citasConfirmadas}</p>
+                  <p className="text-emerald-400/80 text-[9px] sm:text-sm font-semibold uppercase tracking-wider">Confirm.</p>
+                  <p className="text-2xl sm:text-4xl font-bold text-white mt-1">{citasConfirmadas}</p>
                 </div>
-                <div className="bg-gradient-to-br from-emerald-500/20 to-teal-600/20 p-3 rounded-xl">
-                  <CheckCircle className="text-emerald-400" size={28} />
+                <div className="bg-gradient-to-br from-emerald-500/20 to-teal-600/20 p-1.5 sm:p-3 rounded-xl">
+                  <CheckCircle className="text-emerald-400" size={18} />
                 </div>
               </div>
             </div>
@@ -244,24 +244,24 @@ export default function AgendaPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="group relative bg-gradient-to-br from-slate-800/50 to-slate-900/50 border border-orange-500/20 rounded-2xl p-6 hover:border-orange-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-orange-500/10 overflow-hidden"
+            className="group relative bg-gradient-to-br from-slate-800/50 to-slate-900/50 border border-orange-500/20 rounded-xl sm:rounded-2xl p-3 sm:p-6 hover:border-orange-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-orange-500/10 overflow-hidden"
           >
-            <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-orange-500/10 to-transparent rounded-full -mr-12 -mt-12 group-hover:scale-150 transition-transform duration-300"></div>
+            <div className="absolute top-0 right-0 w-16 sm:w-24 h-16 sm:h-24 bg-gradient-to-br from-orange-500/10 to-transparent rounded-full -mr-8 sm:-mr-12 -mt-8 sm:-mt-12 group-hover:scale-150 transition-transform duration-300"></div>
             <div className="relative">
-              <div className="flex items-start justify-between mb-4">
+              <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-orange-400/80 text-sm font-semibold uppercase tracking-wider">Pendientes</p>
-                  <p className="text-4xl font-bold text-white mt-2">{citasPendientes}</p>
+                  <p className="text-orange-400/80 text-[9px] sm:text-sm font-semibold uppercase tracking-wider">Pendient.</p>
+                  <p className="text-2xl sm:text-4xl font-bold text-white mt-1">{citasPendientes}</p>
                 </div>
-                <div className="bg-gradient-to-br from-orange-500/20 to-red-600/20 p-3 rounded-xl">
-                  <AlertCircle className="text-orange-400" size={28} />
+                <div className="bg-gradient-to-br from-orange-500/20 to-red-600/20 p-1.5 sm:p-3 rounded-xl">
+                  <AlertCircle className="text-orange-400" size={18} />
                 </div>
               </div>
             </div>
           </motion.div>
         </motion.div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-6">
           {/* Calendario Premium */}
           <motion.div
             initial={{ opacity: 0, x: -20 }}

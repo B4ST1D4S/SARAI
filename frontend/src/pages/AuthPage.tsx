@@ -80,8 +80,8 @@ export default function AuthPage() {
       >
         {/* Logo/Header */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-white mb-2">EstetIA</h1>
-          <p className="text-gray-400">Historia Clínica Estética Inteligente</p>
+          <h1 className="text-4xl font-bold text-white mb-2">SARAI</h1>
+          <p className="text-gray-400">Sistema Ágil de Registro y Asistencia Inteligente</p>
         </div>
 
         {/* Card */}

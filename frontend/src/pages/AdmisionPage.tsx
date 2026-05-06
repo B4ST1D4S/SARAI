@@ -80,19 +80,19 @@ export default function AdmisionPage() {
   const enEspera = citas.filter(c => c.estado === 'CONFIRMADA' || c.estado === 'PENDIENTE');
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-3 sm:p-6">
       <div className="max-w-5xl mx-auto">
         {/* Header */}
-        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="flex items-center gap-4 mb-2">
-                <div className="w-2 h-10 bg-gradient-to-b from-cyan-400 to-blue-600 rounded-full" />
-                <h1 className="text-4xl font-bold bg-gradient-to-r from-cyan-300 to-blue-400 bg-clip-text text-transparent">
+        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-5 sm:mb-8">
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 sm:gap-4 mb-1 sm:mb-2">
+                <div className="w-1.5 sm:w-2 h-7 sm:h-10 bg-gradient-to-b from-cyan-400 to-blue-600 rounded-full flex-shrink-0" />
+                <h1 className="text-xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-cyan-300 to-blue-400 bg-clip-text text-transparent">
                   Admisión
                 </h1>
               </div>
-              <p className="text-gray-400 ml-6">CU-03 · Registro de llegada y cola de atención — {new Date().toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
+              <p className="text-gray-400 ml-4 sm:ml-6 text-[10px] sm:text-sm truncate">{new Date().toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
             </div>
             <button onClick={cargar} disabled={loading}
               className="flex items-center gap-2 px-4 py-2 border border-slate-600 text-gray-300 rounded-lg hover:bg-slate-800 transition text-sm">

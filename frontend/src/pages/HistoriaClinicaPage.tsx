@@ -261,15 +261,15 @@ export default function HistoriaClinicaPage({
   const porcentaje = Math.round((completadas.filter(Boolean).length / progreso) * 100);
 
   return (
-    <div className="min-h-screen bg-[#080a0f] p-6">
+    <div className="min-h-screen bg-[#080a0f] p-3 sm:p-6">
       <div className="max-w-7xl mx-auto">
         {/* ── Header ── */}
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-black text-white tracking-tight">
+        <div className="flex items-center justify-between mb-5 sm:mb-8 gap-2">
+          <div className="min-w-0">
+            <h1 className="text-lg sm:text-2xl lg:text-3xl font-black text-white tracking-tight">
               Historia <span className="bg-gradient-to-r from-yellow-400 to-amber-500 bg-clip-text text-transparent">Clinica</span>
             </h1>
-            <p className="text-gray-600 text-sm mt-1">Res. 1995/1999 • Norma tecnica colombiana • {historias.length} registros</p>
+            <p className="text-gray-600 text-[10px] sm:text-sm mt-0.5 truncate">{historias.length} registros</p>
           </div>
           <button
             onClick={() => { setShowForm(!showForm); setSeccionActiva(0); }}

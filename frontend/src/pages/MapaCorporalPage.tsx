@@ -180,22 +180,22 @@ export default function MapaCorporalPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-3 sm:p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header Premium */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-8"
+          className="mb-5 sm:mb-8"
         >
-          <div className="flex justify-between items-start mb-6">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 mb-3 sm:mb-6">
             <div>
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-yellow-400 to-yellow-600 bg-clip-text text-transparent mb-2">
+              <h1 className="text-xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-yellow-400 to-yellow-600 bg-clip-text text-transparent mb-1 sm:mb-2">
                 Mapa Corporal 360°
               </h1>
-              <p className="text-gray-400">Documentación digital profesional con análisis de evolución post-operatoria</p>
+              <p className="text-gray-400 text-xs sm:text-sm">Documentación digital profesional</p>
             </div>
-            <div className="flex gap-2 flex-wrap justify-end">
+            <div className="flex gap-2 flex-wrap">
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
@@ -270,7 +270,7 @@ export default function MapaCorporalPage() {
           variants={containerVariants}
           initial="hidden"
           animate="visible"
-          className="grid grid-cols-5 gap-6"
+          className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-6"
         >
           {/* Sidebar Izquierdo - Controles y Análisis */}
           <motion.div variants={itemVariants} className="space-y-6 col-span-1">

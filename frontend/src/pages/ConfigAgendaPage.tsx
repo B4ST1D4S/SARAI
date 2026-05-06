@@ -140,17 +140,17 @@ export default function ConfigAgendaPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-3 sm:p-6">
       <div className="max-w-5xl mx-auto">
         {/* Header */}
-        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
-          <div className="flex items-center gap-4 mb-2">
-            <div className="w-2 h-10 bg-gradient-to-b from-yellow-400 to-amber-600 rounded-full" />
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-yellow-300 to-amber-500 bg-clip-text text-transparent">
-              Configuración de Agenda
+        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-5 sm:mb-8">
+          <div className="flex items-center gap-2 sm:gap-4 mb-1 sm:mb-2">
+            <div className="w-1.5 sm:w-2 h-7 sm:h-10 bg-gradient-to-b from-yellow-400 to-amber-600 rounded-full" />
+            <h1 className="text-xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-yellow-300 to-amber-500 bg-clip-text text-transparent">
+              Config. Agenda
             </h1>
           </div>
-          <p className="text-gray-400 ml-6">CU-01 · Define tu disponibilidad semanal, horarios y bloqueos</p>
+          <p className="text-gray-400 ml-4 sm:ml-6 text-[10px] sm:text-sm">Define tu disponibilidad semanal, horarios y bloqueos</p>
         </motion.div>
 
         {success && (

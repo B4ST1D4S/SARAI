@@ -1,5 +1,6 @@
 ﻿import { useState, useRef, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import SaraiECGIcon from './SaraiECGIcon';
 
 // ─── Constantes de endpoints ──────────────────────────────────────────────────
 const WHISPER_URL = 'http://localhost:8000/transcribir';
@@ -63,6 +64,7 @@ export default function SaraiAssistant({ onCamposDetectados, token, contexto, on
   const [segundos, setSegundos]           = useState(0);
   const [barras, setBarras]               = useState<number[]>(Array(20).fill(4));
   const [minimizado, setMinimizado]       = useState(true);
+  const [vistaMinima, setVistaMinima]     = useState<'icono' | 'pulso'>('pulso');
   const [modoTexto, setModoTexto]         = useState(false);
   const [inputManual, setInputManual]     = useState('');
   const [whisperStatus, setWhisperStatus] = useState<'checking' | 'online' | 'offline'>('checking');
@@ -72,47 +74,45 @@ export default function SaraiAssistant({ onCamposDetectados, token, contexto, on
   const [estadoComandos, setEstadoComandos] = useState<'idle' | 'starting' | 'active' | 'blocked' | 'unsupported'>('idle');
   const [inputComandoTexto, setInputComandoTexto] = useState(''); // fallback comandos por texto
   // Para hacer el widget arrastrable — persistente en sessionStorage
-  const calcPosInicial = () => ({
-    x: Math.max(0, Math.round(window.innerWidth / 2) - 144), // centrado horizontal
-    y: 108,                                                   // alineado con el título Dashboard
-  });
+  // Posicionar junto al panel ONLINE/Disponible del Dashboard (top-right)
+  // En pantallas lg+: calcula la x para quedar a la izquierda del panel ONLINE
+  // (max-w-7xl=1280px centrado, p-6=24px, panel ONLINE ≈170px)
+  const calcPosInicial = () => {
+    const w = window.innerWidth;
+    if (w >= 1024) {
+      const containerW    = Math.min(w, 1280);
+      const containerLeft = (w - containerW) / 2;
+      const contentRight  = containerLeft + containerW - 24; // p-6
+      const onlinePanelW  = 170;
+      const saraiW        = 130;
+      return {
+        x: Math.max(0, contentRight - onlinePanelW - 10 - saraiW),
+        y: 80,
+      };
+    }
+    // móvil/tablet: esquina superior derecha
+    return {
+      x: Math.max(0, w - 110),
+      y: 72,
+    };
+  };
   const [posicion, setPosicion] = useState(calcPosInicial);
   const [dragging, setDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const widgetRef = useRef<HTMLDivElement>(null);
 
-  // Cargar posición guardada — ignorar si la posición fue guardada por debajo de y=50
-  // (versiones anteriores la guardaban en la parte inferior o en negativo)
+  // Limpiar posición guardada de sesiones anteriores para que siempre
+  // arranque junto al panel ONLINE/Disponible
   useEffect(() => {
-    const saved = sessionStorage.getItem('SARAI_POSICION');
-    if (saved) {
-      try {
-        const p = JSON.parse(saved);
-        if (p.x >= 0 && p.y >= 50 && p.y < window.innerHeight - 60) {
-          setPosicion(p);
-        } else {
-          sessionStorage.removeItem('SARAI_POSICION');
-        }
-      } catch {
-        sessionStorage.removeItem('SARAI_POSICION');
-      }
-    }
+    sessionStorage.removeItem('SARAI_POSICION');
   }, []);
 
-  // Re-centrar si la ventana cambia de tamaño (responsive)
+  // Re-calcular posición si la ventana cambia de tamaño
   useEffect(() => {
-    const onResize = () => {
-      const saved = sessionStorage.getItem('SARAI_POSICION');
-      if (!saved) setPosicion(calcPosInicial());
-    };
+    const onResize = () => setPosicion(calcPosInicial());
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
-
-  // Guardar posición cuando cambia
-  useEffect(() => {
-    sessionStorage.setItem('SARAI_POSICION', JSON.stringify(posicion));
-  }, [posicion]);
 
   const mediaRecRef  = useRef<MediaRecorder | null>(null);
   const chunksRef    = useRef<Blob[]>([]);
@@ -799,7 +799,7 @@ export default function SaraiAssistant({ onCamposDetectados, token, contexto, on
     >
 
       {/* ══ CONTRAÍDO — ícono fiel al logo (arrastrable + clic para expandir) ══ */}
-      {minimizado && (
+      {minimizado && vistaMinima === 'icono' && (
         <motion.div
           initial={{ scale: 0.5, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
@@ -1005,6 +1005,28 @@ export default function SaraiAssistant({ onCamposDetectados, token, contexto, on
         </motion.div>
       )}
 
+      {/* ══ VISTA PULSO — logo SARAI ECG flotante (responsive) ══ */}
+      {minimizado && vistaMinima === 'pulso' && (
+        <div className="w-24 sm:w-28 md:w-32">
+          <SaraiECGIcon
+            color={
+              estado === 'grabando'        ? '#f87171' :
+              escuchandoComandos           ? '#a78bfa' :
+              estado === 'transcribiendo'  ? '#c084fc' :
+              estado === 'procesando'      ? '#fbbf24' :
+              whisperStatus === 'online'   ? '#00f5ff' : '#f87171'
+            }
+            speed={
+              estado === 'grabando'                                  ? 'fast' :
+              escuchandoComandos || estado === 'transcribiendo' || estado === 'procesando' ? 'active' :
+              'idle'
+            }
+            pulse={estado === 'grabando' || escuchandoComandos || estado === 'transcribiendo' || estado === 'procesando'}
+            title="SARAI — clic para expandir"
+          />
+        </div>
+      )}
+
       {/* ══ EXPANDIDO — panel completo ══ */}
       {!minimizado && (
       <motion.div
@@ -1019,8 +1041,16 @@ export default function SaraiAssistant({ onCamposDetectados, token, contexto, on
           'border-yellow-600/50 shadow-[0_0_12px_rgba(212,175,55,0.25)]'
         } ${fondo} backdrop-blur-md transition-all duration-300`}
       >
-      {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between px-3 py-3 cursor-move select-none">
+      {/* ── Header — clic en zona de drag colapsa, sin botón flecha separado ─ */}
+      <div
+        className="flex items-center justify-between px-3 py-3 cursor-pointer select-none rounded-t-2xl hover:bg-white/[0.03] transition-colors"
+        onClick={(e) => {
+          // Colapsar si el clic NO fue sobre un botón/input interno
+          if (!(e.target as HTMLElement).closest('button, input, textarea')) {
+            setMinimizado(true);
+          }
+        }}
+      >
         <div className="flex items-center gap-2">
           <motion.div
             animate={{ scale: ['grabando','procesando','transcribiendo'].includes(estado) ? [1, 1.6, 1] : 1 }}
@@ -1055,16 +1085,10 @@ export default function SaraiAssistant({ onCamposDetectados, token, contexto, on
           }`}>
             {whisperStatus === 'online' ? 'W✓' : whisperStatus === 'offline' ? 'W✗' : '…'}
           </span>
-          {/* Botón colapsar */}
-          <button
-            onClick={() => setMinimizado(true)}
-            className="p-1 rounded-full hover:bg-white/10 transition-colors text-gray-500 hover:text-white"
-            title="Colapsar"
-          >
-            <svg viewBox="0 0 12 12" fill="none" className="w-3 h-3">
-              <path d="M2 8L6 4L10 8" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </button>
+          {/* Indicador colapsar — solo visual, el clic es en todo el header */}
+          <svg viewBox="0 0 12 12" fill="none" className="w-3 h-3 text-gray-600">
+            <path d="M2 8L6 4L10 8" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
         </div>
       </div>
 

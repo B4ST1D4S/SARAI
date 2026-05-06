@@ -68,44 +68,43 @@ export default function CRMPage() {
   const totalValor = leads.reduce((sum, l) => sum + l.valor, 0);
 
   return (
-    <div className="min-h-screen bg-slate-900 p-6">
+    <div className="min-h-screen bg-slate-900 p-3 sm:p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-white mb-2">💎 CRM ESTÉTICO - Embudo de Ventas</h1>
-          <p className="text-gray-400">Gestión de pacientes desde cotización hasta seguimiento</p>
+        <div className="mb-5 sm:mb-8">
+          <h1 className="text-xl sm:text-3xl lg:text-4xl font-bold text-white mb-1 sm:mb-2">💎 CRM — Embudo de Ventas</h1>
+          <p className="text-gray-400 text-xs sm:text-sm">Gestión de pacientes desde cotización hasta seguimiento</p>
         </div>
 
         {/* KPI Principal */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-gradient-to-r from-yellow-600 to-yellow-700 rounded-xl p-8 mb-6 border border-yellow-500/30"
+          className="bg-gradient-to-r from-yellow-600 to-yellow-700 rounded-xl p-4 sm:p-8 mb-4 sm:mb-6 border border-yellow-500/30"
         >
-          <div className="grid grid-cols-3 gap-6">
+          <div className="grid grid-cols-3 gap-3 sm:gap-6">
             <div>
-              <p className="text-yellow-100 text-sm font-semibold mb-2">VALOR TOTAL EN PIPELINE</p>
-              <p className="text-4xl font-bold text-white">${(totalValor / 1000000).toFixed(1)}M</p>
+              <p className="text-yellow-100 text-[9px] sm:text-sm font-semibold mb-1 sm:mb-2 uppercase">Pipeline</p>
+              <p className="text-xl sm:text-4xl font-bold text-white">${(totalValor / 1000000).toFixed(1)}M</p>
             </div>
             <div>
-              <p className="text-yellow-100 text-sm font-semibold mb-2">TOTAL OPORTUNIDADES</p>
-              <p className="text-4xl font-bold text-white">{leads.length}</p>
+              <p className="text-yellow-100 text-[9px] sm:text-sm font-semibold mb-1 sm:mb-2 uppercase">Leads</p>
+              <p className="text-xl sm:text-4xl font-bold text-white">{leads.length}</p>
             </div>
             <div>
-              <p className="text-yellow-100 text-sm font-semibold mb-2">CONVERSIÓN COTIZO→OPERO</p>
-              <p className="text-4xl font-bold text-white">
+              <p className="text-yellow-100 text-[9px] sm:text-sm font-semibold mb-1 sm:mb-2 uppercase">Conversión</p>
+              <p className="text-xl sm:text-4xl font-bold text-white">
                 {Math.round(
                   ((leads.filter((l) => l.etapa === 'OPERO').length / leads.filter((l) => l.etapa === 'COTIZO').length) * 100) || 0
-                )}
-                %
+                )}%
               </p>
             </div>
           </div>
         </motion.div>
 
         {/* Embudo Visual */}
-        <div className="bg-slate-800 border border-yellow-600/20 rounded-lg p-6 mb-6">
-          <h2 className="text-2xl font-bold text-white mb-6">📊 Embudo de Ventas</h2>
+        <div className="bg-slate-800 border border-yellow-600/20 rounded-lg p-3 sm:p-6 mb-4 sm:mb-6">
+          <h2 className="text-lg sm:text-2xl font-bold text-white mb-4 sm:mb-6">📊 Embudo</h2>
 
           <div className="space-y-4">
             {etapas.map((item, idx) => {
@@ -140,19 +139,19 @@ export default function CRMPage() {
         </div>
 
         {/* Tabla de Leads */}
-        <div className="bg-slate-800 border border-yellow-600/20 rounded-lg p-6 mb-6">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-bold text-white">📋 Leads Activos</h2>
+        <div className="bg-slate-800 border border-yellow-600/20 rounded-lg p-3 sm:p-6 mb-4 sm:mb-6">
+          <div className="flex justify-between items-center mb-4 sm:mb-6 gap-2">
+            <h2 className="text-lg sm:text-2xl font-bold text-white">📋 Leads</h2>
             <button
               onClick={() => setShowNewLead(!showNewLead)}
-              className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg font-semibold transition"
+              className="px-3 py-1.5 sm:px-4 sm:py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg font-semibold text-xs sm:text-sm transition whitespace-nowrap"
             >
-              + Nuevo Lead
+              + Nuevo
             </button>
           </div>
 
           {/* Filtros */}
-          <div className="flex gap-2 mb-6 flex-wrap">
+          <div className="flex gap-2 mb-4 sm:mb-6 flex-wrap">
             <button
               onClick={() => setFilterEtapa('TODOS')}
               className={`px-4 py-2 rounded-lg font-semibold transition ${

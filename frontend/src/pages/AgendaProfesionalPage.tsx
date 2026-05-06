@@ -137,19 +137,19 @@ export default function AgendaProfesionalPage({ onNavegar, onAbrirHistoriaPacien
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 p-6">
+    <div className="min-h-screen bg-slate-900 p-3 sm:p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="flex justify-between items-center mb-8">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-5 sm:mb-8">
           <div>
-            <h1 className="text-4xl font-bold text-white mb-2">Agenda Profesional</h1>
-            <p className="text-gray-400">Gestiona tus citas y procedimientos</p>
+            <h1 className="text-xl sm:text-3xl lg:text-4xl font-bold text-white mb-1 sm:mb-2">Agenda Profesional</h1>
+            <p className="text-gray-400 text-xs sm:text-sm">Gestiona tus citas y procedimientos</p>
           </div>
           <button
             onClick={() => setShowNewCita(!showNewCita)}
-            className="px-6 py-3 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg font-semibold flex items-center gap-2 transition"
+            className="px-4 py-2 sm:px-6 sm:py-3 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg font-semibold text-sm flex items-center gap-2 transition self-start sm:self-auto"
           >
-            <Plus size={20} /> Nueva Cita
+            <Plus size={16} /> Nueva Cita
           </button>
         </div>
 
