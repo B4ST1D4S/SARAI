@@ -318,3 +318,20 @@ export async function toggleUsuarioStatus(id: string, token: string) {
   });
 }
 
+// ============================================
+// ESPECIALIDADES ENDPOINTS
+// ============================================
+
+export interface EspecialidadItem {
+  id: string;
+  codigo: string;
+  nombre: string;
+}
+
+export async function getEspecialidades(token: string) {
+  return apiCall<EspecialidadItem[]>('/especialidades', {
+    method: 'GET',
+    token,
+  });
+}
+

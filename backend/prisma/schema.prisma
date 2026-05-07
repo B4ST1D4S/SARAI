@@ -1,53 +1,814 @@
-// Este es un ejemplo de Prisma schema para EstetIA
-// Ubicación real: backend/prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-generator client {
-  provider = "prisma-client-js"
+model User {
+  id                       String                 @id @default(cuid())
+  email                    String?                @unique
+  password                 String
+  nombre                   String
+  apellido                 String
+  rol                      Role                   @default(RECEPCIONISTA)
+  especialidad             String?
+  numeroDocumento          String?
+  telefono                 String?
+  activo                   Boolean                @default(true)
+  createdAt                DateTime               @default(now())
+  updatedAt                DateTime               @updatedAt
+  username                 String?                @unique
+  firmaBase64              String?
+  registroMedico           String?
+  registroProfesional      String?
+  tipoDocumento            String?
+  auditLogs                AuditLog[]
+  bloqueosAgenda           BloqueDisponibilidad[]
+  citasAsignadas           Cita[]
+  disponibilidades         DisponibilidadMedico[]
+  historiasEditadas        HistoriaClinica[]
+  pacientesCreados         Paciente[]
+  procedimientosRealizados Procedimiento[]
+
+  @@index([rol])
+  @@index([email])
 }
 
-// ============================================
-// USUARIOS Y AUTENTICACIÓN
-// ============================================
+model Especialidad {
+  id                    String         @id @default(cuid())
+  codigo                String         @unique
+  nombre                String         @unique
+  descripcion           String?
+  aplicaAnestesia       Boolean        @default(false)
+  aplicaPediatria       Boolean        @default(false)
+  aplicaCirugia         Boolean        @default(false)
+  aplicaInstrumentacion Boolean        @default(false)
+  aplicaMedicoFamiliar  Boolean        @default(false)
+  estado                Boolean        @default(true)
+  usuarioCreacion       String?
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime
+  Preparacion           Preparacion[]
+  TipoConsulta          TipoConsulta[]
 
-model User {
-  id        String   @id @default(cuid())
-  username  String   @unique           // login por usuario (ej: "demo", "drlopez")
-  email     String?  @unique           // opcional, para notificaciones
-  password  String                     // bcrypt hash — nunca en texto plano
-  nombre    String
-  apellido  String
-  rol       Role     @default(RECEPCIONISTA)
-  
-  // Para médicos / profesionales
-  especialidad        String?
-  tipoDocumento       String?   // CC, CE, PS, TI
-  numeroDocumento     String?
-  registroProfesional String?   // número de tarjeta profesional
-  registroMedico      String?   // RETHUS / registro médico
-  firmaBase64         String?   @db.Text  // firma escaneada en base64
-  
-  telefono  String?
+  @@index([estado])
+}
+
+model Paciente {
+  id                String                    @id @default(cuid())
+  numeroDocumento   String
+  tipoDocumento     String
+  nombreCompleto    String
+  fechaNacimiento   DateTime
+  genero            String
+  telefonos         String[]
+  email             String?
+  whatsapp          String?
+  direccion         String?
+  ciudad            String?
+  fotoPerfil        String?
+  estado            String                    @default("ACTIVO")
+  creadoPor         String?
+  createdAt         DateTime                  @default(now())
+  updatedAt         DateTime                  @updatedAt
+  alergias          Alergia[]
+  alertas           Alerta[]
+  antecedentes      AntecedentesQuirurgicos[]
+  citas             Cita[]
+  consentimientos   Consentimiento[]
+  fotos             FotoClinica[]
+  historiasClinicas HistoriaClinica[]
+  mapaCorporal      MapaCorporal[]
+  medicacionActual  Medicamento[]
+  creadoBy          User?                     @relation(fields: [creadoPor], references: [id])
+  procedimientos    Procedimiento[]
+  seguimientos      SeguimientoPostOp[]
+  transacciones     Transaccion[]
+
+  @@unique([numeroDocumento, tipoDocumento])
+  @@index([nombreCompleto])
+  @@index([estado])
+}
+
+model Alergia {
+  id         String   @id @default(cuid())
+  pacienteId String
+  nombre     String
+  severidad  String
+  reaccion   String?
+  paciente   Paciente @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
+
+  @@index([pacienteId])
+}
+
+model Medicamento {
+  id         String    @id @default(cuid())
+  pacienteId String?
+  nombre     String
+  dosis      String
+  frecuencia String
+  indicacion String
+  activo     Boolean   @default(true)
+  paciente   Paciente? @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
+
+  @@index([pacienteId])
+}
+
+model AntecedentesQuirurgicos {
+  id             String   @id @default(cuid())
+  pacienteId     String
+  procedimiento  String
+  fecha          DateTime
+  complicaciones String?
+  cirujano       String?
+  paciente       Paciente @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
+
+  @@index([pacienteId])
+}
+
+model Procedimiento {
+  id                      String                @id @default(cuid())
+  pacienteId              String
+  medicoId                String
+  tipoProcedimiento       String
+  nombreProcedimiento     String
+  descripcion             String?
+  fechaProgramada         DateTime
+  fechaRealizada          DateTime?
+  duracionEstimada        Int
+  duracionReal            Int?
+  estado                  String                @default("PENDIENTE")
+  notasPreoperatorio      String?
+  notasOperatorio         String?
+  complicaciones          String[]
+  resultadoVisualEsperado String?
+  resultadoVisualActual   String?
+  createdAt               DateTime              @default(now())
+  updatedAt               DateTime              @updatedAt
+  codigoCUPS              String?
+  alertas                 Alerta[]
+  checklistsCompletados   ChecklistCompletado[]
+  consentimientos         Consentimiento[]
+  fotos                   FotoClinica[]
+  historias               HistoriaClinica[]
+  mapaCorporal            MapaCorporal[]
+  procedimientoCUPS       ProcedimientoCUPS?    @relation(fields: [codigoCUPS], references: [codigoCUPS])
+  medico                  User                  @relation(fields: [medicoId], references: [id])
+  paciente                Paciente              @relation(fields: [pacienteId], references: [id])
+  seguimientos            SeguimientoPostOp[]
+
+  @@index([pacienteId])
+  @@index([medicoId])
+  @@index([codigoCUPS])
+  @@index([estado])
+  @@index([fechaProgramada])
+}
+
+model HistoriaClinica {
+  id                 String             @id @default(cuid())
+  pacienteId         String
+  procedimientoId    String?
+  tipoHistoria       String
+  contenido          Json
+  version            Int                @default(1)
+  editadoPor         String
+  fechaCreacion      DateTime           @default(now())
+  fechaUltimaEdicion DateTime           @updatedAt
+  firmadoPorMedico   Boolean            @default(false)
+  fechaFirma         DateTime?
+  hashIntegridad     String
+  plantillaId        String?
+  usuario            User               @relation(fields: [editadoPor], references: [id])
+  paciente           Paciente           @relation(fields: [pacienteId], references: [id])
+  plantilla          PlantillaTemplate? @relation(fields: [plantillaId], references: [id])
+  procedimiento      Procedimiento?     @relation(fields: [procedimientoId], references: [id])
+
+  @@index([pacienteId])
+  @@index([procedimientoId])
+  @@index([plantillaId])
+  @@index([tipoHistoria])
+  @@index([fechaCreacion])
+}
+
+model PlantillaProcedimiento {
+  id                      String   @id @default(cuid())
+  codigoCups              String   @unique
+  nombreProcedimiento     String
+  categoria               String
+  descripcion             String?
+  camposObligatorios      Json
+  camposOpcionales        Json
+  riesgosAuto             String[]
+  complicacionesEsperadas String[]
+  medicacionRecomendada   Json
+  postoperatorioPorDias   Json
+  consentimientoTemplate  String
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  @@index([categoria])
+}
+
+model Consentimiento {
+  id               String        @id @default(cuid())
+  pacienteId       String
+  procedimientoId  String
+  plantillaId      String
+  contenidoHtml    String
+  contenidoPdfUrl  String?
+  firmaDigitalUrl  String?
+  selfieUrl        String?
+  fechaFirma       DateTime?
+  ipDispositivo    String?
+  navegador        String?
+  sistemaOperativo String?
+  geolocation      Json?
+  firmado          Boolean       @default(false)
+  hashIntegridad   String
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  paciente         Paciente      @relation(fields: [pacienteId], references: [id])
+  procedimiento    Procedimiento @relation(fields: [procedimientoId], references: [id])
+
+  @@index([pacienteId])
+  @@index([procedimientoId])
+  @@index([firmado])
+}
+
+model FotoClinica {
+  id                 String         @id @default(cuid())
+  pacienteId         String
+  procedimientoId    String?
+  tipo               String
+  diasPostOperatorio Int?
+  urlOriginal        String
+  urlComprimida      String
+  urlMiniatura       String
+  metadatos          Json?
+  anotaciones        Json?
+  visibleAlPaciente  Boolean        @default(false)
+  fechaCaptura       DateTime
+  createdAt          DateTime       @default(now())
+  paciente           Paciente       @relation(fields: [pacienteId], references: [id])
+  procedimiento      Procedimiento? @relation(fields: [procedimientoId], references: [id])
+
+  @@index([pacienteId])
+  @@index([procedimientoId])
+  @@index([tipo])
+}
+
+model MapaCorporal {
+  id                 String        @id @default(cuid())
+  pacienteId         String
+  procedimientoId    String
+  fechaEvaluacion    DateTime
+  zonasMarcadas      Json
+  edemaZonas         Json
+  fibrosisZonas      Json
+  dolorZonas         Json
+  colorIndicator     String?
+  anotacionesClinics String?
+  evaluadoPor        String
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  paciente           Paciente      @relation(fields: [pacienteId], references: [id])
+  procedimiento      Procedimiento @relation(fields: [procedimientoId], references: [id])
+
+  @@index([pacienteId])
+  @@index([procedimientoId])
+}
+
+model SeguimientoPostOp {
+  id                          String        @id @default(cuid())
+  pacienteId                  String
+  procedimientoId             String
+  diaPostOp                   Int
+  fechaPrevista               DateTime
+  fechaCompletada             DateTime?
+  tipoSeguimiento             String
+  checklistPreguntas          Json
+  checklistRespuestas         Json?
+  reportarComplicacion        Boolean       @default(false)
+  descripcionComplicacion     String?
+  alertasGeneradas            Json[]
+  completado                  Boolean       @default(false)
+  notificacionWhatsappEnviada Boolean       @default(false)
+  createdAt                   DateTime      @default(now())
+  paciente                    Paciente      @relation(fields: [pacienteId], references: [id])
+  procedimiento               Procedimiento @relation(fields: [procedimientoId], references: [id])
+
+  @@index([pacienteId])
+  @@index([procedimientoId])
+  @@index([diaPostOp])
+  @@index([completado])
+}
+
+model Alerta {
+  id                String         @id @default(cuid())
+  pacienteId        String
+  procedimientoId   String?
+  tipoAlerta        String
+  severidad         String
+  descripcion       String
+  accionRecomendada String
+  iaDetectada       Boolean        @default(false)
+  resuelta          Boolean        @default(false)
+  fechaResolucion   DateTime?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  paciente          Paciente       @relation(fields: [pacienteId], references: [id])
+  procedimiento     Procedimiento? @relation(fields: [procedimientoId], references: [id])
+
+  @@index([pacienteId])
+  @@index([severidad])
+  @@index([resuelta])
+}
+
+model Cita {
+  id                   String   @id @default(cuid())
+  pacienteId           String
+  medicoId             String
+  tipoCita             String
+  fechaHora            DateTime
+  duracionMinutos      Int      @default(60)
+  estado               String   @default("PENDIENTE")
+  motivo               String?
+  notas                String?
+  recordatorioWhatsapp Boolean  @default(false)
+  asistencia           Boolean?
+  salaQuirofanoId      String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  medico               User     @relation(fields: [medicoId], references: [id])
+  paciente             Paciente @relation(fields: [pacienteId], references: [id])
+
+  @@index([pacienteId])
+  @@index([medicoId])
+  @@index([fechaHora])
+  @@index([estado])
+}
+
+model Transaccion {
+  id              String   @id @default(cuid())
+  pacienteId      String
+  procedimientoId String?
+  tipo            String
+  concepto        String
+  monto           Float
+  moneda          String   @default("COP")
+  metodoPago      String
+  referenciaPago  String?
+  estado          String   @default("PENDIENTE")
+  reciboUrl       String?
+  creadoPor       String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  paciente        Paciente @relation(fields: [pacienteId], references: [id])
+
+  @@index([pacienteId])
+  @@index([estado])
+}
+
+model AuditLog {
+  id            String   @id @default(cuid())
+  usuarioId     String
+  tablaAfectada String
+  registroId    String
+  tipoOperacion String
+  datosAntes    Json?
+  datosDespues  Json?
+  ipOrigen      String?
+  userAgent     String?
+  razon         String?
+  timestamp     DateTime @default(now())
+  usuario       User     @relation(fields: [usuarioId], references: [id])
+
+  @@index([usuarioId])
+  @@index([tablaAfectada])
+  @@index([timestamp])
+}
+
+model Integracion {
+  id                        String    @id @default(cuid())
+  tipo                      String
+  credencialesEncriptadas   String
+  activa                    Boolean   @default(true)
+  fechaUltimaSincronizacion DateTime?
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
+}
+
+model ProcedimientoCUPS {
+  id                      String                  @id @default(cuid())
+  codigoCUPS              String                  @unique
+  nombre                  String
+  descripcion             String?
+  tipoCategoria           String
+  riesgoNivel             String
+  diasSeguimiento         Int                     @default(30)
+  datosAdicionales        Json?
+  activo                  Boolean                 @default(true)
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
+  checklistTemplates      ChecklistTemplate[]
+  consentimientosTemplate ConsentimientoTemplate?
+  plantillas              PlantillaTemplate[]
+  procedimientosClinica   Procedimiento[]
+
+  @@index([codigoCUPS])
+  @@index([tipoCategoria])
+  @@index([activo])
+}
+
+model PlantillaTemplate {
+  id                   String            @id @default(cuid())
+  codigoCUPS           String
+  nombre               String
+  tipo                 String
+  descripcion          String?
+  seccionesJSON        Json
+  requiereSignatura    Boolean           @default(false)
+  requiereFoto         Boolean           @default(false)
+  requiereMapaCorporal Boolean           @default(false)
+  ordenVisualizacion   Int               @default(1)
+  activa               Boolean           @default(true)
+  creadoPor            String?
+  actualizadoPor       String?
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+  historiasClinicas    HistoriaClinica[]
+  procedimiento        ProcedimientoCUPS @relation(fields: [codigoCUPS], references: [codigoCUPS], onDelete: Cascade)
+
+  @@unique([codigoCUPS, tipo])
+  @@index([codigoCUPS])
+  @@index([tipo])
+}
+
+model ChecklistTemplate {
+  id                     String            @id @default(cuid())
+  codigoCUPS             String
+  fase                   String
+  nombre                 String
+  itemsJSON              Json
+  alertasAutomaticasJSON Json?
+  activo                 Boolean           @default(true)
+  createdAt              DateTime          @default(now())
+  updatedAt              DateTime          @updatedAt
+  procedimiento          ProcedimientoCUPS @relation(fields: [codigoCUPS], references: [codigoCUPS], onDelete: Cascade)
+
+  @@unique([codigoCUPS, fase])
+  @@index([codigoCUPS])
+}
+
+model ConsentimientoTemplate {
+  id                  String            @id @default(cuid())
+  codigoCUPS          String            @unique
+  titulo              String
+  seccionesJSON       Json
+  riesgosJSON         Json
+  recomendacionesJSON Json?
+  activo              Boolean           @default(true)
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  procedimiento       ProcedimientoCUPS @relation(fields: [codigoCUPS], references: [codigoCUPS], onDelete: Cascade)
+
+  @@index([codigoCUPS])
+}
+
+model ConfiguracionSistema {
+  id          String   @id @default(cuid())
+  clave       String   @unique
+  valor       Json
+  descripcion String?
+  updatedAt   DateTime @updatedAt
+
+  @@index([clave])
+}
+
+model ChecklistCompletado {
+  id              String        @id @default(cuid())
+  procedimientoId String
+  templateId      String
+  fase            String
+  respuestasJSON  Json?
+  completadoEn    DateTime?
+  completadoPor   String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  procedimiento   Procedimiento @relation(fields: [procedimientoId], references: [id], onDelete: Cascade)
+
+  @@index([procedimientoId])
+  @@index([completadoEn])
+}
+
+model DisponibilidadMedico {
+  id           String   @id @default(cuid())
+  medicoId     String
+  diaSemana    Int
+  horaInicio   String
+  horaFin      String
+  duracionSlot Int      @default(60)
+  sede         String?  @default("Principal")
+  tipoAtencion String?  @default("CONSULTA")
+  consultorio  String?
+  activo       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  medico       User     @relation(fields: [medicoId], references: [id], onDelete: Cascade)
+
+  @@index([medicoId])
+  @@index([diaSemana])
+}
+
+model BloqueDisponibilidad {
+  id          String   @id @default(cuid())
+  medicoId    String
+  fechaInicio DateTime
+  fechaFin    DateTime
+  motivo      String?  @default("Bloqueo")
+  todoElDia   Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  medico      User     @relation(fields: [medicoId], references: [id], onDelete: Cascade)
+
+  @@index([medicoId])
+  @@index([fechaInicio])
+}
+
+model CampoPaciente {
+  id              String   @id
+  nombre          String   @unique
+  etiqueta        String
+  seccion         String
+  tipoCampo       String   @default("text")
+  esVisible       Boolean  @default(true)
+  esObligatorio   Boolean  @default(false)
+  esPersonalizado Boolean  @default(false)
+  opciones        Json?
+  placeholder     String?
+  orden           Int      @default(0)
+  estado          Boolean  @default(true)
+  usuarioCreacion String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime
+
+  @@index([esPersonalizado])
+  @@index([esVisible])
+  @@index([seccion])
+}
+
+model Cargo {
+  id                String              @id
+  codigo            String              @unique
+  nombre            String
+  descripcion       String?
+  tipo              String              @default("CONSULTA")
+  valor             Float               @default(0)
+  unidad            String?
+  codigoReferencia  String?
+  aplicaIva         Boolean             @default(false)
+  tasaIva           Float               @default(0)
+  esObligatorio     Boolean             @default(false)
+  aplicaPYP         Boolean             @default(false)
+  estado            Boolean             @default(true)
+  usuarioCreacion   String?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime
+  DepartamentoCargo DepartamentoCargo[]
+
+  @@index([estado])
+  @@index([tipo])
+}
+
+model ConfigServicioConsulta {
+  id                 String             @id
+  tipoConsultaId     String
+  servicioId         String
+  esPrincipal        Boolean            @default(false)
+  generaAutomatico   Boolean            @default(false)
+  requiereOrden      Boolean            @default(false)
+  centroOperacionId  String?
+  cuentaContable     String?
+  hcModuloId         String?
+  usuarioCreacion    String?
+  createdAt          DateTime           @default(now())
+  ServicioFacturable ServicioFacturable @relation(fields: [servicioId], references: [id])
+  TipoConsulta       TipoConsulta       @relation(fields: [tipoConsultaId], references: [id], onDelete: Cascade)
+
+  @@unique([tipoConsultaId, servicioId])
+  @@index([servicioId])
+  @@index([tipoConsultaId])
+}
+
+model Departamento {
+  id                String              @id
+  codigo            String              @unique
+  nombre            String
+  descripcion       String?
+  estado            Boolean             @default(true)
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime
+  DepartamentoCargo DepartamentoCargo[]
+  ReglaOperativa    ReglaOperativa[]
+  TipoConsulta      TipoConsulta[]
+
+  @@index([estado])
+}
+
+model DepartamentoCargo {
+  id                     String       @id
+  departamentoId         String
+  cargoId                String
+  permiteSeleccion       Boolean      @default(true)
+  manejaInsumos          Boolean      @default(false)
+  cumplimientoAutomatico Boolean      @default(false)
+  tomadoAutomatico       Boolean      @default(false)
+  interfaceExterno       Boolean      @default(false)
+  generaOrden            Boolean      @default(false)
+  liquidaHonorarios      Boolean      @default(false)
+  cumplimientoParcial    Boolean      @default(false)
+  manejaCentroCosto      Boolean      @default(false)
+  usuarioCreacion        String?
+  createdAt              DateTime     @default(now())
+  updatedAt              DateTime
+  Cargo                  Cargo        @relation(fields: [cargoId], references: [id])
+  Departamento           Departamento @relation(fields: [departamentoId], references: [id], onDelete: Cascade)
+
+  @@unique([departamentoId, cargoId])
+  @@index([departamentoId])
+}
+
+model HCModulo {
+  id                      String         @id
+  codigo                  String         @unique
+  nombre                  String
+  descripcion             String?
+  activo                  Boolean        @default(true)
+  tipoFinalidad           String?
+  tipoRips                String?
+  parametrosConfiguracion Json?
+  programaId              String?
+  usuarioCreacion         String?
+  createdAt               DateTime       @default(now())
+  updatedAt               DateTime
+  TipoConsulta            TipoConsulta[]
+
+  @@index([activo])
+}
+
+model ListaValor {
+  id        String   @id
+  grupo     String
+  valor     String
+  etiqueta  String
+  orden     Int      @default(0)
   activo    Boolean  @default(true)
-  
-  // Relaciones
-  pacientesCreados Paciente[]
-  procedimientosRealizados Procedimiento[]
-  historiasEditadas HistoriaClinica[]
-  citasAsignadas Cita[]
-  auditLogs AuditLog[]
-  disponibilidades DisponibilidadMedico[]
-  bloqueosAgenda  BloqueDisponibilidad[]
-  
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  
-  @@index([username])
-  @@index([rol])
+  updatedAt DateTime
+
+  @@unique([grupo, valor])
+  @@index([grupo])
+}
+
+model MotivoCita {
+  id          String   @id
+  nombre      String
+  descripcion String?
+  tipo        String   @default("consulta")
+  orden       Int      @default(0)
+  activo      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime
+
+  @@index([activo])
+  @@index([tipo])
+}
+
+model ParametroSistema {
+  id        String   @id
+  grupo     String
+  clave     String
+  valor     String   @default("")
+  etiqueta  String
+  tipo      String   @default("text")
+  orden     Int      @default(0)
+  estado    Boolean  @default(true)
+  updatedAt DateTime
+
+  @@unique([grupo, clave])
+  @@index([grupo])
+}
+
+model Preparacion {
+  id              String        @id
+  nombre          String
+  descripcion     String?
+  tipo            String        @default("consulta")
+  especialidadId  String?
+  tipoConsultaId  String?
+  estado          Boolean       @default(true)
+  usuarioCreacion String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime
+  Especialidad    Especialidad? @relation(fields: [especialidadId], references: [id])
+  TipoConsulta    TipoConsulta? @relation(fields: [tipoConsultaId], references: [id])
+
+  @@index([estado])
+  @@index([tipoConsultaId])
+}
+
+model ReglaOperativa {
+  id                     String             @id
+  departamentoId         String
+  servicioId             String
+  permiteSeleccion       Boolean            @default(true)
+  manejaInsumos          Boolean            @default(false)
+  generaOrden            Boolean            @default(false)
+  liquidaHonorarios      Boolean            @default(false)
+  cumplimientoAutomatico Boolean            @default(false)
+  tomadoAutomatico       Boolean            @default(false)
+  cumplimientoParcial    Boolean            @default(false)
+  manejaCentroCosto      Boolean            @default(false)
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime
+  Departamento           Departamento       @relation(fields: [departamentoId], references: [id], onDelete: Cascade)
+  ServicioFacturable     ServicioFacturable @relation(fields: [servicioId], references: [id])
+
+  @@unique([departamentoId, servicioId])
+  @@index([departamentoId])
+}
+
+model ServicioFacturable {
+  id                     String                   @id
+  codigoCups             String                   @unique
+  nombre                 String
+  descripcion            String?
+  categoria              String?
+  subcategoria           String?
+  tipoServicio           String?
+  nivelComplejidad       String?
+  conceptoRips           String?
+  precioBase             Float                    @default(0)
+  requiereCantidad       Boolean                  @default(false)
+  esHonorario            Boolean                  @default(false)
+  esPOS                  Boolean                  @default(false)
+  estado                 Boolean                  @default(true)
+  createdAt              DateTime                 @default(now())
+  updatedAt              DateTime
+  ConfigServicioConsulta ConfigServicioConsulta[]
+  ReglaOperativa         ReglaOperativa[]
+
+  @@index([categoria])
+  @@index([estado])
+}
+
+model TipoConsulta {
+  id                       String                   @id
+  nombre                   String
+  descripcion              String?
+  especialidadId           String?
+  departamentoId           String?
+  hcModuloId               String?
+  requiereCaja             Boolean                  @default(false)
+  manejaAnestesia          Boolean                  @default(false)
+  permiteAgendamiento      Boolean                  @default(true)
+  controlaTiempoCita       Boolean                  @default(false)
+  abreHistoriaClinica      Boolean                  @default(true)
+  permiteCargosAdicionales Boolean                  @default(false)
+  esProgramaPYP            Boolean                  @default(false)
+  manejaProtocolos         Boolean                  @default(false)
+  clasificacion            String                   @default("CONSULTA")
+  esPsicologia             Boolean                  @default(false)
+  duracionMinutos          Int                      @default(30)
+  bodegaId                 String?
+  estado                   Boolean                  @default(true)
+  usuarioCreacion          String?
+  createdAt                DateTime                 @default(now())
+  updatedAt                DateTime
+  ConfigServicioConsulta   ConfigServicioConsulta[]
+  Preparacion              Preparacion[]
+  Departamento             Departamento?            @relation(fields: [departamentoId], references: [id])
+  Especialidad             Especialidad?            @relation(fields: [especialidadId], references: [id])
+  HCModulo                 HCModulo?                @relation(fields: [hcModuloId], references: [id])
+
+  @@index([especialidadId])
+  @@index([estado])
+}
+
+model TipoConsultorio {
+  id               String   @id
+  codigo           String   @unique
+  tipoConsultorio  String
+  descripcion      String?
+  indiceAutomatico Int?
+  estado           Boolean  @default(true)
+  usuarioCreacion  String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime
+
+  @@index([estado])
 }
 
 enum Role {
@@ -56,715 +817,4 @@ enum Role {
   AUXILIAR
   RECEPCIONISTA
   PACIENTE
-}
-
-// ============================================
-// PACIENTES (CORE)
-// ============================================
-
-model Paciente {
-  id                String   @id @default(cuid())
-  numeroDocumento   String
-  tipoDocumento     String   // CC, CE, PS, PEP
-  nombreCompleto    String
-  fechaNacimiento   DateTime
-  genero            String   // M, F, O
-  
-  telefonos         String[]
-  email             String?
-  whatsapp          String?
-  
-  direccion         String?
-  ciudad            String?
-  
-  alergias          Alergia[]
-  medicacionActual  Medicamento[]
-  antecedentes      AntecedentesQuirurgicos[]
-  
-  fotoPerfil        String?
-  estado            String   @default("ACTIVO") // ACTIVO, INACTIVO, FALLECIDO
-  
-  // Relaciones
-  procedimientos    Procedimiento[]
-  historiasClinicas HistoriaClinica[]
-  fotos             FotoClinica[]
-  citas             Cita[]
-  transacciones     Transaccion[]
-  alertas           Alerta[]
-  consentimientos   Consentimiento[]
-  mapaCorporal      MapaCorporal[]
-  seguimientos      SeguimientoPostOp[]
-  
-  creadoPor         String?
-  creadoBy          User?    @relation(fields: [creadoPor], references: [id])
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  
-  @@unique([numeroDocumento, tipoDocumento])
-  @@index([nombreCompleto])
-  @@index([estado])
-}
-
-model Alergia {
-  id          String @id @default(cuid())
-  pacienteId  String
-  paciente    Paciente @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
-  
-  nombre      String
-  severidad   String // CRITICA, ALTA, MEDIA, LEVE
-  reaccion    String?
-  
-  @@index([pacienteId])
-}
-
-model Medicamento {
-  id          String @id @default(cuid())
-  pacienteId  String?
-  paciente    Paciente? @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
-  
-  nombre      String
-  dosis       String
-  frecuencia  String
-  indicacion  String
-  activo      Boolean @default(true)
-  
-  @@index([pacienteId])
-}
-
-model AntecedentesQuirurgicos {
-  id          String @id @default(cuid())
-  pacienteId  String
-  paciente    Paciente @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
-  
-  procedimiento String
-  fecha       DateTime
-  complicaciones String?
-  cirujano    String?
-  
-  @@index([pacienteId])
-}
-
-// ============================================
-// PROCEDIMIENTOS
-// ============================================
-
-model Procedimiento {
-  id                      String   @id @default(cuid())
-  pacienteId              String
-  paciente                Paciente @relation(fields: [pacienteId], references: [id])
-  
-  medicoId                String
-  medico                  User     @relation(fields: [medicoId], references: [id])
-  
-  // NUEVO: Vinculación con CUPS
-  codigoCUPS              String?
-  procedimientoCUPS       ProcedimientoCUPS? @relation(fields: [codigoCUPS], references: [codigoCUPS])
-  
-  tipoProcedimiento       String
-  nombreProcedimiento     String
-  descripcion             String?
-  
-  fechaProgramada         DateTime
-  fechaRealizada          DateTime?
-  
-  duracionEstimada        Int      // minutos
-  duracionReal            Int?
-  
-  estado                  String   @default("PENDIENTE") // PENDIENTE, EN_CURSO, COMPLETADO, CANCELADO
-  
-  notasPreoperatorio      String?
-  notasOperatorio         String?
-  complicaciones          String[]
-  
-  resultadoVisualEsperado String?
-  resultadoVisualActual   String?
-  
-  // Relaciones
-  historias               HistoriaClinica[]
-  fotos                   FotoClinica[]
-  consentimientos         Consentimiento[]
-  seguimientos            SeguimientoPostOp[]
-  alertas                 Alerta[]
-  mapaCorporal            MapaCorporal[]
-  checklistsCompletados   ChecklistCompletado[]
-  
-  createdAt               DateTime @default(now())
-  updatedAt               DateTime @updatedAt
-  
-  @@index([pacienteId])
-  @@index([medicoId])
-  @@index([codigoCUPS])
-  @@index([estado])
-  @@index([fechaProgramada])
-}
-
-// ============================================
-// HISTORIA CLÍNICA DINÁMICA
-// ============================================
-
-model HistoriaClinica {
-  id                String   @id @default(cuid())
-  pacienteId        String
-  paciente          Paciente @relation(fields: [pacienteId], references: [id])
-  
-  procedimientoId   String?
-  procedimiento     Procedimiento? @relation(fields: [procedimientoId], references: [id])
-  
-  // NUEVO: Vinculación con plantilla
-  plantillaId       String?
-  plantilla         PlantillaTemplate? @relation(fields: [plantillaId], references: [id])
-  
-  tipoHistoria      String   // ANAMNESIS, EXAMEN_FISICO, DIAGNOSTICO, PLAN, SEGUIMIENTO
-  contenido         Json     // Campo flexible para datos dinámicos
-  version           Int      @default(1)
-  
-  editadoPor        String
-  usuario           User     @relation(fields: [editadoPor], references: [id])
-  
-  fechaCreacion     DateTime @default(now())
-  fechaUltimaEdicion DateTime @updatedAt
-  
-  firmadoPorMedico  Boolean  @default(false)
-  fechaFirma        DateTime?
-  
-  hashIntegridad    String   // SHA-256 para auditoría
-  
-  @@index([pacienteId])
-  @@index([procedimientoId])
-  @@index([plantillaId])
-  @@index([tipoHistoria])
-  @@index([fechaCreacion])
-}
-
-// ============================================
-// PLANTILLAS POR PROCEDIMIENTO
-// ============================================
-
-model PlantillaProcedimiento {
-  id                          String   @id @default(cuid())
-  codigoCups                  String   @unique
-  nombreProcedimiento         String
-  categoria                   String   // FACIAL, CORPORAL, NO_INVASIVO
-  descripcion                 String?
-  
-  camposObligatorios          Json     // Array de FormField
-  camposOpcionales            Json     // Array de FormField
-  
-  riesgosAuto                 String[] // Array de riesgos por defecto
-  complicacionesEsperadas     String[] // Array de complicaciones
-  medicacionRecomendada       Json     // Array de medicamentos
-  
-  postoperatorioPorDias       Json     // Estructura de seguimiento por días
-  
-  consentimientoTemplate      String   // HTML del consentimiento
-  
-  createdAt                   DateTime @default(now())
-  updatedAt                   DateTime @updatedAt
-  
-  @@index([categoria])
-}
-
-// ============================================
-// CONSENTIMIENTO INFORMADO
-// ============================================
-
-model Consentimiento {
-  id                String   @id @default(cuid())
-  pacienteId        String
-  paciente          Paciente @relation(fields: [pacienteId], references: [id])
-  
-  procedimientoId   String
-  procedimiento     Procedimiento @relation(fields: [procedimientoId], references: [id])
-  
-  plantillaId       String
-  
-  contenidoHtml     String
-  contenidoPdfUrl   String?
-  
-  firmaDigitalUrl   String?   // URL de imagen de firma
-  selfieUrl         String?   // URL de selfie
-  
-  fechaFirma        DateTime?
-  
-  ipDispositivo     String?
-  navegador         String?
-  sistemaOperativo  String?
-  geolocation       Json?     // {latitude, longitude}
-  
-  firmado           Boolean   @default(false)
-  hashIntegridad    String    // SHA-256
-  
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-  
-  @@index([pacienteId])
-  @@index([procedimientoId])
-  @@index([firmado])
-}
-
-// ============================================
-// FOTOS CLÍNICAS
-// ============================================
-
-model FotoClinica {
-  id                String   @id @default(cuid())
-  pacienteId        String
-  paciente          Paciente @relation(fields: [pacienteId], references: [id])
-  
-  procedimientoId   String?
-  procedimiento     Procedimiento? @relation(fields: [procedimientoId], references: [id])
-  
-  tipo              String   // ANTES, DESPUES, SEGUIMIENTO
-  diasPostOperatorio Int?
-  
-  urlOriginal       String
-  urlComprimida     String
-  urlMiniatura      String
-  
-  metadatos         Json?    // {fecha, hora, dispositivo}
-  anotaciones       Json?    // Array de anotaciones clínicas
-  
-  visibleAlPaciente Boolean  @default(false)
-  
-  fechaCaptura      DateTime
-  createdAt         DateTime @default(now())
-  
-  @@index([pacienteId])
-  @@index([procedimientoId])
-  @@index([tipo])
-}
-
-// ============================================
-// MAPA CORPORAL INTERACTIVO
-// ============================================
-
-model MapaCorporal {
-  id                String   @id @default(cuid())
-  pacienteId        String
-  paciente          Paciente @relation(fields: [pacienteId], references: [id])
-  
-  procedimientoId   String
-  procedimiento     Procedimiento @relation(fields: [procedimientoId], references: [id])
-  
-  fechaEvaluacion   DateTime
-  
-  zonasMarcadas     Json     // GeoJSON de zonas
-  edemaZonas        Json     // {zona, severidad, colorCode}
-  fibrosisZonas     Json     // {zona, presente, descripcion}
-  dolorZonas        Json     // {zona, escala, tipo}
-  
-  colorIndicator    String?
-  anotacionesClinics String?
-  
-  evaluadoPor       String
-  
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  
-  @@index([pacienteId])
-  @@index([procedimientoId])
-}
-
-// ============================================
-// SEGUIMIENTO POSTOPERATORIO
-// ============================================
-
-model SeguimientoPostOp {
-  id                      String   @id @default(cuid())
-  pacienteId              String
-  paciente                Paciente @relation(fields: [pacienteId], references: [id])
-  
-  procedimientoId         String
-  procedimiento           Procedimiento @relation(fields: [procedimientoId], references: [id])
-  
-  diaPostOp               Int
-  fechaPrevista           DateTime
-  fechaCompletada         DateTime?
-  
-  tipoSeguimiento         String   // CHECKLIST, FOTOS, CONTROL, EVALUACION
-  
-  checklistPreguntas      Json     // Array de preguntas
-  checklistRespuestas     Json?    // Respuestas del paciente
-  
-  reportarComplicacion    Boolean  @default(false)
-  descripcionComplicacion String?
-  
-  alertasGeneradas        Json[]   // Array de alertas
-  
-  completado              Boolean  @default(false)
-  notificacionWhatsappEnviada Boolean @default(false)
-  
-  createdAt               DateTime @default(now())
-  
-  @@index([pacienteId])
-  @@index([procedimientoId])
-  @@index([diaPostOp])
-  @@index([completado])
-}
-
-// ============================================
-// ALERTAS CLÍNICAS
-// ============================================
-
-model Alerta {
-  id                  String   @id @default(cuid())
-  pacienteId          String
-  paciente            Paciente @relation(fields: [pacienteId], references: [id])
-  
-  procedimientoId     String?
-  procedimiento       Procedimiento? @relation(fields: [procedimientoId], references: [id])
-  
-  tipoAlerta          String   // RIESGO, COMPLICACION, CONTROL_PENDIENTE, MEDICACION
-  severidad           String   // CRITICA, ALTA, MEDIA, BAJA
-  
-  descripcion         String
-  accionRecomendada   String
-  
-  iaDetectada         Boolean  @default(false)
-  
-  resuelta            Boolean  @default(false)
-  fechaResolucion     DateTime?
-  
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
-  
-  @@index([pacienteId])
-  @@index([severidad])
-  @@index([resuelta])
-}
-
-// ============================================
-// CITAS / AGENDA
-// ============================================
-
-model Cita {
-  id                String   @id @default(cuid())
-  pacienteId        String
-  paciente          Paciente @relation(fields: [pacienteId], references: [id])
-  
-  medicoId          String
-  medico            User     @relation(fields: [medicoId], references: [id])
-  
-  tipoCita          String   // CONSULTA, PREOPERATORIO, POSTOPERATORIO, CONTROL
-  
-  fechaHora         DateTime
-  duracionMinutos   Int      @default(60)
-  
-  estado            String   @default("PENDIENTE") // PENDIENTE, CONFIRMADA, EN_SALA, COMPLETADA, CANCELADA
-  
-  motivo            String?
-  notas             String?
-  
-  recordatorioWhatsapp Boolean @default(false)
-  asistencia        Boolean?
-  
-  salaQuirofanoId   String?
-  
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  
-  @@index([pacienteId])
-  @@index([medicoId])
-  @@index([fechaHora])
-  @@index([estado])
-}
-
-// ============================================
-// TRANSACCIONES / FACTURACIÓN
-// ============================================
-
-model Transaccion {
-  id              String   @id @default(cuid())
-  pacienteId      String
-  paciente        Paciente @relation(fields: [pacienteId], references: [id])
-  
-  procedimientoId String?
-  
-  tipo            String   // CARGO, PAGO, ABONO
-  concepto        String
-  
-  monto           Float
-  moneda          String   @default("COP")
-  
-  metodoPago      String   // EFECTIVO, TARJETA, TRANSFER, OTRO
-  referenciaPago  String?
-  
-  estado          String   @default("PENDIENTE")
-  
-  reciboUrl       String?
-  
-  creadoPor       String
-  
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  
-  @@index([pacienteId])
-  @@index([estado])
-}
-
-// ============================================
-// LOGS DE AUDITORÍA
-// ============================================
-
-model AuditLog {
-  id              String   @id @default(cuid())
-  usuarioId       String
-  usuario         User     @relation(fields: [usuarioId], references: [id])
-  
-  tablaAfectada   String
-  registroId      String
-  
-  tipoOperacion   String   // CREATE, UPDATE, DELETE, VIEW
-  
-  datosAntes      Json?
-  datosDespues    Json?
-  
-  ipOrigen        String?
-  userAgent       String?
-  razon           String?
-  
-  timestamp       DateTime @default(now())
-  
-  @@index([usuarioId])
-  @@index([tablaAfectada])
-  @@index([timestamp])
-}
-
-// ============================================
-// INTEGRACIONES
-// ============================================
-
-model Integracion {
-  id              String   @id @default(cuid())
-  tipo            String   // WHATSAPP, GOOGLE_CALENDAR, STRIPE, OPENAI
-  
-  credencialesEncriptadas String
-  activa          Boolean  @default(true)
-  
-  fechaUltimaSincronizacion DateTime?
-  
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-}
-
-// ============================================
-// PROCEDIMIENTOS CUPS - MAESTRO PARAMETRIZABLE
-// ============================================
-
-model ProcedimientoCUPS {
-  id                  String    @id @default(cuid())
-  codigoCUPS          String    @unique
-  nombre              String    // "Rinoplastia", "Liposucción", etc
-  descripcion         String?
-  
-  tipoCategoria       String    // "Facial", "Corporal", "No-invasivo"
-  riesgoNivel         String    // "Bajo", "Medio", "Alto"
-  
-  diasSeguimiento     Int       @default(30)  // cuántos días seguimiento automático
-  
-  // Datos JSON para flexibilidad
-  datosAdicionales    Json?
-  
-  activo              Boolean   @default(true)
-  
-  // Relaciones
-  plantillas          PlantillaTemplate[]
-  checklistTemplates  ChecklistTemplate[]
-  consentimientosTemplate ConsentimientoTemplate[]
-  procedimientosClinica Procedimiento[]  // Procedimientos clínicos asociados
-  
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
-  
-  @@index([codigoCUPS])
-  @@index([tipoCategoria])
-  @@index([activo])
-}
-
-// ============================================
-// PLANTILLAS PARAMETRIZABLES POR CUPS
-// ============================================
-
-model PlantillaTemplate {
-  id                  String    @id @default(cuid())
-  codigoCUPS          String
-  procedimiento       ProcedimientoCUPS @relation(fields: [codigoCUPS], references: [codigoCUPS], onDelete: Cascade)
-  
-  nombre              String    // "Historia Clínica", "Evaluación Pre-op", etc
-  tipo                String    // "historia-clinica", "evaluacion", "seguimiento"
-  descripcion         String?
-  
-  // Estructura dinámica de secciones
-  seccionesJSON       Json      // Array de secciones: [{id, nombre, campos: []}]
-  
-  // Configuración
-  requiereSignatura   Boolean   @default(false)
-  requiereFoto        Boolean   @default(false)
-  requiereMapaCorporal Boolean  @default(false)
-  
-  ordenVisualizacion  Int       @default(1)
-  activa              Boolean   @default(true)
-  
-  // Auditoría
-  creadoPor           String?
-  actualizadoPor      String?
-  
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
-  
-  // Relaciones
-  historiasClinicas   HistoriaClinica[]
-  
-  @@unique([codigoCUPS, tipo])
-  @@index([codigoCUPS])
-  @@index([tipo])
-}
-
-// ============================================
-// CHECKLIST DINÁMICO POR FASES
-// ============================================
-
-model ChecklistTemplate {
-  id                  String    @id @default(cuid())
-  codigoCUPS          String
-  procedimiento       ProcedimientoCUPS @relation(fields: [codigoCUPS], references: [codigoCUPS], onDelete: Cascade)
-  
-  fase                String    // "pre-operatorio", "intra-operatorio", "post-operatorio"
-  nombre              String    // "Checklist Pre-op", etc
-  
-  // Array de items: [{id, label, requerido, orden, tipo}]
-  itemsJSON           Json
-  
-  // Alertas automáticas por día
-  // [{dia: 1, mensaje: "...", tipo: "info|warning|critical"}]
-  alertasAutomaticasJSON Json?
-  
-  activo              Boolean   @default(true)
-  
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
-  
-  @@unique([codigoCUPS, fase])
-  @@index([codigoCUPS])
-}
-
-// ============================================
-// CONSENTIMIENTO DINÁMICO
-// ============================================
-
-model ConsentimientoTemplate {
-  id                  String    @id @default(cuid())
-  codigoCUPS          String
-  procedimiento       ProcedimientoCUPS @relation(fields: [codigoCUPS], references: [codigoCUPS], onDelete: Cascade)
-  
-  titulo              String
-  
-  // Secciones dinámicas: [{id, titulo, contenido, requerido}]
-  seccionesJSON       Json
-  
-  // Riesgos por CUPS: [{riesgo, probabilidad, severidad, descripcion}]
-  riesgosJSON         Json
-  
-  // Recomendaciones pre/post: [{tipo, texto}]
-  recomendacionesJSON Json?
-  
-  activo              Boolean   @default(true)
-  
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
-  
-  @@unique([codigoCUPS])
-  @@index([codigoCUPS])
-}
-
-// ============================================
-// CONFIGURACIÓN DEL SISTEMA
-// ============================================
-
-model ConfiguracionSistema {
-  id                  String    @id @default(cuid())
-  clave               String    @unique
-  valor               Json
-  descripcion         String?
-  
-  // Ejemplo:
-  // clave: "whatsapp_token", valor: "{token: ...}"
-  // clave: "dias_seguimiento_default", valor: "{dias: 30}"
-  
-  updatedAt           DateTime  @updatedAt
-  
-  @@index([clave])
-}
-
-// ============================================
-// INSTANCIAS DE CHECKLISTS COMPLETADOS
-// ============================================
-
-model ChecklistCompletado {
-  id                  String    @id @default(cuid())
-  procedimientoId     String
-  procedimiento       Procedimiento @relation(fields: [procedimientoId], references: [id], onDelete: Cascade)
-  
-  templateId          String
-  
-  fase                String    // copia de fase del template
-  
-  // Respuestas: [{itemId, respuesta, comentario}]
-  respuestasJSON      Json?
-  
-  completadoEn        DateTime?
-  completadoPor       String?   // User ID
-  
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
-  
-  @@index([procedimientoId])
-  @@index([completadoEn])
-}
-
-// ============================================
-// DISPONIBILIDAD DEL MÉDICO (CU-01)
-// ============================================
-
-model DisponibilidadMedico {
-  id           String   @id @default(cuid())
-  medicoId     String
-  medico       User     @relation(fields: [medicoId], references: [id], onDelete: Cascade)
-
-  diaSemana    Int      // 0=Dom, 1=Lun, 2=Mar, 3=Mié, 4=Jue, 5=Vie, 6=Sáb
-  horaInicio   String   // "08:00"
-  horaFin      String   // "18:00"
-  duracionSlot Int      @default(60) // minutos por cita
-
-  sede         String?  @default("Principal")
-  tipoAtencion String?  @default("CONSULTA") // CONSULTA | PREOPERATORIO | POSTOPERATORIO | CONTROL
-  consultorio  String?
-
-  activo       Boolean  @default(true)
-
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  @@index([medicoId])
-  @@index([diaSemana])
-}
-
-// ============================================
-// BLOQUEOS DE AGENDA (vacaciones, festivos)
-// ============================================
-
-model BloqueDisponibilidad {
-  id        String   @id @default(cuid())
-  medicoId  String
-  medico    User     @relation(fields: [medicoId], references: [id], onDelete: Cascade)
-
-  fechaInicio DateTime
-  fechaFin    DateTime
-  motivo      String?  @default("Bloqueo")
-  todoElDia   Boolean  @default(true)
-
-  createdAt DateTime @default(now())
-
-  @@index([medicoId])
-  @@index([fechaInicio])
 }

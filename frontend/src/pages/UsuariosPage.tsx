@@ -20,8 +20,10 @@ import {
   getAllUsuarios,
   updateUsuario,
   toggleUsuarioStatus,
+  getEspecialidades,
   CreateUserRequest,
   UpdateUserRequest,
+  EspecialidadItem,
 } from '../services/api';
 
 // ─── Constantes ──────────────────────────────────────────────────────────────
@@ -108,6 +110,8 @@ export default function UsuariosPage() {
   const [error, setError]         = useState<string | null>(null);
   const [success, setSuccess]     = useState<string | null>(null);
 
+  const [especialidades, setEspecialidades] = useState<EspecialidadItem[]>([]);
+
   const token    = localStorage.getItem('accessToken') || '';
   const firmaRef = useRef<HTMLInputElement>(null);
 
@@ -119,7 +123,13 @@ export default function UsuariosPage() {
     setLoading(false);
   };
 
-  useEffect(() => { loadUsuarios(); }, []);
+  useEffect(() => {
+    loadUsuarios();
+    // Cargar especialidades al montar
+    getEspecialidades(token).then((res) => {
+      if (res.data) setEspecialidades(res.data);
+    });
+  }, []);
 
   // ── Filtrado ──────────────────────────────────────────────────────────────
   const usuariosFiltrados = usuarios.filter((u) => {
@@ -602,9 +612,16 @@ export default function UsuariosPage() {
                             </Field>
                           </div>
                           <Field label="Especialidad">
-                            <input value={form.especialidad}
+                            <select
+                              value={form.especialidad ?? ''}
                               onChange={(e) => setForm((f) => ({ ...f, especialidad: e.target.value }))}
-                              placeholder="Ej: Cirugía Plástica" className={inputCls} />
+                              className={inputCls}
+                            >
+                              <option value="">— Seleccionar especialidad —</option>
+                              {especialidades.map((e) => (
+                                <option key={e.id} value={e.nombre}>{e.nombre}</option>
+                              ))}
+                            </select>
                           </Field>
                           <div className="grid grid-cols-2 gap-4">
                             <Field label="Registro profesional">
