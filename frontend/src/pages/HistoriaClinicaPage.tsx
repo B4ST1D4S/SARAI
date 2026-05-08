@@ -189,6 +189,7 @@ export default function HistoriaClinicaPage({
   const [loading,    setLoading]    = useState(false);
   const [autoMsg,    setAutoMsg]    = useState(false);
   const [errMsg,     setErrMsg]     = useState('');
+  const [showPrintModal, setShowPrintModal] = useState(false);
   const savedIdRef   = useRef<string | null>(null);
   const autoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const token        = localStorage.getItem('accessToken') || '';
@@ -344,11 +345,9 @@ export default function HistoriaClinicaPage({
       r = await createHistoriaClinica(payload, token);
     }
     if (!r?.error) {
-      setGuardado(true);
       savedIdRef.current = null;
-      setForm(BLANK);
       cargarHistorias();
-      setTimeout(() => { setGuardado(false); setShowForm(false); }, 2500);
+      setShowPrintModal(true); // Modal de impresión maneja el cierre
     }
     setLoading(false);
   };
@@ -401,6 +400,26 @@ export default function HistoriaClinicaPage({
     return () => onRegisterCampos?.(null);
   }, [onRegisterCampos, handleCamposSarai]);
 
+  // Impresión separada por body-class
+  const printHC = () => {
+    const panel = document.getElementById('hc-scroll-panel');
+    const prev = panel?.style.cssText || '';
+    if (panel) { panel.style.overflow = 'visible'; panel.style.height = 'auto'; panel.style.maxHeight = 'none'; }
+    document.body.classList.add('print-hc');
+    window.print();
+    document.body.classList.remove('print-hc');
+    if (panel) { panel.style.cssText = prev; }
+  };
+  const printOrdenes = () => {
+    const panel = document.getElementById('hc-scroll-panel');
+    const prev = panel?.style.cssText || '';
+    if (panel) { panel.style.overflow = 'visible'; panel.style.height = 'auto'; panel.style.maxHeight = 'none'; }
+    document.body.classList.add('print-ordenes');
+    window.print();
+    document.body.classList.remove('print-ordenes');
+    if (panel) { panel.style.cssText = prev; }
+  };
+
   const scrollTo = (id: string) => {
     setSecActiva(id);
     setTimeout(() => {
@@ -451,27 +470,7 @@ export default function HistoriaClinicaPage({
           {!showForm && <span className="text-[10px] text-gray-600 border border-white/10 rounded-full px-2 py-0.5">{historias.length} registros</span>}
         </div>
         <div className="flex items-center gap-2">
-          {showForm && (
-            <button
-              type="button"
-              onClick={() => {
-                const panel = document.getElementById('hc-scroll-panel');
-                if (panel) {
-                  const original = panel.style.cssText;
-                  panel.style.overflow = 'visible';
-                  panel.style.height = 'auto';
-                  window.print();
-                  setTimeout(() => { panel.style.cssText = original; }, 500);
-                } else {
-                  window.print();
-                }
-              }}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl font-bold text-xs bg-yellow-500/10 border border-yellow-500/40 text-yellow-300 hover:bg-yellow-500/20 hover:border-yellow-400 hover:text-yellow-200 transition-all"
-              title="Imprimir Historia Clínica (Ctrl+P)"
-            >
-              <Printer size={13} /> Imprimir
-            </button>
-          )}
+
           <button
             onClick={() => setShowForm(!showForm)}
             className={`px-4 py-2 rounded-xl font-bold text-xs transition-all ${
@@ -580,23 +579,19 @@ export default function HistoriaClinicaPage({
                     : guardado ? <><CheckCircle size={12} /> Guardada ✓</>
                     : <><Save size={12} /> Guardar Historia</>}
                 </button>
-                {/* Imprimir HC + Órdenes Médicas */}
                 <button
                   type="button"
-                  onClick={() => {
-                    const panel = document.getElementById('hc-scroll-panel');
-                    if (panel) {
-                      const prev = panel.style.cssText;
-                      panel.style.overflow = 'visible';
-                      panel.style.height = 'auto';
-                      panel.style.maxHeight = 'none';
-                      window.print();
-                      setTimeout(() => { panel.style.cssText = prev; }, 800);
-                    } else { window.print(); }
-                  }}
+                  onClick={printHC}
                   className="w-full py-2 rounded-lg font-bold text-xs bg-yellow-500/10 border border-yellow-500/30 text-yellow-300 hover:bg-yellow-500/20 hover:border-yellow-400 transition-all flex items-center justify-center gap-1.5"
                 >
-                  <Printer size={12} /> Imprimir HC + Órdenes
+                  <Printer size={12} /> Imprimir HC
+                </button>
+                <button
+                  type="button"
+                  onClick={printOrdenes}
+                  className="w-full py-2 rounded-lg font-bold text-xs bg-blue-500/10 border border-blue-500/30 text-blue-300 hover:bg-blue-500/20 hover:border-blue-400 transition-all flex items-center justify-center gap-1.5"
+                >
+                  <Printer size={12} /> Imprimir Órdenes
                 </button>
                 {autoMsg && (
                   <p className="text-center text-[9px] text-emerald-400 flex items-center justify-center gap-1">
@@ -611,9 +606,10 @@ export default function HistoriaClinicaPage({
 
             {/* ══ PANEL DERECHO: todas las secciones ══ */}
             <div id="hc-scroll-panel" className="flex-1 overflow-y-auto bg-[#080a0f]">
-              <div className="p-6 space-y-6 max-w-4xl">
+              <div className="p-6 max-w-4xl">
+              <div id="hc-secciones" className="space-y-6">
 
-                {/* 1 */}
+                {/* 1 */
                 <SecCard id="motivo-consulta" num={1} title="Motivo de Consulta" emoji="💬" done={done['motivo-consulta']}>
                   <Ta label="Motivo / Queja Principal *" rows={3} value={form.motivoConsulta}
                     onChange={e => s('motivoConsulta', e.target.value)} required
@@ -751,6 +747,9 @@ export default function HistoriaClinicaPage({
                   <Ta label="Recomendaciones al Paciente" rows={7} value={form.recomendacionesMed} onChange={e => s('recomendacionesMed', e.target.value)} placeholder="Indicaciones de cuidado, actividad física, señales de alarma..." />
                 </SecCard>
 
+              </div>{/* fin hc-secciones */}
+              <div id="ordenes-secciones" className="space-y-6 mt-6">
+
                 {/* 12 */}
                 <SecCard id="apoyos-diag" num={12} title="Solicitud Apoyos Diagnósticos" emoji="🧪" done={form.apoyosDiag.length > 0}>
                   <div className="space-y-2">
@@ -851,10 +850,53 @@ export default function HistoriaClinicaPage({
                   </div>
                 </SecCard>
 
+              </div>{/* fin ordenes-secciones */}
               </div>
-            </div>{/* fin panel derecho */}
+            </div>{/* fin panel derecho */
 
           </div>{/* fin flex paneles */}
+
+          {/* ══ MODAL: opciones de impresión tras guardar ══ */}
+          {showPrintModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                className="bg-[#0d0f14] border border-white/10 rounded-3xl p-8 w-full max-w-sm shadow-2xl mx-4"
+              >
+                <div className="text-center mb-6">
+                  <div className="w-16 h-16 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto mb-4">
+                    <CheckCircle size={32} className="text-emerald-400" />
+                  </div>
+                  <h3 className="text-xl font-black text-white mb-1">Historia Guardada ✓</h3>
+                  <p className="text-gray-500 text-sm">¿Desea imprimir algún documento?</p>
+                </div>
+                <div className="space-y-3">
+                  <button
+                    type="button"
+                    onClick={() => { printHC(); setShowPrintModal(false); setForm(BLANK); setGuardado(false); setShowForm(false); }}
+                    className="w-full py-3 rounded-xl font-bold text-sm bg-gradient-to-r from-yellow-500 to-amber-600 text-slate-900 hover:from-yellow-400 hover:to-amber-500 flex items-center justify-center gap-2"
+                  >
+                    <Printer size={15} /> Imprimir Historia Clínica
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { printOrdenes(); setShowPrintModal(false); setForm(BLANK); setGuardado(false); setShowForm(false); }}
+                    className="w-full py-3 rounded-xl font-bold text-sm bg-blue-500/10 border border-blue-500/30 text-blue-300 hover:bg-blue-500/20 flex items-center justify-center gap-2"
+                  >
+                    <Printer size={15} /> Imprimir Órdenes Médicas
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setShowPrintModal(false); setForm(BLANK); setGuardado(false); setShowForm(false); }}
+                    className="w-full py-3 rounded-xl font-bold text-sm bg-white/5 border border-white/10 text-gray-400 hover:text-white flex items-center justify-center"
+                  >
+                    Cerrar sin imprimir
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
         </form>
       )}{/* fin showForm */}
 
