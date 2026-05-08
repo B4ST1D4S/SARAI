@@ -12,27 +12,51 @@ interface SaraiAssistantProps {
   contexto?: string;
   onNavegar?: (pagina: string) => void;
   onAbrirNuevaHistoria?: () => void;   // abre el formulario de nueva HC
-  onIrSeccion?: (seccion: number) => void; // navega a sección dentro del form
+  onIrSeccion?: (id: string) => void;  // navega a sección HC por ID del DOM
+  onImprimir?: () => void;             // imprime la vista actual
 }
 
 // Mapa de comandos de voz → página
 // ⚠️ ORDEN IMPORTA: entradas más específicas (con más palabras) deben ir ANTES
 //    que las genéricas para evitar que 'agenda' capture 'agenda profesional'.
 const COMANDOS_NAV = [
-  { palabras: ['dashboard', 'inicio', 'panel principal', 'panel'],              pagina: 'dashboard',          label: 'Dashboard' },
-  { palabras: ['pacientes', 'lista pacientes'],                                  pagina: 'pacientes',          label: 'Pacientes' },
-  { palabras: ['historia clínica', 'historia clinica', 'historial', 'historia'], pagina: 'historia',           label: 'Historia Clínica' },
-  // Agenda Profesional ANTES de Agenda para evitar colisión con la palabra 'agenda'
-  { palabras: ['agenda profesional', 'agenda del médico', 'agenda del medico', 'agenda medico'], pagina: 'agendaProfesional', label: 'Agenda Profesional' },
-  { palabras: ['agenda paciente', 'agenda del paciente', 'agenda', 'citas'],    pagina: 'agenda',             label: 'Agenda' },
-  { palabras: ['quirófano', 'quirofano', 'cirujano', 'vista cirujano'],          pagina: 'vista-cirujano',     label: 'Quirófano' },
-  { palabras: ['seguimiento', 'follow up', 'followup'],                          pagina: 'followup',           label: 'Seguimiento' },
-  { palabras: ['consentimiento', 'consentimientos'],                             pagina: 'consentimiento',     label: 'Consentimiento' },
-  { palabras: ['crm', 'gestión', 'gestion'],                                    pagina: 'crm',                label: 'CRM' },
-  { palabras: ['facturación', 'facturacion', 'facturas', 'factura'],             pagina: 'facturacion',        label: 'Facturación' },
-  { palabras: ['plantillas', 'plantilla'],                                       pagina: 'plantillas',         label: 'Plantillas' },
-  { palabras: ['fotos', 'fotografías', 'fotografias'],                          pagina: 'fotos',              label: 'Fotos' },
-  { palabras: ['mapa corporal', 'mapa', 'cuerpo'],                              pagina: 'mapa-corporal',      label: 'Mapa Corporal' },
+  { palabras: ['dashboard', 'inicio', 'panel principal', 'panel'],                                             pagina: 'dashboard',          label: 'Dashboard' },
+  { palabras: ['pacientes', 'lista pacientes', 'lista de pacientes'],                                          pagina: 'pacientes',          label: 'Pacientes' },
+  { palabras: ['historia clínica', 'historia clinica', 'historial', 'historia'],                              pagina: 'historia',           label: 'Historia Clínica' },
+  // Agenda Profesional ANTES de Agenda para evitar colisión
+  { palabras: ['agenda profesional', 'agenda del médico', 'agenda del medico', 'agenda medico'],              pagina: 'agendaProfesional',  label: 'Agenda Profesional' },
+  { palabras: ['configurar agenda', 'config agenda', 'configuracion agenda', 'configuración agenda'],         pagina: 'config-agenda',      label: 'Config Agenda' },
+  { palabras: ['agenda paciente', 'agenda del paciente', 'agenda', 'citas'],                                  pagina: 'agenda',             label: 'Agenda Paciente' },
+  { palabras: ['admisión', 'admision', 'admitir'],                                                            pagina: 'admision',           label: 'Admisión' },
+  { palabras: ['quirófano', 'quirofano', 'cirujano', 'vista cirujano', 'sala de cirugía', 'sala cirugia'],   pagina: 'vista-cirujano',     label: 'Quirófano' },
+  { palabras: ['seguimiento', 'follow up', 'followup', 'control'],                                            pagina: 'followup',           label: 'Seguimiento' },
+  { palabras: ['consentimiento', 'consentimientos', 'consentimiento informado'],                              pagina: 'consentimiento',     label: 'Consentimiento' },
+  { palabras: ['crm', 'gestión de relaciones', 'gestion de relaciones'],                                     pagina: 'crm',                label: 'CRM' },
+  { palabras: ['facturación', 'facturacion', 'facturas', 'factura'],                                         pagina: 'facturacion',        label: 'Facturación' },
+  { palabras: ['plantillas', 'plantilla'],                                                                    pagina: 'plantillas',         label: 'Plantillas' },
+  { palabras: ['fotos', 'fotografías', 'fotografias', 'galería', 'galeria'],                                 pagina: 'fotos',              label: 'Fotos' },
+  { palabras: ['mapa corporal', 'mapa del cuerpo', 'mapa'],                                                   pagina: 'mapa-corporal',      label: 'Mapa Corporal' },
+  { palabras: ['admin', 'administración', 'administracion', 'parametrización', 'parametrizacion', 'sistema'], pagina: 'admin',              label: 'Administración' },
+];
+
+// Mapa de secciones de Historia Clínica → IDs del DOM
+// ⚠️ Palabras más específicas primero para evitar colisiones
+const SECCIONES_HC_VOZ: { palabras: string[]; id: string; label: string }[] = [
+  { palabras: ['motivo de consulta', 'motivo', 'queja principal', 'queja'],                            id: 'motivo-consulta', label: 'Motivo de Consulta'    },
+  { palabras: ['signos vitales', 'signos', 'vitales', 'presion arterial', 'frecuencia cardiaca'],      id: 'signos-vitales',  label: 'Signos Vitales'        },
+  { palabras: ['antecedentes personales', 'antecedentes personales'],                                  id: 'antec-pers',      label: 'Antec. Personales'     },
+  { palabras: ['antecedentes familiares', 'familiares', 'familia'],                                    id: 'antec-fam',       label: 'Antec. Familiares'     },
+  { palabras: ['gineco', 'ginecologico', 'ginecoobstetrico', 'obstetricia', 'fum', 'menstruacion'],    id: 'antec-gineco',    label: 'Gineco Obstétrico'     },
+  { palabras: ['evolucion cirugia', 'evolucion cirugia plastica', 'evolucion estetica', 'postoperatorio', 'postop'], id: 'evolucion-cx', label: 'Evolución Cirugía' },
+  { palabras: ['finalidad de atencion', 'finalidad'],                                                  id: 'finalidad',       label: 'Finalidad de Atención' },
+  { palabras: ['origen de atencion', 'origen'],                                                        id: 'origen',          label: 'Origen de Atención'    },
+  { palabras: ['diagnostico', 'impresion diagnostica', 'cie diez', 'cie10', 'diagnostico principal'],  id: 'diagnostico',     label: 'Diagnóstico'           },
+  { palabras: ['plan terapeutico', 'plan', 'conducta', 'tratamiento', 'manejo'],                       id: 'plan',            label: 'Plan Terapéutico'      },
+  { palabras: ['recomendaciones', 'recomendacion', 'indicaciones'],                                    id: 'recomendaciones', label: 'Recomendaciones'        },
+  { palabras: ['apoyos diagnosticos', 'laboratorio', 'laboratorios', 'examenes', 'imagen diagnostica'], id: 'apoyos-diag',    label: 'Apoyos Diagnósticos'   },
+  { palabras: ['procedimientos quirurgicos', 'procedimiento quirurgico', 'procedimiento qx'],          id: 'proc-qx',         label: 'Procedimientos Qx'     },
+  { palabras: ['medicamentos', 'formulacion', 'medicamento', 'medicina', 'farmaco'],                   id: 'medicamentos',    label: 'Formulación Meds'      },
+  { palabras: ['interconsulta', 'interconsultas', 'especialista', 'especialidad'],                     id: 'interconsulta',   label: 'Interconsulta'         },
 ];
 
 const PALABRAS_ACTIVACION = ['sarai', 'hey sarai', 'oye sarai', 'grabar', 'iniciar grabación', 'iniciar grabacion', 'escuchar'];
@@ -56,7 +80,7 @@ function fmt(s: number) {
 
 type Estado = 'esperando' | 'grabando' | 'transcribiendo' | 'procesando' | 'listo' | 'error';
 
-export default function SaraiAssistant({ onCamposDetectados, token, contexto, onNavegar, onAbrirNuevaHistoria, onIrSeccion }: SaraiAssistantProps) {
+export default function SaraiAssistant({ onCamposDetectados, token, contexto, onNavegar, onAbrirNuevaHistoria, onIrSeccion, onImprimir }: SaraiAssistantProps) {
   const [estado, setEstado]               = useState<Estado>('esperando');
   const [transcripcion, setTranscripcion] = useState('');
   const [resultado, setResultado]         = useState('');
@@ -546,21 +570,19 @@ export default function SaraiAssistant({ onCamposDetectados, token, contexto, on
         }
       }
 
-      // ── PASO 7: Secciones del formulario de Historia Clínica ──────────────
-      // Solo palabras muy específicas — sin ambigüedad con módulos
-      const SECCIONES_VOZ = [
-        { palabras: ['datos generales'],                                      idx: 0 },
-        { palabras: ['anamnesis', 'motivo de consulta', 'queja principal'],   idx: 1 },
-        { palabras: ['antecedentes'],                                         idx: 2 },
-        { palabras: ['examen fisico', 'signos vitales'],                      idx: 3 },
-        { palabras: ['evaluacion estetica', 'procedimiento estetico'],        idx: 4 },
-        { palabras: ['diagnostico y plan', 'plan quirurgico'],                idx: 5 },
-      ];
-      const NOMBRES_SEC = ['Datos Generales', 'Anamnesis', 'Antecedentes', 'Examen Físico', 'Evaluación Estética', 'Diagnóstico y Plan'];
-      for (const s of SECCIONES_VOZ) {
-        if (s.palabras.some(p => navCmd.includes(normalizarTexto(p)))) {
-          setUltimoComando(`→ Sección: ${NOMBRES_SEC[s.idx]}`);
-          onIrSeccion?.(s.idx);
+      // ── PASO 7: Imprimir ──────────────────────────────────────────────────
+      if (['imprimir', 'imprime', 'print', 'imprimir historia', 'imprimir ordenes'].some(p => navCmd.includes(p))) {
+        setUltimoComando('🖨 Imprimiendo...');
+        onImprimir?.();
+        setTimeout(() => setUltimoComando(''), 3000);
+        return;
+      }
+
+      // ── PASO 8: Secciones del formulario de Historia Clínica ──────────────
+      for (const sec of SECCIONES_HC_VOZ) {
+        if (sec.palabras.some(p => navCmd.includes(normalizarTexto(p)))) {
+          setUltimoComando(`→ HC: ${sec.label}`);
+          onIrSeccion?.(sec.id);
           setTimeout(() => setUltimoComando(''), 3000);
           return;
         }

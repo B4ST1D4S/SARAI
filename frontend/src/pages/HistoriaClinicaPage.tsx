@@ -7,7 +7,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import {
-  CheckCircle, Plus, Trash2, Save,
+  CheckCircle, Plus, Trash2, Save, Printer,
 } from 'lucide-react';
 import {
   createHistoriaClinica, getAllPacientes, getHistoriasMedico, updateHistoriaClinica,
@@ -167,14 +167,16 @@ export default function HistoriaClinicaPage({
   onShowFormChange,
   seccionExterna,
   onSeccionChange,
+  onSeccionActivaChange,
   onRegisterCampos,
   pacienteIdExterno,
 }: {
   onNavegar?: (pagina: string) => void;
   showFormExternal?: boolean;
   onShowFormChange?: (v: boolean) => void;
-  seccionExterna?: number;
-  onSeccionChange?: (n: number) => void;
+  seccionExterna?: string;
+  onSeccionChange?: (id: string) => void;
+  onSeccionActivaChange?: (id: string) => void;
   onRegisterCampos?: (fn: ((c: Record<string, string>) => void) | null) => void;
   pacienteIdExterno?: string;
 } = {}) {
@@ -195,6 +197,9 @@ export default function HistoriaClinicaPage({
   void onSeccionChange;
 
   const setShowForm = (v: boolean) => { setShowFormS(v); onShowFormChange?.(v); };
+
+  // Notificar sección activa al padre (para contexto SARAI)
+  useEffect(() => { onSeccionActivaChange?.(secActiva); }, [secActiva]);
 
   // Setter tipado
   const s = <K extends keyof FormHC>(k: K, v: FormHC[K]) =>
@@ -217,9 +222,8 @@ export default function HistoriaClinicaPage({
   // Sync desde props externas
   useEffect(() => { if (showFormExternal !== undefined) setShowFormS(showFormExternal); }, [showFormExternal]);
   useEffect(() => {
-    if (seccionExterna !== undefined) {
-      const sec = ALL_SECCIONES[seccionExterna];
-      if (sec) setSecActiva(sec.id);
+    if (seccionExterna) {
+      scrollTo(seccionExterna);
     }
   }, [seccionExterna]);
   useEffect(() => {
@@ -426,16 +430,39 @@ export default function HistoriaClinicaPage({
           </h1>
           {!showForm && <span className="text-[10px] text-gray-600 border border-white/10 rounded-full px-2 py-0.5">{historias.length} registros</span>}
         </div>
-        <button
-          onClick={() => setShowForm(!showForm)}
-          className={`px-4 py-2 rounded-xl font-bold text-xs transition-all ${
-            showForm
-              ? 'bg-white/5 border border-white/10 text-gray-400 hover:text-white'
-              : 'bg-gradient-to-r from-yellow-500 to-amber-600 text-slate-900 hover:from-yellow-400 hover:to-amber-500 shadow-lg shadow-yellow-500/20'
-          }`}
-        >
-          {showForm ? '✕ Cancelar' : '+ Nueva Historia'}
-        </button>
+        <div className="flex items-center gap-2">
+          {showForm && (
+            <button
+              type="button"
+              onClick={() => {
+                const panel = document.getElementById('hc-scroll-panel');
+                if (panel) {
+                  const original = panel.style.cssText;
+                  panel.style.overflow = 'visible';
+                  panel.style.height = 'auto';
+                  window.print();
+                  setTimeout(() => { panel.style.cssText = original; }, 500);
+                } else {
+                  window.print();
+                }
+              }}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl font-bold text-xs bg-white/5 border border-white/10 text-gray-400 hover:text-white hover:border-white/20 transition-all"
+              title="Imprimir Historia Clínica (Ctrl+P)"
+            >
+              <Printer size={13} /> Imprimir
+            </button>
+          )}
+          <button
+            onClick={() => setShowForm(!showForm)}
+            className={`px-4 py-2 rounded-xl font-bold text-xs transition-all ${
+              showForm
+                ? 'bg-white/5 border border-white/10 text-gray-400 hover:text-white'
+                : 'bg-gradient-to-r from-yellow-500 to-amber-600 text-slate-900 hover:from-yellow-400 hover:to-amber-500 shadow-lg shadow-yellow-500/20'
+            }`}
+          >
+            {showForm ? '✕ Cancelar' : '+ Nueva Historia'}
+          </button>
+        </div>
       </div>
 
       {/* ══ MODO DASHBOARD (formulario) ══ */}

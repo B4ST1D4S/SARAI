@@ -18,6 +18,51 @@ html, body, #root {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* ── Estilos de impresión Historia Clínica ───────────────────── */
+@media print {
+  /* Ocultar todo excepto el panel de contenido */
+  body > * { display: none !important; }
+  #root > div > main { display: block !important; margin: 0 !important; }
+  #root { display: block !important; height: auto !important; }
+
+  /* Mostrar solo el panel scroll de HC */
+  #hc-scroll-panel {
+    display: block !important;
+    overflow: visible !important;
+    height: auto !important;
+    background: white !important;
+    color: black !important;
+  }
+
+  /* Ocultar sidebar, nav izquierdo, topbar, SARAI */
+  aside, nav, [data-sarai], .fixed { display: none !important; }
+
+  /* Cards en blanco y negro */
+  #hc-scroll-panel .bg-white\/\[0\.02\] {
+    background: white !important;
+    border: 1px solid #ccc !important;
+    color: black !important;
+    page-break-inside: avoid;
+    margin-bottom: 16px;
+  }
+
+  /* Inputs legibles en papel */
+  #hc-scroll-panel input,
+  #hc-scroll-panel textarea,
+  #hc-scroll-panel select {
+    background: transparent !important;
+    border: 1px solid #999 !important;
+    color: black !important;
+    -webkit-print-color-adjust: exact;
+  }
+
+  /* Texto visible */
+  #hc-scroll-panel * { color: black !important; }
+
+  /* Ocultar botones de acción */
+  #hc-scroll-panel button { display: none !important; }
+}
+
 body {
   background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
   color: #e2e8f0;
