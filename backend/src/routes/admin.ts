@@ -23,6 +23,14 @@ import {
   getTiposConsultorio, createTipoConsultorio, updateTipoConsultorio, deleteTipoConsultorio,
   // Departamento × Cargo
   getDepartamentoCargos, createDepartamentoCargo, updateDepartamentoCargo, deleteDepartamentoCargo,
+  // Campos Paciente
+  getCamposPaciente, createCampoPaciente, updateCampoPaciente, deleteCampoPaciente, resetCamposPaciente,
+  // Parámetros Sistema
+  getParametrosSistema, updateParametroSistema,
+  // Listas de Valores
+  getListasValores, createListaValor, updateListaValor, deleteListaValor,
+  // Motivos de Cita
+  getMotivosCita, createMotivoCita, updateMotivoCita, deleteMotivoCita,
 } from '../controllers/adminController.js';
 
 const router = Router();
@@ -126,5 +134,36 @@ router.get('/departamentos/:departamentoId/cargos', getDepartamentoCargos);
 router.post('/departamentos/:departamentoId/cargos', onlyAdmin, createDepartamentoCargo);
 router.put('/departamento-cargos/:id', onlyAdmin, updateDepartamentoCargo);
 router.delete('/departamento-cargos/:id', onlyAdmin, deleteDepartamentoCargo);
+
+// ─────────────────────────────────────────
+// CAMPOS DEL FORMULARIO DE PACIENTE
+// ─────────────────────────────────────────
+router.get('/campos-paciente', getCamposPaciente);
+router.post('/campos-paciente', onlyAdmin, createCampoPaciente);
+router.put('/campos-paciente/:id', onlyAdmin, updateCampoPaciente);
+router.delete('/campos-paciente/:id', onlyAdmin, deleteCampoPaciente);
+router.post('/campos-paciente/reset', onlyAdmin, resetCamposPaciente);
+
+// ─────────────────────────────────────────
+// PARÁMETROS DEL SISTEMA (key-value por grupo)
+// ─────────────────────────────────────────
+router.get('/parametros-sistema/:grupo', getParametrosSistema);
+router.put('/parametros-sistema/:grupo/:clave', onlyAdmin, updateParametroSistema);
+
+// ─────────────────────────────────────────
+// LISTAS DE VALORES (selects del formulario)
+// ─────────────────────────────────────────
+router.get('/listas-valores', getListasValores);
+router.post('/listas-valores', onlyAdmin, createListaValor);
+router.put('/listas-valores/:id', onlyAdmin, updateListaValor);
+router.delete('/listas-valores/:id', onlyAdmin, deleteListaValor);
+
+// ─────────────────────────────────────────
+// MOTIVOS DE CITA / CANCELACIÓN
+// ─────────────────────────────────────────
+router.get('/motivos-cita', getMotivosCita);
+router.post('/motivos-cita', onlyAdmin, createMotivoCita);
+router.put('/motivos-cita/:id', onlyAdmin, updateMotivoCita);
+router.delete('/motivos-cita/:id', onlyAdmin, deleteMotivoCita);
 
 export default router;

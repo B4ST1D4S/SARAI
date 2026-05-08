@@ -1046,3 +1046,79 @@ model DepartamentoCargo {
   @@unique([departamentoId, cargoId])
   @@index([departamentoId])
 }
+
+// ============================================
+// CAMPOS DEL FORMULARIO DE PACIENTE
+// ============================================
+
+model CampoPaciente {
+  id              String   @id @default(cuid())
+  nombre          String   @unique  // key interno: primerNombre, numeroCelular, etc.
+  etiqueta        String            // label visible: "Primer Nombre"
+  seccion         String            // documentacion | personal | contacto | laboral | demografico | consulta | salud | notas
+  tipoCampo       String   @default("text") // text | select | date | tel | email | textarea | number
+  esVisible       Boolean  @default(true)
+  esObligatorio   Boolean  @default(false)
+  esPersonalizado Boolean  @default(false)  // true = creado desde Admin, no viene del form original
+  opciones        Json?             // [{value, label}] para tipoCampo = select
+  placeholder     String?
+  orden           Int      @default(0)
+  estado          Boolean  @default(true)
+  usuarioCreacion String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([seccion])
+  @@index([esVisible])
+  @@index([esPersonalizado])
+}
+
+// ============================================
+// PARAMETRIZACIÓN GENERAL DEL SISTEMA
+// ============================================
+
+// Parámetros clave-valor por grupo (clinica | agenda)
+model ParametroSistema {
+  id        String   @id @default(cuid())
+  grupo     String   // clinica | agenda
+  clave     String   // nombre_clinica | duracion_default | etc.
+  valor     String   @default("")
+  etiqueta  String   // label visible en el formulario
+  tipo      String   @default("text") // text | number | time | boolean | email | url | tel
+  orden     Int      @default(0)
+  estado    Boolean  @default(true)
+  updatedAt DateTime @updatedAt
+
+  @@unique([grupo, clave])
+  @@index([grupo])
+}
+
+// Listas de valores para los campos select del formulario de paciente
+model ListaValor {
+  id        String   @id @default(cuid())
+  grupo     String   // tipoDocumento | generoBiologico | estadoCivil | grupoEtnico | nivelEducacion | orientacionSexual | discapacidad | formaAsignacion | generoSentido
+  valor     String
+  etiqueta  String
+  orden     Int      @default(0)
+  activo    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([grupo, valor])
+  @@index([grupo])
+}
+
+// Motivos de cita / cancelación / reprogramación
+model MotivoCita {
+  id          String   @id @default(cuid())
+  nombre      String
+  descripcion String?
+  tipo        String   @default("consulta") // consulta | control | preoperatorio | seguimiento | cancelacion
+  orden       Int      @default(0)
+  activo      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([tipo])
+  @@index([activo])
+}

@@ -10,10 +10,61 @@ function headers() {
   return { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` };
 }
 
+// ─── In-memory cache (TTL 60 s) ─────────────────────────────
+type CacheEntry = { data: unknown; ts: number };
+const _cache = new Map<string, CacheEntry>();
+const CACHE_TTL = 5 * 60_000; // 5 minutos
+
+function cacheGet<T>(key: string): T | null {
+  const e = _cache.get(key);
+  if (!e) return null;
+  if (Date.now() - e.ts > CACHE_TTL) { _cache.delete(key); return null; }
+  return e.data as T;
+}
+function cacheSet(key: string, data: unknown) {
+  _cache.set(key, { data, ts: Date.now() });
+}
+function cacheInvalidate(prefix: string) {
+  for (const k of _cache.keys()) { if (k.startsWith(prefix)) _cache.delete(k); }
+}
+
 async function req<T>(url: string, options: RequestInit = {}): Promise<T> {
+  const method = (options.method ?? 'GET').toUpperCase();
+  const isGet  = method === 'GET';
+
+  if (isGet) {
+    const hit = cacheGet<T>(url);
+    if (hit !== null) return hit;
+  }
+
   const r = await fetch(`${API}/admin${url}`, { headers: headers(), ...options });
   const data = await r.json();
-  if (!r.ok) throw new Error(data.error || 'Error en la solicitud');
+  if (!r.ok) {
+    // Token expirado/inválido → limpiar sesión y recargar como api.ts
+    if (r.status === 401 || r.status === 403) {
+      const msg = (data.error || '').toLowerCase();
+      if (msg.includes('token') || msg.includes('expirad') || msg.includes('inválid') || msg.includes('autenticad')) {
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('user');
+        window.location.reload();
+      }
+    }
+    throw new Error(data.error || 'Error en la solicitud');
+  }
+
+  if (isGet) {
+    cacheSet(url, data);
+  } else {
+    // Invalidar colección base (ej: PUT /tipos-consulta/123 → borra /tipos-consulta*)
+    const base = '/' + url.split('/').filter(Boolean)[0];
+    cacheInvalidate(base);
+    // Dependencias cruzadas
+    if (base === '/especialidades' || base === '/departamentos') {
+      cacheInvalidate('/tipos-consulta');
+      cacheInvalidate('/preparaciones');
+    }
+  }
+
   return data as T;
 }
 
@@ -42,8 +93,11 @@ export const updateServicio = (id: string, body: any) => req(`/servicios/${id}`,
 export const deleteServicio = (id: string) => req(`/servicios/${id}`, { method: 'DELETE' });
 
 // ─── Tipos de Consulta ─────────────────────────────────────────
-export const getTiposConsulta   = ()          => req('/tipos-consulta');
-export const getTipoConsultaById= (id: string)=> req(`/tipos-consulta/${id}`);
+export const getTiposConsulta       = ()          => req('/tipos-consulta');
+export const getTipoConsultaById    = (id: string)=> req(`/tipos-consulta/${id}`);
+export const getServiciosDeConsulta   = (tcId: string) => req(`/tipos-consulta/${tcId}/servicios`);
+export const addServicioAConsulta     = (tcId: string, body: any) => req(`/tipos-consulta/${tcId}/servicios`, { method: 'POST', body: JSON.stringify(body) });
+export const removeServicioDeConsulta = (confId: string) => req(`/config-servicios/${confId}`, { method: 'DELETE' });
 export const createTipoConsulta = (body: any) => req('/tipos-consulta', { method: 'POST', body: JSON.stringify(body) });
 export const updateTipoConsulta = (id: string, body: any) => req(`/tipos-consulta/${id}`, { method: 'PUT', body: JSON.stringify(body) });
 export const deleteTipoConsulta = (id: string) => req(`/tipos-consulta/${id}`, { method: 'DELETE' });
@@ -81,3 +135,26 @@ export const getDepartamentoCargos   = (depId: string)        => req(`/departame
 export const createDepartamentoCargo = (depId: string, body: any) => req(`/departamentos/${depId}/cargos`, { method: 'POST', body: JSON.stringify(body) });
 export const updateDepartamentoCargo = (id: string, body: any) => req(`/departamento-cargos/${id}`, { method: 'PUT', body: JSON.stringify(body) });
 export const deleteDepartamentoCargo = (id: string)           => req(`/departamento-cargos/${id}`, { method: 'DELETE' });
+// ─── Campos del Formulario de Paciente ──────────────────────────────────
+export const getCamposPaciente   = (seccion?: string)       => req(`/campos-paciente${seccion ? '?seccion=' + seccion : ''}`);
+export const createCampoPaciente = (body: any)              => req('/campos-paciente', { method: 'POST', body: JSON.stringify(body) });
+export const updateCampoPaciente = (id: string, body: any)  => req(`/campos-paciente/${id}`, { method: 'PUT', body: JSON.stringify(body) });
+export const deleteCampoPaciente = (id: string)             => req(`/campos-paciente/${id}`, { method: 'DELETE' });
+export const resetCamposPaciente = ()                       => req('/campos-paciente/reset', { method: 'POST' });
+
+// ─── Parámetros del Sistema ────────────────────────────────────────────
+export const getParametrosSistema   = (grupo: string)             => req(`/parametros-sistema/${grupo}`);
+export const updateParametroSistema = (grupo: string, clave: string, valor: string) =>
+  req(`/parametros-sistema/${grupo}/${clave}`, { method: 'PUT', body: JSON.stringify({ valor }) });
+
+// ─── Listas de Valores ──────────────────────────────────────────────────────
+export const getListasValores   = (grupo?: string) => req(`/listas-valores${grupo ? '?grupo=' + grupo : ''}`);
+export const createListaValor   = (body: any)      => req('/listas-valores', { method: 'POST', body: JSON.stringify(body) });
+export const updateListaValor   = (id: string, body: any) => req(`/listas-valores/${id}`, { method: 'PUT', body: JSON.stringify(body) });
+export const deleteListaValor   = (id: string)     => req(`/listas-valores/${id}`, { method: 'DELETE' });
+
+// ─── Motivos de Cita ─────────────────────────────────────────────────────────
+export const getMotivosCita   = (tipo?: string) => req(`/motivos-cita${tipo ? '?tipo=' + tipo : ''}`);
+export const createMotivoCita = (body: any)     => req('/motivos-cita', { method: 'POST', body: JSON.stringify(body) });
+export const updateMotivoCita = (id: string, body: any) => req(`/motivos-cita/${id}`, { method: 'PUT', body: JSON.stringify(body) });
+export const deleteMotivoCita = (id: string)    => req(`/motivos-cita/${id}`, { method: 'DELETE' });
