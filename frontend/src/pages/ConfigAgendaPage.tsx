@@ -662,7 +662,6 @@ export default function ConfigAgendaPage() {
                     </p>
                   )}
                 </div>
-                </div>
               </div>
 
               {/* Footer fijo */}
