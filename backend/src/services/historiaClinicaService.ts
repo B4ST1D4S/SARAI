@@ -13,15 +13,18 @@ export interface CreateHistoriaClinicaRequest {
   diagnostico: string;
   tratamientoRecomendado: string;
   fotos?: string[];
+  datosExtendidos?: Record<string, any>;
 }
 
 export interface UpdateHistoriaClinicaRequest {
   tipoConsulta?: string;
+  tipoHistoria?: string;
   quejaPrincipal?: string;
   historiaEnfermedad?: string;
   observacionesAntropometricas?: string;
   diagnostico?: string;
   tratamientoRecomendado?: string;
+  datosExtendidos?: Record<string, any>;
 }
 
 export async function createHistoriaClinica(data: CreateHistoriaClinicaRequest) {
@@ -39,7 +42,8 @@ export async function createHistoriaClinica(data: CreateHistoriaClinicaRequest) 
           diagnostico: data.diagnostico,
           tratamientoRecomendado: data.tratamientoRecomendado,
           fotos: data.fotos || [],
-        },
+          ...(data.datosExtendidos || {}),
+        },,
         version: 1,
         hashIntegridad: 'hash_' + Date.now(),
       },
@@ -175,10 +179,17 @@ export async function updateHistoriaClinica(
     const historia = await prisma.historiaClinica.update({
       where: { id },
       data: {
-        contenido: data as any,
-        version: {
-          increment: 1,
-        },
+        contenido: {
+          ...((await prisma.historiaClinica.findUnique({ where: { id }, select: { contenido: true } }))?.contenido as any || {}),
+          ...(data.tipoConsulta && { tipoConsulta: data.tipoConsulta }),
+          ...(data.quejaPrincipal && { quejaPrincipal: data.quejaPrincipal }),
+          ...(data.historiaEnfermedad !== undefined && { historiaEnfermedad: data.historiaEnfermedad }),
+          ...(data.observacionesAntropometricas !== undefined && { observacionesAntropometricas: data.observacionesAntropometricas }),
+          ...(data.diagnostico !== undefined && { diagnostico: data.diagnostico }),
+          ...(data.tratamientoRecomendado !== undefined && { tratamientoRecomendado: data.tratamientoRecomendado }),
+          ...(data.datosExtendidos || {}),
+        } as any,
+        version: { increment: 1 },
         editadoPor: medicoId,
         hashIntegridad: 'hash_' + Date.now(),
       },

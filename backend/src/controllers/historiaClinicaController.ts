@@ -25,6 +25,7 @@ export async function create(req: Request, res: Response): Promise<void> {
       diagnostico,
       tratamientoRecomendado,
       fotos,
+      datosExtendidos,
     } = req.body;
 
     if (!pacienteId || !tipoHistoria || !tipoConsulta || !quejaPrincipal) {
@@ -43,6 +44,7 @@ export async function create(req: Request, res: Response): Promise<void> {
       diagnostico: diagnostico || '',
       tratamientoRecomendado: tratamientoRecomendado || '',
       fotos: fotos || [],
+      datosExtendidos: datosExtendidos || {},
     });
 
     res.status(201).json(historia);
@@ -121,11 +123,13 @@ export async function update(req: Request, res: Response): Promise<void> {
     const { id } = req.params;
     const {
       tipoConsulta,
+      tipoHistoria,
       quejaPrincipal,
       historiaEnfermedad,
       observacionesAntropometricas,
       diagnostico,
       tratamientoRecomendado,
+      datosExtendidos,
     } = req.body;
 
     if (!id) {
@@ -135,11 +139,13 @@ export async function update(req: Request, res: Response): Promise<void> {
 
     const historia = await updateHistoriaClinica(id, req.user.userId, {
       tipoConsulta,
+      tipoHistoria,
       quejaPrincipal,
       historiaEnfermedad,
       observacionesAntropometricas,
       diagnostico,
       tratamientoRecomendado,
+      datosExtendidos,
     });
 
     res.json(historia);
