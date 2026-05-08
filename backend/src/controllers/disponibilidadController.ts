@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import prisma from '../lib/prisma.js';
 import {
   getDisponibilidadMedico,
   createDisponibilidad,
@@ -10,8 +10,6 @@ import {
   deleteBloqueo,
   getSlotsDisponibles,
 } from '../services/disponibilidadService.js';
-
-const prisma = new PrismaClient();
 
 // GET /api/disponibilidad/medico/:medicoId
 export async function getMedicoDisponibilidad(req: Request, res: Response): Promise<void> {

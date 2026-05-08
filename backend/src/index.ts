@@ -2,7 +2,6 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
-import { PrismaClient } from '@prisma/client';
 import authRoutes from './routes/auth.js';
 import pacientesRoutes from './routes/pacientes.js';
 import historiaClinicaRoutes from './routes/historiaClinica.js';
@@ -17,7 +16,6 @@ import especialidadesRoutes from './routes/especialidades.js';
 dotenv.config();
 
 const app = express();
-const prisma = new PrismaClient();
 const PORT = process.env.PORT || 3001;
 
 // ============================================

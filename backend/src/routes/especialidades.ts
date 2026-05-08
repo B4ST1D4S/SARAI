@@ -1,9 +1,8 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
+import prisma from '../lib/prisma.js';
 import { authenticateToken } from '../middleware/auth.js';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // GET /api/especialidades — listar activas (requiere sesión)
 router.get('/', authenticateToken, async (req, res) => {

@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import prisma from '../lib/prisma.js';
 import {
   createCita,
   getCitasByMedico,
@@ -258,8 +259,6 @@ export async function admision(req: Request, res: Response): Promise<void> {
     const { id } = req.params;
     if (!id) { res.status(400).json({ error: 'ID de cita requerido' }); return; }
 
-    const { PrismaClient } = await import('@prisma/client');
-    const prisma = new PrismaClient();
     const cita = await prisma.cita.update({
       where: { id },
       data: { estado: 'EN_SALA', asistencia: true },
