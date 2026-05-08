@@ -188,6 +188,7 @@ export default function HistoriaClinicaPage({
   const [guardado,   setGuardado]   = useState(false);
   const [loading,    setLoading]    = useState(false);
   const [autoMsg,    setAutoMsg]    = useState(false);
+  const [errMsg,     setErrMsg]     = useState('');
   const savedIdRef   = useRef<string | null>(null);
   const autoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const token        = localStorage.getItem('accessToken') || '';
@@ -223,7 +224,12 @@ export default function HistoriaClinicaPage({
   useEffect(() => { if (showFormExternal !== undefined) setShowFormS(showFormExternal); }, [showFormExternal]);
   useEffect(() => {
     if (seccionExterna) {
-      scrollTo(seccionExterna);
+      // Asegurar que el formulario esté abierto antes de intentar scroll
+      if (!showForm) {
+        setShowFormS(true);
+        onShowFormChange?.(true);
+      }
+      setTimeout(() => scrollTo(seccionExterna), 120);
     }
   }, [seccionExterna]);
   useEffect(() => {
@@ -315,6 +321,20 @@ export default function HistoriaClinicaPage({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!form.pacienteId) {
+      setErrMsg('Seleccione un paciente antes de guardar');
+      setTimeout(() => setErrMsg(''), 3000);
+      // Scroll to top of form
+      document.getElementById('hc-scroll-panel')?.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    if (!form.motivoConsulta) {
+      setErrMsg('El motivo de consulta es obligatorio');
+      setTimeout(() => setErrMsg(''), 3000);
+      scrollTo('motivo-consulta');
+      return;
+    }
+    setErrMsg('');
     setLoading(true);
     const payload = buildPayload();
     let r: any;
@@ -446,7 +466,7 @@ export default function HistoriaClinicaPage({
                   window.print();
                 }
               }}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl font-bold text-xs bg-white/5 border border-white/10 text-gray-400 hover:text-white hover:border-white/20 transition-all"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl font-bold text-xs bg-yellow-500/10 border border-yellow-500/40 text-yellow-300 hover:bg-yellow-500/20 hover:border-yellow-400 hover:text-yellow-200 transition-all"
               title="Imprimir Historia Clínica (Ctrl+P)"
             >
               <Printer size={13} /> Imprimir
@@ -553,8 +573,8 @@ export default function HistoriaClinicaPage({
               {/* guardar fijo abajo */}
               <div className="flex-shrink-0 p-3 border-t border-white/[0.06]">
                 <button type="submit"
-                  disabled={loading || !form.pacienteId || !form.motivoConsulta}
-                  className="w-full py-2 rounded-lg font-bold text-xs bg-gradient-to-r from-yellow-500 to-amber-600 text-slate-900 hover:from-yellow-400 hover:to-amber-500 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-1.5">
+                  disabled={loading}
+                  className="w-full py-2 rounded-lg font-bold text-xs bg-gradient-to-r from-yellow-500 to-amber-600 text-slate-900 hover:from-yellow-400 hover:to-amber-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-1.5">
                   {loading
                     ? <><span className="w-3 h-3 border-2 border-slate-900/30 border-t-slate-900 rounded-full animate-spin" /> Guardando…</>
                     : guardado ? <><CheckCircle size={12} /> Guardada ✓</>
@@ -564,6 +584,9 @@ export default function HistoriaClinicaPage({
                   <p className="text-center text-[9px] text-emerald-400 mt-1 flex items-center justify-center gap-1">
                     <CheckCircle size={8} /> Autoguardado
                   </p>
+                )}
+                {errMsg && (
+                  <p className="text-center text-[9px] text-red-400 mt-1 leading-tight">{errMsg}</p>
                 )}
               </div>
             </div>
