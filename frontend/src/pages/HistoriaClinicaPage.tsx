@@ -380,7 +380,17 @@ export default function HistoriaClinicaPage({
   const scrollTo = (id: string) => {
     setSecActiva(id);
     setTimeout(() => {
-      document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      const panel = document.getElementById('hc-scroll-panel');
+      const el    = document.getElementById(id);
+      if (!panel || !el) return;
+      // Acumula offsetTop subiendo por offsetParent hasta llegar al panel
+      let offset = 0;
+      let node: HTMLElement | null = el;
+      while (node && node !== panel) {
+        offset += node.offsetTop;
+        node = node.offsetParent as HTMLElement | null;
+      }
+      panel.scrollTo({ top: offset - 12, behavior: 'smooth' });
     }, 0);
   };
 
