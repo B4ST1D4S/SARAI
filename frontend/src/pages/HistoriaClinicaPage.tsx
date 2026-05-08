@@ -570,8 +570,8 @@ export default function HistoriaClinicaPage({
                 ))}
               </div>
 
-              {/* guardar fijo abajo */}
-              <div className="flex-shrink-0 p-3 border-t border-white/[0.06]">
+              {/* guardar + imprimir fijo abajo */}
+              <div className="flex-shrink-0 p-3 border-t border-white/[0.06] space-y-2">
                 <button type="submit"
                   disabled={loading}
                   className="w-full py-2 rounded-lg font-bold text-xs bg-gradient-to-r from-yellow-500 to-amber-600 text-slate-900 hover:from-yellow-400 hover:to-amber-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-1.5">
@@ -580,13 +580,31 @@ export default function HistoriaClinicaPage({
                     : guardado ? <><CheckCircle size={12} /> Guardada ✓</>
                     : <><Save size={12} /> Guardar Historia</>}
                 </button>
+                {/* Imprimir HC + Órdenes Médicas */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const panel = document.getElementById('hc-scroll-panel');
+                    if (panel) {
+                      const prev = panel.style.cssText;
+                      panel.style.overflow = 'visible';
+                      panel.style.height = 'auto';
+                      panel.style.maxHeight = 'none';
+                      window.print();
+                      setTimeout(() => { panel.style.cssText = prev; }, 800);
+                    } else { window.print(); }
+                  }}
+                  className="w-full py-2 rounded-lg font-bold text-xs bg-yellow-500/10 border border-yellow-500/30 text-yellow-300 hover:bg-yellow-500/20 hover:border-yellow-400 transition-all flex items-center justify-center gap-1.5"
+                >
+                  <Printer size={12} /> Imprimir HC + Órdenes
+                </button>
                 {autoMsg && (
-                  <p className="text-center text-[9px] text-emerald-400 mt-1 flex items-center justify-center gap-1">
+                  <p className="text-center text-[9px] text-emerald-400 flex items-center justify-center gap-1">
                     <CheckCircle size={8} /> Autoguardado
                   </p>
                 )}
                 {errMsg && (
-                  <p className="text-center text-[9px] text-red-400 mt-1 leading-tight">{errMsg}</p>
+                  <p className="text-center text-[9px] text-red-400 leading-tight">{errMsg}</p>
                 )}
               </div>
             </div>
