@@ -519,10 +519,12 @@ export default function ConfigAgendaPage() {
       {/* Modal: Nueva Franja Horaria */}
       <AnimatePresence>
         {showFormDisp && medicoSeleccionado && (
-          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <motion.div initial={{ scale: 0.92, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.92, opacity: 0 }}
-              className="bg-slate-900 border border-yellow-500/30 rounded-2xl p-6 max-w-lg w-full">
-              <div className="flex items-center justify-between mb-5">
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
+            <motion.div initial={{ scale: 0.92, opacity: 0, y: 40 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.92, opacity: 0, y: 40 }}
+              className="bg-slate-900 border border-yellow-500/30 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg flex flex-col max-h-[92dvh] sm:max-h-[90vh]">
+
+              {/* Header fijo */}
+              <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-slate-700/50 shrink-0">
                 <div>
                   <h3 className="text-lg font-bold text-yellow-400 flex items-center gap-2"><Plus size={18} /> Nueva Franja Horaria</h3>
                   <p className="text-gray-500 text-xs mt-0.5">{medicoSeleccionado.nombre} {medicoSeleccionado.apellido}</p>
@@ -530,7 +532,8 @@ export default function ConfigAgendaPage() {
                 <button onClick={() => setShowFormDisp(false)} className="text-gray-400 hover:text-white p-1"><X size={20} /></button>
               </div>
 
-              <div className="space-y-4">
+              {/* Body scrollable */}
+              <div className="overflow-y-auto flex-1 px-6 py-4 space-y-4">
                 {/* Tipo de Consulta */}
                 {tiposConsulta.length > 0 && (
                   <div>
@@ -659,9 +662,11 @@ export default function ConfigAgendaPage() {
                     </p>
                   )}
                 </div>
+                </div>
               </div>
 
-              <div className="flex gap-3 mt-6">
+              {/* Footer fijo */}
+              <div className="flex gap-3 px-6 py-4 border-t border-slate-700/50 shrink-0">
                 <button onClick={() => setShowFormDisp(false)}
                   className="flex-1 px-4 py-2.5 border border-slate-600 text-gray-300 rounded-xl hover:bg-slate-800 transition text-sm font-medium">
                   Cancelar
@@ -679,16 +684,21 @@ export default function ConfigAgendaPage() {
       {/* Modal: Nuevo Bloqueo */}
       <AnimatePresence>
         {showFormBloqueo && medicoSeleccionado && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-slate-900 border border-orange-500/30 rounded-2xl p-6 max-w-md w-full space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-xl font-bold text-orange-400 flex items-center gap-2"><Calendar size={20} /> Bloquear Período</h3>
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
+            <motion.div initial={{ scale: 0.9, opacity: 0, y: 40 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 40 }}
+              className="bg-slate-900 border border-orange-500/30 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md flex flex-col max-h-[92dvh] sm:max-h-[85vh]">
+
+              {/* Header fijo */}
+              <div className="flex items-center justify-between px-6 pt-5 pb-3 border-b border-slate-700/50 shrink-0">
+                <div>
+                  <h3 className="text-xl font-bold text-orange-400 flex items-center gap-2"><Calendar size={20} /> Bloquear Período</h3>
+                  <p className="text-gray-500 text-xs mt-0.5">{medicoSeleccionado.nombre} {medicoSeleccionado.apellido}</p>
+                </div>
                 <button onClick={() => setShowFormBloqueo(false)} className="text-gray-400 hover:text-white"><X size={20} /></button>
               </div>
-              <p className="text-gray-500 text-xs -mt-2">{medicoSeleccionado.nombre} {medicoSeleccionado.apellido}</p>
 
-              <div className="space-y-3">
+              {/* Body scrollable */}
+              <div className="overflow-y-auto flex-1 px-6 py-4 space-y-3">
                 <div>
                   <label className="text-xs text-gray-400 uppercase font-semibold mb-1 block">Motivo</label>
                   <input type="text" value={newBloqueo.motivo} onChange={e => setNewBloqueo(p => ({ ...p, motivo: e.target.value }))}
@@ -709,14 +719,15 @@ export default function ConfigAgendaPage() {
                 </div>
               </div>
 
-              <div className="flex gap-3 pt-2">
+              {/* Footer fijo */}
+              <div className="flex gap-3 px-6 py-4 border-t border-slate-700/50 shrink-0">
                 <button onClick={() => setShowFormBloqueo(false)}
-                  className="flex-1 px-4 py-2 border border-slate-600 text-gray-300 rounded-lg hover:bg-slate-800 transition text-sm">
+                  className="flex-1 px-4 py-2.5 border border-slate-600 text-gray-300 rounded-lg hover:bg-slate-800 transition text-sm">
                   Cancelar
                 </button>
                 <button onClick={handleGuardarBloqueo}
-                  className="flex-1 px-4 py-2 bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-lg font-semibold text-sm shadow-lg">
-                  <Check size={14} className="inline mr-1" /> Guardar Bloqueo
+                  className="flex-1 px-4 py-2.5 bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-lg font-semibold text-sm shadow-lg flex items-center justify-center gap-1.5">
+                  <Check size={14} /> Guardar Bloqueo
                 </button>
               </div>
             </motion.div>
