@@ -35,27 +35,33 @@ export async function getDisponibilidadMedico(medicoId: string) {
 }
 
 export async function createDisponibilidad(data: CreateDisponibilidadRequest) {
-  // Verificar solapamiento mismo día
-  const existe = await prisma.disponibilidadMedico.findFirst({
-    where: {
-      medicoId: data.medicoId,
-      diaSemana: data.diaSemana,
-      activo: true,
-      horaInicio: { lte: data.horaFin },
-      horaFin: { gte: data.horaInicio },
-    },
+  const newData = {
+    medicoId: data.medicoId,
+    diaSemana: data.diaSemana,
+    horaInicio: data.horaInicio,
+    horaFin: data.horaFin,
+    duracionSlot: data.duracionSlot ?? 60,
+    sede: data.sede ?? 'Principal',
+    tipoAtencion: data.tipoAtencion ?? 'CONSULTA',
+    consultorio: data.consultorio ?? '',
+    activo: true,
+    fechaDesde: data.fechaDesde ? new Date(data.fechaDesde) : null,
+    fechaHasta: data.fechaHasta ? new Date(data.fechaHasta) : null,
+  };
+
+  // Si ya existe una franja para ese médico y día, reemplazarla (upsert)
+  const existente = await prisma.disponibilidadMedico.findFirst({
+    where: { medicoId: data.medicoId, diaSemana: data.diaSemana, activo: true },
   });
-  if (existe) {
-    throw new Error(`Ya existe disponibilidad en ese horario para el día ${data.diaSemana}`);
+
+  if (existente) {
+    return prisma.disponibilidadMedico.update({
+      where: { id: existente.id },
+      data: newData,
+    });
   }
-  return prisma.disponibilidadMedico.create({
-    data: {
-      ...data,
-      duracionSlot: data.duracionSlot ?? 60,
-      fechaDesde: data.fechaDesde ? new Date(data.fechaDesde) : undefined,
-      fechaHasta: data.fechaHasta ? new Date(data.fechaHasta) : undefined,
-    },
-  });
+
+  return prisma.disponibilidadMedico.create({ data: newData });
 }
 
 export async function updateDisponibilidad(id: string, data: Partial<CreateDisponibilidadRequest>) {

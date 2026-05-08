@@ -226,13 +226,13 @@ export default function ConfigAgendaPage() {
       if (errors.length > 0 && errors.length === dias.length) {
         throw new Error(errors[0]);
       }
-      const creados = dias.length - errors.length;
+      const guardados = dias.length - errors.length;
       setSuccess(
         newDisp.todaLaSemana
-          ? `Agenda creada para ${creados} día${creados !== 1 ? 's' : ''}: ${turnos} turnos de ${newDisp.duracionSlot}min`
-          : `Agenda creada: ${turnos} turnos de ${newDisp.duracionSlot}min`
+          ? `Agenda guardada para ${guardados} día${guardados !== 1 ? 's' : ''}: ${turnos} turnos de ${newDisp.duracionSlot}min`
+          : `Agenda guardada: ${turnos} turnos de ${newDisp.duracionSlot}min`
       );
-      if (errors.length > 0) setError(`Algunos días ya tenían horario: ${errors.join(', ')}`);
+      if (errors.length > 0) setError(`Algunos días no se pudieron guardar: ${errors.join(', ')}`);
       setShowFormDisp(false);
       setNewDisp({ ...EMPTY_DISP });
       await recargar();
