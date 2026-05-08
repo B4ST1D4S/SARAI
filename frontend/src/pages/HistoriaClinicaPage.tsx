@@ -142,7 +142,7 @@ function SecCard({ id, num, title, emoji, done, children }: {
   done?: boolean; children: React.ReactNode;
 }) {
   return (
-    <div id={id} className="bg-white/[0.02] border border-white/5 rounded-2xl overflow-hidden scroll-mt-4">
+    <div id={id} className="bg-white/[0.02] border border-white/5 rounded-2xl overflow-hidden scroll-mt-6">
       <div className="flex items-center gap-3 px-5 py-3.5 border-b border-white/5 bg-white/[0.015]">
         <span className="text-base select-none">{emoji}</span>
         <span className="w-5 h-5 rounded bg-yellow-500/15 flex items-center justify-center text-yellow-400 text-[9px] font-bold shrink-0">{num}</span>
@@ -379,13 +379,9 @@ export default function HistoriaClinicaPage({
 
   const scrollTo = (id: string) => {
     setSecActiva(id);
-    const panel = document.getElementById('hc-scroll-panel');
-    const el    = document.getElementById(id);
-    if (panel && el) {
-      const panelTop = panel.getBoundingClientRect().top;
-      const elTop    = el.getBoundingClientRect().top;
-      panel.scrollBy({ top: elTop - panelTop - 16, behavior: 'smooth' });
-    }
+    setTimeout(() => {
+      document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 0);
   };
 
   const done: Record<string, boolean> = {
