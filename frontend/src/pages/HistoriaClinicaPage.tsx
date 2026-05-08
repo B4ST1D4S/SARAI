@@ -381,7 +381,11 @@ export default function HistoriaClinicaPage({
     setSecActiva(id);
     const panel = document.getElementById('hc-scroll-panel');
     const el    = document.getElementById(id);
-    if (panel && el) panel.scrollTo({ top: el.offsetTop - 16, behavior: 'smooth' });
+    if (panel && el) {
+      const panelTop = panel.getBoundingClientRect().top;
+      const elTop    = el.getBoundingClientRect().top;
+      panel.scrollBy({ top: elTop - panelTop - 16, behavior: 'smooth' });
+    }
   };
 
   const done: Record<string, boolean> = {
