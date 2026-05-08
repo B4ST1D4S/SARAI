@@ -468,10 +468,10 @@ export default function HistoriaClinicaPage({
                 </div>
 
                 {/* ── Layout: nav izquierda + sección derecha ── */}
-                <div className="grid grid-cols-1 xl:grid-cols-[220px_1fr] gap-4 items-start">
+                <div className="grid grid-cols-1 md:grid-cols-[240px_1fr] gap-4 items-start">
 
                   {/* ══ COLUMNA IZQUIERDA: Nav sticky ══ */}
-                  <div className="sticky top-4 space-y-3">
+                  <div className="sticky top-4 max-h-[calc(100vh-7rem)] overflow-y-auto space-y-3 pr-0.5">
                     <div className="bg-white/[0.03] border border-white/5 rounded-2xl p-3">
                       {/* Progreso */}
                       <div className="flex items-center justify-between mb-2">
@@ -834,6 +834,7 @@ export default function HistoriaClinicaPage({
                         placeholder="Control en X días/semanas, indicaciones de seguimiento..."
                       />
                     </SecCard>
+                    )}
 
                     {/* ─── 11. Recomendaciones Médicas ─── */}
                     {secActiva === 'recomendaciones' && (
