@@ -493,11 +493,11 @@ export default function HistoriaClinicaPage({
                   </div>
                 </div>
 
-                {/* ── Layout: nav izquierda + sección derecha ── */}
-                <div className="grid grid-cols-1 md:grid-cols-[240px_1fr] gap-4 items-start">
+                {/* ── Layout: nav izquierda + formulario derecha ── */}
+                <div className="grid grid-cols-1 md:grid-cols-[240px_1fr] gap-4" style={{ height: 'calc(100vh - 14rem)' }}>
 
-                  {/* ══ COLUMNA IZQUIERDA: Nav sticky ══ */}
-                  <div className="sticky top-4 max-h-[calc(100vh-7rem)] overflow-y-auto space-y-3 pr-0.5">
+                  {/* ══ COLUMNA IZQUIERDA: Nav ══ */}
+                  <div className="overflow-y-auto space-y-3 pr-0.5 h-full">
                     <div className="bg-white/[0.03] border border-white/5 rounded-2xl p-3">
                       {/* Progreso */}
                       <div className="flex items-center justify-between mb-2">
@@ -588,7 +588,7 @@ export default function HistoriaClinicaPage({
                   </div>
 
                   {/* ══ COLUMNA DERECHA: formulario continuo ══ */}
-                  <div id="hc-scroll-panel" className="max-h-[calc(100vh-12rem)] overflow-y-auto space-y-4 pr-1">
+                  <div id="hc-scroll-panel" className="overflow-y-auto space-y-4 pr-1 h-full">
                     {/* ─── 1. Motivo de Consulta ─── */}
                     <SecCard id="motivo-consulta" num={1} title="Motivo de Consulta" emoji="💬" done={done['motivo-consulta']}>
                       <Ta
