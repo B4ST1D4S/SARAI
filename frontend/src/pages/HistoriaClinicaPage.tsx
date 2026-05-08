@@ -377,7 +377,33 @@ export default function HistoriaClinicaPage({
     return () => onRegisterCampos?.(null);
   }, [onRegisterCampos, handleCamposSarai]);
 
-  const scrollTo = (id: string) => setSecActiva(id);
+  const scrollTo = (id: string) => {
+    setSecActiva(id);
+    const panel = document.getElementById('hc-scroll-panel');
+    const el   = document.getElementById(id);
+    if (panel && el) panel.scrollTo({ top: el.offsetTop - 12, behavior: 'smooth' });
+  };
+
+  // Resalta la sección visible al hacer scroll manual
+  useEffect(() => {
+    if (!showForm) return;
+    const panel = document.getElementById('hc-scroll-panel');
+    if (!panel) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const vis = entries
+          .filter(e => e.isIntersecting)
+          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+        if (vis.length > 0) setSecActiva(vis[0].target.id);
+      },
+      { root: panel, threshold: 0.25 }
+    );
+    ALL_SECCIONES.forEach(({ id }) => {
+      const el = document.getElementById(id);
+      if (el) observer.observe(el);
+    });
+    return () => observer.disconnect();
+  }, [showForm]);
 
   const done: Record<string, boolean> = {
     'motivo-consulta': !!form.motivoConsulta,
@@ -492,7 +518,7 @@ export default function HistoriaClinicaPage({
                         {SECCIONES_HC.map(sec => (
                           <button
                             type="button" key={sec.id}
-                            onClick={() => setSecActiva(sec.id)}
+                            onClick={() => scrollTo(sec.id)}
                             className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-[11px] transition-all ${
                               secActiva === sec.id
                                 ? 'bg-yellow-500/10 text-yellow-300 border border-yellow-500/20'
@@ -520,7 +546,7 @@ export default function HistoriaClinicaPage({
                         {SECCIONES_OM.map(sec => (
                           <button
                             type="button" key={sec.id}
-                            onClick={() => setSecActiva(sec.id)}
+                            onClick={() => scrollTo(sec.id)}
                             className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-[11px] transition-all ${
                               secActiva === sec.id
                                 ? 'bg-blue-500/10 text-blue-300 border border-blue-500/20'
@@ -559,43 +585,11 @@ export default function HistoriaClinicaPage({
                       )}
                     </div>
 
-                    {/* Navegación prev/next */}
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const idx = ALL_SECCIONES.findIndex(s => s.id === secActiva);
-                          if (idx > 0) setSecActiva(ALL_SECCIONES[idx - 1].id);
-                        }}
-                        className="flex-1 py-2 rounded-xl text-xs font-semibold bg-white/5 border border-white/10 text-gray-400 hover:text-white hover:bg-white/10 transition-all"
-                      >
-                        ← Anterior
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const idx = ALL_SECCIONES.findIndex(s => s.id === secActiva);
-                          if (idx < ALL_SECCIONES.length - 1) setSecActiva(ALL_SECCIONES[idx + 1].id);
-                        }}
-                        className="flex-1 py-2 rounded-xl text-xs font-semibold bg-white/5 border border-white/10 text-gray-400 hover:text-white hover:bg-white/10 transition-all"
-                      >
-                        Siguiente →
-                      </button>
-                    </div>
                   </div>
 
-                  {/* ══ COLUMNA DERECHA: sección activa ══ */}
-                  <div>
-                    <AnimatePresence mode="wait">
-                      <motion.div
-                        key={secActiva}
-                        initial={{ opacity: 0, x: 12 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, x: -12 }}
-                        transition={{ duration: 0.18 }}
-                      >
+                  {/* ══ COLUMNA DERECHA: formulario continuo ══ */}
+                  <div id="hc-scroll-panel" className="max-h-[calc(100vh-12rem)] overflow-y-auto space-y-4 pr-1">
                     {/* ─── 1. Motivo de Consulta ─── */}
-                    {secActiva === 'motivo-consulta' && (
                     <SecCard id="motivo-consulta" num={1} title="Motivo de Consulta" emoji="💬" done={done['motivo-consulta']}>
                       <Ta
                         label="Motivo / Queja Principal *"
@@ -613,10 +607,8 @@ export default function HistoriaClinicaPage({
                         placeholder="Descripción cronológica, tiempo de evolución, síntomas asociados, tratamientos previos..."
                       />
                     </SecCard>
-                    )}
 
                     {/* ─── 2. Signos Vitales ─── */}
-                    {secActiva === 'signos-vitales' && (
                     <SecCard id="signos-vitales" num={2} title="Signos Vitales" emoji="❤️" done={done['signos-vitales']}>
                       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
                         <Inp label="Peso (kg)" type="number" step="0.1" value={form.peso} onChange={e => s('peso', e.target.value)} placeholder="65.0" />
@@ -652,10 +644,8 @@ export default function HistoriaClinicaPage({
                         <Inp label="Glicemia (mg/dL) — opcional" type="number" value={form.glicemia} onChange={e => s('glicemia', e.target.value)} placeholder="90" />
                       </div>
                     </SecCard>
-                    )}
 
                     {/* ─── 3. Antecedentes Personales ─── */}
-                    {secActiva === 'antec-pers' && (
                     <SecCard id="antec-pers" num={3} title="Antecedentes Personales" emoji="📁" done={done['antec-pers']}>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <Ta label="Patológicos" rows={3} value={form.antPatologicos} onChange={e => s('antPatologicos', e.target.value)} placeholder="HTA, DM2, cardiopatías, hospitalizaciones..." />
@@ -666,10 +656,8 @@ export default function HistoriaClinicaPage({
                         <Ta label="Hospitalarios" rows={2} value={form.antHospitalarios} onChange={e => s('antHospitalarios', e.target.value)} placeholder="Hospitalizaciones previas, motivo, duración..." />
                       </div>
                     </SecCard>
-                    )}
 
                     {/* ─── 4. Antecedentes Familiares ─── */}
-                    {secActiva === 'antec-fam' && (
                     <SecCard id="antec-fam" num={4} title="Antecedentes Familiares" emoji="👨‍👩‍👧" done={done['antec-fam']}>
                       <p className="text-[11px] text-gray-500">Marque las patologías presentes en familiares de primer grado:</p>
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-1">
@@ -680,10 +668,8 @@ export default function HistoriaClinicaPage({
                       </div>
                       <Ta label="Otros antecedentes familiares" rows={3} value={form.antFamOtros} onChange={e => s('antFamOtros', e.target.value)} placeholder="Enfermedades genéticas, mentales, otras..." />
                     </SecCard>
-                    )}
 
                     {/* ─── 5. Gineco Obstétrico ─── */}
-                    {secActiva === 'antec-gineco' && (
                     <SecCard id="antec-gineco" num={5} title="Antecedentes Gineco Obstétricos" emoji="🌸" done={done['antec-gineco']}>
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                         <Inp label="FUM (Última Menstruación)" type="date" value={form.fum} onChange={e => s('fum', e.target.value)} />
@@ -696,10 +682,8 @@ export default function HistoriaClinicaPage({
                       <Chk label="Menopausia" checked={form.menopausia} onChange={v => s('menopausia', v)} />
                       <p className="text-[10px] text-gray-600">* Omitir si no aplica al paciente</p>
                     </SecCard>
-                    )}
 
                     {/* ─── 6. Evolución Cirugía Plástica ─── */}
-                    {secActiva === 'evolucion-cx' && (
                     <SecCard id="evolucion-cx" num={6} title="Evolución Cirugía Plástica y Estética" emoji="✂️" done={done['evolucion-cx']}>
                       <Inp label="Procedimiento Realizado" value={form.procedimientoRealizado} onChange={e => s('procedimientoRealizado', e.target.value)} placeholder="Ej: Rinoplastia abierta, liposucción abdominal..." />
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -709,10 +693,8 @@ export default function HistoriaClinicaPage({
                         <Ta label="Evolución Postoperatoria" rows={3} value={form.evolucionPostop} onChange={e => s('evolucionPostop', e.target.value)} placeholder="Cicatrización, edema, resultado estético..." />
                       </div>
                     </SecCard>
-                    )}
 
                     {/* ─── 7. Finalidad de Atención (RIPS) ─── */}
-                    {secActiva === 'finalidad' && (
                     <SecCard id="finalidad" num={7} title="Finalidad de Atención" emoji="🎯" done={done['finalidad']}>
                       <p className="text-[11px] text-gray-500">Según RIPS — Resolución 3374 de 2000 (Ministerio de Salud Colombia):</p>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
@@ -738,10 +720,8 @@ export default function HistoriaClinicaPage({
                         ))}
                       </div>
                     </SecCard>
-                    )}
 
                     {/* ─── 8. Origen de Atención ─── */}
-                    {secActiva === 'origen' && (
                     <SecCard id="origen" num={8} title="Origen de Atención" emoji="📍" done={done['origen']}>
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                         {[
@@ -764,10 +744,8 @@ export default function HistoriaClinicaPage({
                         ))}
                       </div>
                     </SecCard>
-                    )}
 
                     {/* ─── 9. Impresión Diagnóstica ─── */}
-                    {secActiva === 'diagnostico' && (
                     <SecCard id="diagnostico" num={9} title="Impresión Diagnóstica" emoji="🔬" done={done['diagnostico']}>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <Inp
@@ -797,10 +775,8 @@ export default function HistoriaClinicaPage({
                         <option value="DESCARTADO">Descartado</option>
                       </Sel>
                     </SecCard>
-                    )}
 
                     {/* ─── 10. Plan Terapéutico ─── */}
-                    {secActiva === 'plan' && (
                     <SecCard id="plan" num={10} title="Plan Terapéutico" emoji="📋" done={done['plan']}>
                       <Ta
                         label="Conducta / Manejo"
@@ -834,10 +810,8 @@ export default function HistoriaClinicaPage({
                         placeholder="Control en X días/semanas, indicaciones de seguimiento..."
                       />
                     </SecCard>
-                    )}
 
                     {/* ─── 11. Recomendaciones Médicas ─── */}
-                    {secActiva === 'recomendaciones' && (
                     <SecCard id="recomendaciones" num={11} title="Recomendaciones Médicas" emoji="📝" done={done['recomendaciones']}>
                       <Ta
                         label="Recomendaciones al Paciente"
@@ -847,10 +821,8 @@ export default function HistoriaClinicaPage({
                         placeholder="Indicaciones de cuidado, actividad física, alimentación, cuidados del área, señales de alarma..."
                       />
                     </SecCard>
-                    )}
 
                     {/* ─── 12. Apoyos Diagnósticos ─── */}
-                    {secActiva === 'apoyos-diag' && (
                     <SecCard id="apoyos-diag" num={12} title="Solicitud Apoyos Diagnósticos" emoji="🧪" done={form.apoyosDiag.length > 0}>
                       <div className="space-y-2">
                         {form.apoyosDiag.map(item => (
@@ -891,10 +863,8 @@ export default function HistoriaClinicaPage({
                         </button>
                       </div>
                     </SecCard>
-                    )}
 
                     {/* ─── 13. Procedimientos Quirúrgicos ─── */}
-                    {secActiva === 'proc-qx' && (
                     <SecCard id="proc-qx" num={13} title="Solicitud Procedimientos Quirúrgicos" emoji="🏥" done={form.procedimientosQx.length > 0}>
                       <div className="space-y-2">
                         {form.procedimientosQx.map(item => (
@@ -921,10 +891,8 @@ export default function HistoriaClinicaPage({
                         </button>
                       </div>
                     </SecCard>
-                    )}
 
                     {/* ─── 14. Formulación Medicamentos ─── */}
-                    {secActiva === 'medicamentos' && (
                     <SecCard id="medicamentos" num={14} title="Formulación Medicamentos" emoji="💊" done={form.medicamentos.length > 0}>
                       <div className="space-y-2">
                         {form.medicamentos.map(item => (
@@ -950,10 +918,8 @@ export default function HistoriaClinicaPage({
                         </button>
                       </div>
                     </SecCard>
-                    )}
 
                     {/* ─── 15. Interconsulta ─── */}
-                    {secActiva === 'interconsulta' && (
                     <SecCard id="interconsulta" num={15} title="Solicitud de Interconsulta" emoji="👨‍⚕️" done={form.interconsultas.length > 0}>
                       <div className="space-y-2">
                         {form.interconsultas.map(item => (
@@ -977,10 +943,6 @@ export default function HistoriaClinicaPage({
                         </button>
                       </div>
                     </SecCard>
-                    )}
-
-                      </motion.div>
-                    </AnimatePresence>
                   </div>{/* fin columna derecha */}
                 </div>
               </form>
