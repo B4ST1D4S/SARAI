@@ -1,13 +1,34 @@
 /**
  * CU-01: Configuración de Agenda del Profesional
- * Permite definir disponibilidad semanal, horarios, sede y bloqueos.
+ * Permite seleccionar un profesional, ver sus tipos de consulta por especialidad
+ * y definir disponibilidad semanal con intervalos de turno.
  */
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Settings, Plus, Trash2, Calendar, Clock, MapPin, AlertCircle, Check, X } from 'lucide-react';
+import {
+  Settings, Plus, Trash2, Calendar, Clock, MapPin,
+  AlertCircle, Check, X, User, Stethoscope, ChevronRight,
+  Clock3,
+} from 'lucide-react';
 
 const DIAS = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
-const TIPOS = ['CONSULTA', 'PREOPERATORIO', 'POSTOPERATORIO', 'CONTROL'];
+const INTERVALOS = [10, 15, 20, 30, 45, 60, 90, 120];
+
+interface Medico {
+  id: string;
+  nombre: string;
+  apellido: string;
+  especialidad: string | null;
+  registroMedico: string | null;
+  email: string | null;
+}
+
+interface TipoConsulta {
+  id: string;
+  nombre: string;
+  duracionMinutos: number;
+  clasificacion: string;
+}
 
 interface Disponibilidad {
   id: string;
@@ -18,6 +39,7 @@ interface Disponibilidad {
   sede: string;
   tipoAtencion: string;
   consultorio: string;
+  activo: boolean;
 }
 
 interface Bloqueo {
@@ -28,24 +50,42 @@ interface Bloqueo {
   todoElDia: boolean;
 }
 
+const EMPTY_DISP = {
+  diaSemana: 1,
+  horaInicio: '08:00',
+  horaFin: '16:00',
+  duracionSlot: 30,
+  sede: 'Principal',
+  tipoConsultaId: '',
+  tipoConsultaNombre: '',
+  consultorio: '',
+};
+
+function calcularTurnos(horaInicio: string, horaFin: string, intervalo: number): number {
+  const [hI, mI] = horaInicio.split(':').map(Number);
+  const [hF, mF] = horaFin.split(':').map(Number);
+  const totalMin = (hF * 60 + mF) - (hI * 60 + mI);
+  if (totalMin <= 0 || intervalo <= 0) return 0;
+  return Math.floor(totalMin / intervalo);
+}
+
 export default function ConfigAgendaPage() {
+  const [medicos, setMedicos] = useState<Medico[]>([]);
+  const [medicoSeleccionado, setMedicoSeleccionado] = useState<Medico | null>(null);
+  const [tiposConsulta, setTiposConsulta] = useState<TipoConsulta[]>([]);
+  const [especialidadMedico, setEspecialidadMedico] = useState('');
   const [disponibilidades, setDisponibilidades] = useState<Disponibilidad[]>([]);
   const [bloqueos, setBloqueos] = useState<Bloqueo[]>([]);
+
   const [loading, setLoading] = useState(false);
+  const [loadingMedicos, setLoadingMedicos] = useState(false);
+  const [loadingTipos, setLoadingTipos] = useState(false);
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
+
   const [showFormDisp, setShowFormDisp] = useState(false);
   const [showFormBloqueo, setShowFormBloqueo] = useState(false);
-
-  const [newDisp, setNewDisp] = useState({
-    diaSemana: 1,
-    horaInicio: '08:00',
-    horaFin: '18:00',
-    duracionSlot: 60,
-    sede: 'Principal',
-    tipoAtencion: 'CONSULTA',
-    consultorio: '',
-  });
+  const [newDisp, setNewDisp] = useState({ ...EMPTY_DISP });
 
   const [newBloqueo, setNewBloqueo] = useState({
     fechaInicio: '',
@@ -60,42 +100,116 @@ export default function ConfigAgendaPage() {
     catch { return {}; }
   };
 
-  const medicoId = getUser().id || getUser().userId;
+  // ── Cargar lista de médicos al montar ────────────────────────────────
+  useEffect(() => {
+    const cargarMedicos = async () => {
+      setLoadingMedicos(true);
+      try {
+        const token = getToken();
+        const res = await fetch('/api/disponibilidad/medicos-list', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await res.json();
+        const lista: Medico[] = data.medicos || [];
+        setMedicos(lista);
 
-  const cargar = async () => {
-    if (!medicoId) return;
+        // Si el usuario logueado es MEDICO, pre-seleccionarlo
+        const user = getUser();
+        if (user.rol === 'MEDICO' && lista.length > 0) {
+          const propio = lista.find(m => m.id === (user.id || user.userId));
+          if (propio) await seleccionarMedico(propio);
+        }
+      } catch {
+        setError('Error cargando lista de profesionales');
+      } finally {
+        setLoadingMedicos(false);
+      }
+    };
+    cargarMedicos();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── Seleccionar médico → cargar tipos de consulta y disponibilidades ─
+  const seleccionarMedico = async (medico: Medico) => {
+    setMedicoSeleccionado(medico);
+    setTiposConsulta([]);
+    setDisponibilidades([]);
+    setBloqueos([]);
+    setLoadingTipos(true);
+
+    const token = getToken();
+    try {
+      const [resTipos, resDis, resBlq] = await Promise.all([
+        fetch(`/api/disponibilidad/tipos-consulta/${medico.id}`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`/api/disponibilidad/medico/${medico.id}`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`/api/disponibilidad/bloqueos/medico/${medico.id}`, { headers: { Authorization: `Bearer ${token}` } }),
+      ]);
+      const [dataTipos, dataDis, dataBlq] = await Promise.all([resTipos.json(), resDis.json(), resBlq.json()]);
+      setTiposConsulta(dataTipos.tiposConsulta || []);
+      setEspecialidadMedico(dataTipos.especialidadMedico || '');
+      setDisponibilidades(dataDis.disponibilidades || []);
+      setBloqueos(dataBlq.bloqueos || []);
+
+      if (dataTipos.tiposConsulta?.length > 0) {
+        const t = dataTipos.tiposConsulta[0];
+        setNewDisp(p => ({ ...p, tipoConsultaId: t.id, tipoConsultaNombre: t.nombre, duracionSlot: t.duracionMinutos || 30 }));
+      }
+    } catch {
+      setError('Error cargando datos del profesional');
+    } finally {
+      setLoadingTipos(false);
+    }
+  };
+
+  const recargar = async () => {
+    if (!medicoSeleccionado) return;
     setLoading(true);
     try {
       const token = getToken();
-      const [rdis, rblq] = await Promise.all([
-        fetch(`/api/disponibilidad/medico/${medicoId}`, { headers: { Authorization: `Bearer ${token}` } }),
-        fetch(`/api/disponibilidad/bloqueos/medico/${medicoId}`, { headers: { Authorization: `Bearer ${token}` } }),
+      const [resDis, resBlq] = await Promise.all([
+        fetch(`/api/disponibilidad/medico/${medicoSeleccionado.id}`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`/api/disponibilidad/bloqueos/medico/${medicoSeleccionado.id}`, { headers: { Authorization: `Bearer ${token}` } }),
       ]);
-      const [ddata, bdata] = await Promise.all([rdis.json(), rblq.json()]);
-      setDisponibilidades(ddata.disponibilidades || []);
-      setBloqueos(bdata.bloqueos || []);
+      const [dataDis, dataBlq] = await Promise.all([resDis.json(), resBlq.json()]);
+      setDisponibilidades(dataDis.disponibilidades || []);
+      setBloqueos(dataBlq.bloqueos || []);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { cargar(); }, []);
-
+  // ── Guardar disponibilidad ────────────────────────────────────────────
   const handleGuardarDisp = async () => {
     setError('');
+    if (!medicoSeleccionado) return;
+
+    const turnos = calcularTurnos(newDisp.horaInicio, newDisp.horaFin, newDisp.duracionSlot);
+    if (turnos <= 0) { setError('El horario de fin debe ser posterior al de inicio'); return; }
+
     try {
       const token = getToken();
+      const body = {
+        medicoId: medicoSeleccionado.id,
+        diaSemana: newDisp.diaSemana,
+        horaInicio: newDisp.horaInicio,
+        horaFin: newDisp.horaFin,
+        duracionSlot: newDisp.duracionSlot,
+        sede: newDisp.sede || 'Principal',
+        tipoAtencion: newDisp.tipoConsultaNombre || 'CONSULTA',
+        consultorio: newDisp.consultorio,
+      };
       const res = await fetch('/api/disponibilidad', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify(newDisp),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Error al guardar');
-      setSuccess('Disponibilidad configurada');
+      setSuccess(`Agenda creada: ${turnos} turnos de ${newDisp.duracionSlot} min`);
       setShowFormDisp(false);
-      cargar();
-      setTimeout(() => setSuccess(''), 3000);
+      setNewDisp({ ...EMPTY_DISP });
+      await recargar();
+      setTimeout(() => setSuccess(''), 4000);
     } catch (e: any) {
       setError(e.message);
     }
@@ -103,27 +217,27 @@ export default function ConfigAgendaPage() {
 
   const handleEliminarDisp = async (id: string) => {
     const token = getToken();
-    await fetch(`/api/disponibilidad/${id}`, {
-      method: 'DELETE',
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    cargar();
+    await fetch(`/api/disponibilidad/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+    await recargar();
   };
 
+  // ── Guardar bloqueo ──────────────────────────────────────────────────
   const handleGuardarBloqueo = async () => {
     setError('');
+    if (!medicoSeleccionado) return;
     try {
       const token = getToken();
       const res = await fetch('/api/disponibilidad/bloqueos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify(newBloqueo),
+        body: JSON.stringify({ ...newBloqueo, medicoId: medicoSeleccionado.id }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Error al guardar');
       setSuccess('Bloqueo creado');
       setShowFormBloqueo(false);
-      cargar();
+      setNewBloqueo({ fechaInicio: '', fechaFin: '', motivo: '', todoElDia: true });
+      await recargar();
       setTimeout(() => setSuccess(''), 3000);
     } catch (e: any) {
       setError(e.message);
@@ -132,196 +246,341 @@ export default function ConfigAgendaPage() {
 
   const handleEliminarBloqueo = async (id: string) => {
     const token = getToken();
-    await fetch(`/api/disponibilidad/bloqueos/${id}`, {
-      method: 'DELETE',
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    cargar();
+    await fetch(`/api/disponibilidad/bloqueos/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+    await recargar();
   };
+
+  const turnosPreview = calcularTurnos(newDisp.horaInicio, newDisp.horaFin, newDisp.duracionSlot);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-3 sm:p-6">
-      <div className="max-w-5xl mx-auto">
+      <div className="max-w-6xl mx-auto">
+
         {/* Header */}
-        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-5 sm:mb-8">
-          <div className="flex items-center gap-2 sm:gap-4 mb-1 sm:mb-2">
-            <div className="w-1.5 sm:w-2 h-7 sm:h-10 bg-gradient-to-b from-yellow-400 to-amber-600 rounded-full" />
-            <h1 className="text-xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-yellow-300 to-amber-500 bg-clip-text text-transparent">
-              Config. Agenda
-            </h1>
+        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
+          <div className="flex items-center gap-3 mb-1">
+            <div className="w-1.5 h-10 bg-gradient-to-b from-yellow-400 to-amber-600 rounded-full" />
+            <div>
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-yellow-300 to-amber-500 bg-clip-text text-transparent">
+                Configuración de Agenda
+              </h1>
+              <p className="text-gray-400 text-sm">Asigna horarios y tipos de consulta por profesional</p>
+            </div>
           </div>
-          <p className="text-gray-400 ml-4 sm:ml-6 text-[10px] sm:text-sm">Define tu disponibilidad semanal, horarios y bloqueos</p>
         </motion.div>
 
-        {success && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-            className="mb-4 p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg text-emerald-400 flex items-center gap-2">
-            <Check size={16} /> {success}
-          </motion.div>
-        )}
-        {error && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-            className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 flex items-center gap-2">
-            <AlertCircle size={16} /> {error}
-          </motion.div>
-        )}
+        {/* Alertas */}
+        <AnimatePresence>
+          {success && (
+            <motion.div key="ok" initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+              className="mb-4 p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg text-emerald-400 flex items-center gap-2 text-sm">
+              <Check size={16} /> {success}
+            </motion.div>
+          )}
+          {error && (
+            <motion.div key="err" initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+              className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 flex items-center gap-2 text-sm">
+              <AlertCircle size={16} /> {error}
+              <button onClick={() => setError('')} className="ml-auto"><X size={14} /></button>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-        {/* ── DISPONIBILIDAD ─────────────────────────────────────────── */}
-        <section className="mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold text-white flex items-center gap-2">
-              <Clock size={20} className="text-yellow-400" /> Disponibilidad Semanal
-            </h2>
-            <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-              onClick={() => setShowFormDisp(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-yellow-500 to-amber-600 text-white rounded-lg font-semibold text-sm shadow-lg">
-              <Plus size={16} /> Agregar Horario
-            </motion.button>
-          </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-          {loading ? (
-            <div className="text-gray-400 text-sm p-4">Cargando...</div>
-          ) : disponibilidades.length === 0 ? (
-            <div className="p-8 border border-dashed border-slate-600 rounded-xl text-center text-gray-500">
-              <Settings size={40} className="mx-auto mb-3 opacity-30" />
-              <p>No has configurado ningún horario aún.</p>
-              <p className="text-sm mt-1">Agrega tu disponibilidad semanal para que los pacientes puedan agendar citas.</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {disponibilidades.map((d) => (
-                <motion.div key={d.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}
-                  className="flex items-center justify-between p-4 bg-slate-800/50 border border-slate-700/50 rounded-xl hover:border-yellow-500/30 transition-colors">
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 bg-yellow-500/10 border border-yellow-500/30 rounded-lg flex items-center justify-center">
-                      <span className="text-yellow-400 font-bold text-xs">{DIAS[d.diaSemana].slice(0, 3).toUpperCase()}</span>
-                    </div>
-                    <div>
-                      <p className="text-white font-semibold">{DIAS[d.diaSemana]}</p>
-                      <p className="text-gray-400 text-sm">{d.horaInicio} – {d.horaFin} · {d.duracionSlot}min/cita</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <div className="text-right">
-                      <p className="text-gray-300 text-sm">{d.sede || 'Principal'}</p>
-                      <p className="text-gray-500 text-xs">{d.tipoAtencion}</p>
-                    </div>
-                    <button onClick={() => handleEliminarDisp(d.id)}
-                      className="p-2 text-gray-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors">
-                      <Trash2 size={16} />
+          {/* Panel izquierdo: lista de profesionales */}
+          <div className="lg:col-span-1">
+            <div className="bg-slate-800/60 border border-slate-700/50 rounded-2xl overflow-hidden">
+              <div className="p-4 border-b border-slate-700/50">
+                <h2 className="text-white font-bold flex items-center gap-2">
+                  <User size={16} className="text-yellow-400" /> Profesionales
+                </h2>
+                <p className="text-gray-500 text-xs mt-0.5">Selecciona para configurar agenda</p>
+              </div>
+
+              {loadingMedicos ? (
+                <div className="p-6 text-center text-gray-500 text-sm">Cargando...</div>
+              ) : medicos.length === 0 ? (
+                <div className="p-6 text-center text-gray-500 text-sm">
+                  <User size={32} className="mx-auto mb-2 opacity-30" />
+                  No hay profesionales registrados
+                </div>
+              ) : (
+                <div className="divide-y divide-slate-700/30">
+                  {medicos.map(m => (
+                    <button key={m.id} onClick={() => seleccionarMedico(m)}
+                      className={`w-full text-left p-4 flex items-center gap-3 hover:bg-slate-700/40 transition-colors ${
+                        medicoSeleccionado?.id === m.id ? 'bg-yellow-500/10 border-l-2 border-yellow-400' : ''
+                      }`}
+                    >
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${
+                        medicoSeleccionado?.id === m.id ? 'bg-yellow-500 text-slate-900' : 'bg-slate-700 text-gray-300'
+                      }`}>
+                        {m.nombre[0]}{m.apellido[0]}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-white font-semibold text-sm truncate">{m.nombre} {m.apellido}</p>
+                        <p className="text-gray-400 text-xs truncate">{m.especialidad || 'Sin especialidad'}</p>
+                      </div>
+                      {medicoSeleccionado?.id === m.id && (
+                        <ChevronRight size={16} className="text-yellow-400 ml-auto shrink-0" />
+                      )}
                     </button>
-                  </div>
-                </motion.div>
-              ))}
+                  ))}
+                </div>
+              )}
             </div>
-          )}
-        </section>
-
-        {/* ── BLOQUEOS ───────────────────────────────────────────────── */}
-        <section>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold text-white flex items-center gap-2">
-              <Calendar size={20} className="text-orange-400" /> Bloqueos y Excepciones
-            </h2>
-            <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-              onClick={() => setShowFormBloqueo(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-lg font-semibold text-sm shadow-lg">
-              <Plus size={16} /> Bloquear Período
-            </motion.button>
           </div>
 
-          {bloqueos.length === 0 ? (
-            <div className="p-6 border border-dashed border-slate-600 rounded-xl text-center text-gray-500 text-sm">
-              Sin bloqueos configurados (vacaciones, festivos, etc.)
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {bloqueos.map((b) => (
-                <motion.div key={b.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                  className="flex items-center justify-between p-4 bg-slate-800/50 border border-orange-500/20 rounded-xl">
-                  <div>
-                    <p className="text-white font-semibold">{b.motivo || 'Bloqueo'}</p>
-                    <p className="text-gray-400 text-sm">
-                      {new Date(b.fechaInicio).toLocaleDateString('es-CO')} → {new Date(b.fechaFin).toLocaleDateString('es-CO')}
-                      {b.todoElDia && <span className="ml-2 text-orange-400 text-xs">Todo el día</span>}
-                    </p>
+          {/* Panel derecho */}
+          <div className="lg:col-span-2 space-y-5">
+
+            {!medicoSeleccionado ? (
+              <div className="flex flex-col items-center justify-center h-64 bg-slate-800/40 border border-dashed border-slate-600 rounded-2xl text-gray-500">
+                <Settings size={48} className="mb-3 opacity-20" />
+                <p className="font-semibold">Selecciona un profesional</p>
+                <p className="text-sm">para ver y configurar su agenda</p>
+              </div>
+            ) : loadingTipos ? (
+              <div className="flex items-center justify-center h-48 text-gray-400 text-sm">Cargando datos...</div>
+            ) : (
+              <>
+                {/* Info del profesional + tipos de consulta */}
+                <div className="bg-slate-800/60 border border-yellow-500/20 rounded-2xl p-5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h2 className="text-xl font-bold text-white">
+                        {medicoSeleccionado.nombre} {medicoSeleccionado.apellido}
+                      </h2>
+                      <div className="flex items-center gap-2 mt-1 flex-wrap">
+                        <span className="px-2 py-0.5 bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 text-xs rounded-full">
+                          {especialidadMedico || medicoSeleccionado.especialidad || 'Sin especialidad'}
+                        </span>
+                        {medicoSeleccionado.registroMedico && (
+                          <span className="text-gray-400 text-xs">Reg. {medicoSeleccionado.registroMedico}</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-2 shrink-0">
+                      <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+                        onClick={() => { setNewDisp({ ...EMPTY_DISP }); setShowFormDisp(true); }}
+                        className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-yellow-500 to-amber-600 text-white rounded-xl font-semibold text-sm shadow-lg">
+                        <Plus size={15} /> Franja
+                      </motion.button>
+                      <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+                        onClick={() => setShowFormBloqueo(true)}
+                        className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-xl font-semibold text-sm shadow-lg">
+                        <Calendar size={15} /> Bloqueo
+                      </motion.button>
+                    </div>
                   </div>
-                  <button onClick={() => handleEliminarBloqueo(b.id)}
-                    className="p-2 text-gray-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors">
-                    <Trash2 size={16} />
-                  </button>
-                </motion.div>
-              ))}
-            </div>
-          )}
-        </section>
+
+                  {tiposConsulta.length > 0 ? (
+                    <div className="mt-4">
+                      <p className="text-xs text-gray-400 uppercase font-semibold mb-2">
+                        Tipos de consulta compatibles ({tiposConsulta.length})
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {tiposConsulta.map(t => (
+                          <span key={t.id}
+                            className="px-3 py-1 bg-slate-700/60 border border-slate-600 text-gray-300 text-xs rounded-lg flex items-center gap-1.5">
+                            <Clock3 size={10} className="text-yellow-400" />
+                            {t.nombre}
+                            <span className="text-gray-500">· {t.duracionMinutos}min</span>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mt-3 p-3 bg-amber-500/5 border border-amber-500/20 rounded-lg text-amber-400/80 text-xs flex items-center gap-2">
+                      <AlertCircle size={14} />
+                      Sin tipos de consulta para esta especialidad. Se podrá configurar agenda de forma general.
+                    </div>
+                  )}
+                </div>
+
+                {/* Franjas horarias */}
+                <div>
+                  <h3 className="text-white font-bold mb-3 flex items-center gap-2">
+                    <Clock size={16} className="text-yellow-400" /> Franjas Horarias
+                    <span className="ml-auto text-xs text-gray-500 font-normal">{disponibilidades.length} registro{disponibilidades.length !== 1 ? 's' : ''}</span>
+                  </h3>
+
+                  {loading ? (
+                    <div className="text-gray-500 text-sm p-4 text-center">Cargando...</div>
+                  ) : disponibilidades.length === 0 ? (
+                    <div className="p-8 border border-dashed border-slate-600 rounded-xl text-center text-gray-500">
+                      <Clock size={36} className="mx-auto mb-2 opacity-25" />
+                      <p className="text-sm">Sin franjas configuradas. Usa "Franja" para agregar.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {disponibilidades.map(d => {
+                        const turnos = calcularTurnos(d.horaInicio, d.horaFin, d.duracionSlot);
+                        return (
+                          <motion.div key={d.id}
+                            initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}
+                            className="flex items-center gap-4 p-4 bg-slate-800/50 border border-slate-700/50 rounded-xl hover:border-yellow-500/20 transition-colors group"
+                          >
+                            <div className="w-12 h-12 bg-yellow-500/10 border border-yellow-500/20 rounded-xl flex items-center justify-center shrink-0">
+                              <span className="text-yellow-400 font-bold text-xs">{DIAS[d.diaSemana].slice(0, 3).toUpperCase()}</span>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-white font-semibold text-sm">{DIAS[d.diaSemana]}</span>
+                                <span className="text-gray-400 text-sm">{d.horaInicio} – {d.horaFin}</span>
+                                <span className="px-2 py-0.5 bg-slate-700 text-gray-300 text-xs rounded-full">{d.duracionSlot}min/turno</span>
+                                <span className="px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs rounded-full">{turnos} turnos</span>
+                              </div>
+                              <div className="flex items-center gap-3 mt-1">
+                                <span className="text-gray-500 text-xs flex items-center gap-1"><MapPin size={10} />{d.sede || 'Principal'}</span>
+                                {d.tipoAtencion && <span className="text-gray-500 text-xs flex items-center gap-1"><Stethoscope size={10} />{d.tipoAtencion}</span>}
+                                {d.consultorio && <span className="text-gray-500 text-xs">{d.consultorio}</span>}
+                              </div>
+                            </div>
+                            <button onClick={() => handleEliminarDisp(d.id)}
+                              className="p-2 text-gray-600 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors opacity-0 group-hover:opacity-100">
+                              <Trash2 size={15} />
+                            </button>
+                          </motion.div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Bloqueos */}
+                {bloqueos.length > 0 && (
+                  <div>
+                    <h3 className="text-white font-bold mb-3 flex items-center gap-2">
+                      <Calendar size={16} className="text-orange-400" /> Bloqueos
+                    </h3>
+                    <div className="space-y-2">
+                      {bloqueos.map(b => (
+                        <motion.div key={b.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                          className="flex items-center justify-between p-4 bg-slate-800/50 border border-orange-500/20 rounded-xl group">
+                          <div>
+                            <p className="text-white font-semibold text-sm">{b.motivo || 'Bloqueo'}</p>
+                            <p className="text-gray-400 text-xs">
+                              {new Date(b.fechaInicio).toLocaleDateString('es-CO')} → {new Date(b.fechaFin).toLocaleDateString('es-CO')}
+                              {b.todoElDia && <span className="ml-2 text-orange-400">Todo el día</span>}
+                            </p>
+                          </div>
+                          <button onClick={() => handleEliminarBloqueo(b.id)}
+                            className="p-2 text-gray-600 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors opacity-0 group-hover:opacity-100">
+                            <Trash2 size={15} />
+                          </button>
+                        </motion.div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
       </div>
 
-      {/* ── MODAL NUEVA DISPONIBILIDAD ────────────────────────────────── */}
+      {/* Modal: Nueva Franja Horaria */}
       <AnimatePresence>
-        {showFormDisp && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-slate-900 border border-yellow-500/30 rounded-2xl p-6 max-w-lg w-full space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-xl font-bold text-yellow-400 flex items-center gap-2">
-                  <Plus size={20} /> Nuevo Horario
-                </h3>
-                <button onClick={() => setShowFormDisp(false)} className="text-gray-400 hover:text-white"><X size={20} /></button>
+        {showFormDisp && medicoSeleccionado && (
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <motion.div initial={{ scale: 0.92, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.92, opacity: 0 }}
+              className="bg-slate-900 border border-yellow-500/30 rounded-2xl p-6 max-w-lg w-full">
+              <div className="flex items-center justify-between mb-5">
+                <div>
+                  <h3 className="text-lg font-bold text-yellow-400 flex items-center gap-2"><Plus size={18} /> Nueva Franja Horaria</h3>
+                  <p className="text-gray-500 text-xs mt-0.5">{medicoSeleccionado.nombre} {medicoSeleccionado.apellido}</p>
+                </div>
+                <button onClick={() => setShowFormDisp(false)} className="text-gray-400 hover:text-white p-1"><X size={20} /></button>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs text-gray-400 uppercase font-semibold mb-1 block">Día de la semana</label>
-                  <select value={newDisp.diaSemana} onChange={e => setNewDisp(p => ({ ...p, diaSemana: +e.target.value }))}
-                    className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm">
-                    {DIAS.map((d, i) => <option key={i} value={i}>{d}</option>)}
-                  </select>
+              <div className="space-y-4">
+                {/* Tipo de Consulta */}
+                {tiposConsulta.length > 0 && (
+                  <div>
+                    <label className="text-xs text-gray-400 uppercase font-semibold mb-1.5 block">Tipo de Consulta</label>
+                    <select
+                      value={newDisp.tipoConsultaId}
+                      onChange={e => {
+                        const t = tiposConsulta.find(x => x.id === e.target.value);
+                        setNewDisp(p => ({ ...p, tipoConsultaId: e.target.value, tipoConsultaNombre: t?.nombre || '', duracionSlot: t?.duracionMinutos || p.duracionSlot }));
+                      }}
+                      className="w-full bg-slate-800 border border-slate-600 rounded-xl px-3 py-2.5 text-white text-sm focus:border-yellow-500 focus:outline-none"
+                    >
+                      <option value="">— Selecciona tipo de consulta —</option>
+                      {tiposConsulta.map(t => (
+                        <option key={t.id} value={t.id}>{t.nombre} ({t.duracionMinutos}min)</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {/* Día y slot */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-gray-400 uppercase font-semibold mb-1.5 block">Día</label>
+                    <select value={newDisp.diaSemana} onChange={e => setNewDisp(p => ({ ...p, diaSemana: +e.target.value }))}
+                      className="w-full bg-slate-800 border border-slate-600 rounded-xl px-3 py-2.5 text-white text-sm focus:border-yellow-500 focus:outline-none">
+                      {DIAS.map((d, i) => <option key={i} value={i}>{d}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-400 uppercase font-semibold mb-1.5 block">Intervalo de turno</label>
+                    <select value={newDisp.duracionSlot} onChange={e => setNewDisp(p => ({ ...p, duracionSlot: +e.target.value }))}
+                      className="w-full bg-slate-800 border border-slate-600 rounded-xl px-3 py-2.5 text-white text-sm focus:border-yellow-500 focus:outline-none">
+                      {INTERVALOS.map(v => <option key={v} value={v}>{v} min</option>)}
+                    </select>
+                  </div>
                 </div>
-                <div>
-                  <label className="text-xs text-gray-400 uppercase font-semibold mb-1 block">Duración slot (min)</label>
-                  <select value={newDisp.duracionSlot} onChange={e => setNewDisp(p => ({ ...p, duracionSlot: +e.target.value }))}
-                    className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm">
-                    {[15, 20, 30, 45, 60, 90].map(v => <option key={v} value={v}>{v} min</option>)}
-                  </select>
+
+                {/* Hora inicio / fin */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-gray-400 uppercase font-semibold mb-1.5 block">Hora inicio</label>
+                    <input type="time" value={newDisp.horaInicio} onChange={e => setNewDisp(p => ({ ...p, horaInicio: e.target.value }))}
+                      className="w-full bg-slate-800 border border-slate-600 rounded-xl px-3 py-2.5 text-white text-sm focus:border-yellow-500 focus:outline-none" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-400 uppercase font-semibold mb-1.5 block">Hora fin</label>
+                    <input type="time" value={newDisp.horaFin} onChange={e => setNewDisp(p => ({ ...p, horaFin: e.target.value }))}
+                      className="w-full bg-slate-800 border border-slate-600 rounded-xl px-3 py-2.5 text-white text-sm focus:border-yellow-500 focus:outline-none" />
+                  </div>
                 </div>
-                <div>
-                  <label className="text-xs text-gray-400 uppercase font-semibold mb-1 block">Hora inicio</label>
-                  <input type="time" value={newDisp.horaInicio} onChange={e => setNewDisp(p => ({ ...p, horaInicio: e.target.value }))}
-                    className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm" />
+
+                {/* Preview turnos */}
+                <div className={`p-3 rounded-xl border text-sm flex items-center gap-3 ${
+                  turnosPreview > 0 ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' : 'bg-red-500/10 border-red-500/20 text-red-400'
+                }`}>
+                  <Clock size={16} />
+                  {turnosPreview > 0
+                    ? <><strong className="text-white">{turnosPreview} turnos</strong> de {newDisp.duracionSlot}min entre {newDisp.horaInicio} y {newDisp.horaFin}</>
+                    : 'La hora fin debe ser posterior al inicio'}
                 </div>
-                <div>
-                  <label className="text-xs text-gray-400 uppercase font-semibold mb-1 block">Hora fin</label>
-                  <input type="time" value={newDisp.horaFin} onChange={e => setNewDisp(p => ({ ...p, horaFin: e.target.value }))}
-                    className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm" />
-                </div>
-                <div>
-                  <label className="text-xs text-gray-400 uppercase font-semibold mb-1 block">Sede</label>
-                  <input type="text" value={newDisp.sede} onChange={e => setNewDisp(p => ({ ...p, sede: e.target.value }))}
-                    placeholder="Principal" className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm" />
-                </div>
-                <div>
-                  <label className="text-xs text-gray-400 uppercase font-semibold mb-1 block">Tipo Atención</label>
-                  <select value={newDisp.tipoAtencion} onChange={e => setNewDisp(p => ({ ...p, tipoAtencion: e.target.value }))}
-                    className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm">
-                    {TIPOS.map(t => <option key={t} value={t}>{t}</option>)}
-                  </select>
-                </div>
-                <div className="col-span-2">
-                  <label className="text-xs text-gray-400 uppercase font-semibold mb-1 block">Consultorio (opcional)</label>
-                  <input type="text" value={newDisp.consultorio} onChange={e => setNewDisp(p => ({ ...p, consultorio: e.target.value }))}
-                    placeholder="Ej: Consultorio 2" className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm" />
+
+                {/* Sede y consultorio */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-gray-400 uppercase font-semibold mb-1.5 block">Sede</label>
+                    <input type="text" value={newDisp.sede} onChange={e => setNewDisp(p => ({ ...p, sede: e.target.value }))}
+                      placeholder="Principal" className="w-full bg-slate-800 border border-slate-600 rounded-xl px-3 py-2.5 text-white text-sm placeholder-gray-600 focus:border-yellow-500 focus:outline-none" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-400 uppercase font-semibold mb-1.5 block">Consultorio</label>
+                    <input type="text" value={newDisp.consultorio} onChange={e => setNewDisp(p => ({ ...p, consultorio: e.target.value }))}
+                      placeholder="Ej: Consultorio 2" className="w-full bg-slate-800 border border-slate-600 rounded-xl px-3 py-2.5 text-white text-sm placeholder-gray-600 focus:border-yellow-500 focus:outline-none" />
+                  </div>
                 </div>
               </div>
 
-              <div className="flex gap-3 pt-2">
+              <div className="flex gap-3 mt-6">
                 <button onClick={() => setShowFormDisp(false)}
-                  className="flex-1 px-4 py-2 border border-slate-600 text-gray-300 rounded-lg hover:bg-slate-800 transition text-sm">
+                  className="flex-1 px-4 py-2.5 border border-slate-600 text-gray-300 rounded-xl hover:bg-slate-800 transition text-sm font-medium">
                   Cancelar
                 </button>
-                <button onClick={handleGuardarDisp}
-                  className="flex-1 px-4 py-2 bg-gradient-to-r from-yellow-500 to-amber-600 text-white rounded-lg font-semibold text-sm shadow-lg">
-                  <Check size={14} className="inline mr-1" /> Guardar
+                <button onClick={handleGuardarDisp} disabled={turnosPreview <= 0}
+                  className="flex-1 px-4 py-2.5 bg-gradient-to-r from-yellow-500 to-amber-600 text-white rounded-xl font-semibold text-sm shadow-lg disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                  <Check size={16} /> Guardar Agenda
                 </button>
               </div>
             </motion.div>
@@ -329,24 +588,24 @@ export default function ConfigAgendaPage() {
         )}
       </AnimatePresence>
 
-      {/* ── MODAL NUEVO BLOQUEO ──────────────────────────────────────── */}
+      {/* Modal: Nuevo Bloqueo */}
       <AnimatePresence>
-        {showFormBloqueo && (
+        {showFormBloqueo && medicoSeleccionado && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
             <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
               className="bg-slate-900 border border-orange-500/30 rounded-2xl p-6 max-w-md w-full space-y-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-xl font-bold text-orange-400 flex items-center gap-2">
-                  <Calendar size={20} /> Bloquear Período
-                </h3>
+                <h3 className="text-xl font-bold text-orange-400 flex items-center gap-2"><Calendar size={20} /> Bloquear Período</h3>
                 <button onClick={() => setShowFormBloqueo(false)} className="text-gray-400 hover:text-white"><X size={20} /></button>
               </div>
+              <p className="text-gray-500 text-xs -mt-2">{medicoSeleccionado.nombre} {medicoSeleccionado.apellido}</p>
 
               <div className="space-y-3">
                 <div>
                   <label className="text-xs text-gray-400 uppercase font-semibold mb-1 block">Motivo</label>
                   <input type="text" value={newBloqueo.motivo} onChange={e => setNewBloqueo(p => ({ ...p, motivo: e.target.value }))}
-                    placeholder="Vacaciones, festivo, capacitación..." className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm" />
+                    placeholder="Vacaciones, festivo, capacitación..."
+                    className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm" />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
@@ -379,3 +638,4 @@ export default function ConfigAgendaPage() {
     </div>
   );
 }
+
