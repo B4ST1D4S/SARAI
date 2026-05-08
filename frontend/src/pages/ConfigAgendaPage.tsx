@@ -40,6 +40,8 @@ interface Disponibilidad {
   tipoAtencion: string;
   consultorio: string;
   activo: boolean;
+  fechaDesde?: string | null;
+  fechaHasta?: string | null;
 }
 
 interface Bloqueo {
@@ -50,8 +52,11 @@ interface Bloqueo {
   todoElDia: boolean;
 }
 
+const today = () => new Date().toISOString().slice(0, 10);
+
 const EMPTY_DISP = {
   diaSemana: 1,
+  todaLaSemana: false,   // si true → crea Lun-Sáb
   horaInicio: '08:00',
   horaFin: '16:00',
   duracionSlot: 30,
@@ -59,6 +64,8 @@ const EMPTY_DISP = {
   tipoConsultaId: '',
   tipoConsultaNombre: '',
   consultorio: '',
+  fechaDesde: '',        // vigencia opcional
+  fechaHasta: '',
 };
 
 function calcularTurnos(horaInicio: string, horaFin: string, intervalo: number): number {
@@ -185,27 +192,47 @@ export default function ConfigAgendaPage() {
 
     const turnos = calcularTurnos(newDisp.horaInicio, newDisp.horaFin, newDisp.duracionSlot);
     if (turnos <= 0) { setError('El horario de fin debe ser posterior al de inicio'); return; }
+    if (newDisp.fechaHasta && newDisp.fechaDesde && newDisp.fechaHasta < newDisp.fechaDesde) {
+      setError('La fecha fin debe ser igual o posterior a la fecha inicio'); return;
+    }
+
+    const dias = newDisp.todaLaSemana ? [1, 2, 3, 4, 5, 6] : [newDisp.diaSemana];
+    const baseBody = {
+      medicoId: medicoSeleccionado.id,
+      horaInicio: newDisp.horaInicio,
+      horaFin: newDisp.horaFin,
+      duracionSlot: newDisp.duracionSlot,
+      sede: newDisp.sede || 'Principal',
+      tipoAtencion: newDisp.tipoConsultaNombre || 'CONSULTA',
+      consultorio: newDisp.consultorio,
+      fechaDesde: newDisp.fechaDesde || undefined,
+      fechaHasta: newDisp.fechaHasta || undefined,
+    };
 
     try {
       const token = getToken();
-      const body = {
-        medicoId: medicoSeleccionado.id,
-        diaSemana: newDisp.diaSemana,
-        horaInicio: newDisp.horaInicio,
-        horaFin: newDisp.horaFin,
-        duracionSlot: newDisp.duracionSlot,
-        sede: newDisp.sede || 'Principal',
-        tipoAtencion: newDisp.tipoConsultaNombre || 'CONSULTA',
-        consultorio: newDisp.consultorio,
-      };
-      const res = await fetch('/api/disponibilidad', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify(body),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Error al guardar');
-      setSuccess(`Agenda creada: ${turnos} turnos de ${newDisp.duracionSlot} min`);
+      const errors: string[] = [];
+
+      for (const dia of dias) {
+        const res = await fetch('/api/disponibilidad', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ ...baseBody, diaSemana: dia }),
+        });
+        const data = await res.json();
+        if (!res.ok) errors.push(`${DIAS[dia]}: ${data.error || 'error'}`);
+      }
+
+      if (errors.length > 0 && errors.length === dias.length) {
+        throw new Error(errors[0]);
+      }
+      const creados = dias.length - errors.length;
+      setSuccess(
+        newDisp.todaLaSemana
+          ? `Agenda creada para ${creados} día${creados !== 1 ? 's' : ''}: ${turnos} turnos de ${newDisp.duracionSlot}min`
+          : `Agenda creada: ${turnos} turnos de ${newDisp.duracionSlot}min`
+      );
+      if (errors.length > 0) setError(`Algunos días ya tenían horario: ${errors.join(', ')}`);
       setShowFormDisp(false);
       setNewDisp({ ...EMPTY_DISP });
       await recargar();
@@ -432,10 +459,18 @@ export default function ConfigAgendaPage() {
                                 <span className="px-2 py-0.5 bg-slate-700 text-gray-300 text-xs rounded-full">{d.duracionSlot}min/turno</span>
                                 <span className="px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs rounded-full">{turnos} turnos</span>
                               </div>
-                              <div className="flex items-center gap-3 mt-1">
+                              <div className="flex items-center gap-3 mt-1 flex-wrap">
                                 <span className="text-gray-500 text-xs flex items-center gap-1"><MapPin size={10} />{d.sede || 'Principal'}</span>
                                 {d.tipoAtencion && <span className="text-gray-500 text-xs flex items-center gap-1"><Stethoscope size={10} />{d.tipoAtencion}</span>}
                                 {d.consultorio && <span className="text-gray-500 text-xs">{d.consultorio}</span>}
+                                {(d.fechaDesde || d.fechaHasta) && (
+                                  <span className="text-yellow-400/70 text-xs flex items-center gap-1">
+                                    <Calendar size={9} />
+                                    {d.fechaDesde ? new Date(d.fechaDesde).toLocaleDateString('es-CO', { day: '2-digit', month: 'short' }) : '…'}
+                                    {' → '}
+                                    {d.fechaHasta ? new Date(d.fechaHasta).toLocaleDateString('es-CO', { day: '2-digit', month: 'short' }) : '…'}
+                                  </span>
+                                )}
                               </div>
                             </div>
                             <button onClick={() => handleEliminarDisp(d.id)}
@@ -516,16 +551,41 @@ export default function ConfigAgendaPage() {
                   </div>
                 )}
 
+                {/* Toggle toda la semana */}
+                <div className="flex items-center gap-3 p-3 bg-slate-800/60 border border-slate-600/50 rounded-xl">
+                  <button
+                    type="button"
+                    onClick={() => setNewDisp(p => ({ ...p, todaLaSemana: !p.todaLaSemana }))}
+                    className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${
+                      newDisp.todaLaSemana ? 'bg-yellow-500' : 'bg-slate-600'
+                    }`}
+                  >
+                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+                      newDisp.todaLaSemana ? 'translate-x-5' : 'translate-x-0'
+                    }`} />
+                  </button>
+                  <div>
+                    <p className="text-white text-sm font-medium">
+                      {newDisp.todaLaSemana ? 'Toda la semana (Lun–Sáb)' : 'Día específico'}
+                    </p>
+                    {newDisp.todaLaSemana && (
+                      <p className="text-gray-400 text-xs">Se crearán 6 franjas: Lunes a Sábado</p>
+                    )}
+                  </div>
+                </div>
+
                 {/* Día y slot */}
                 <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs text-gray-400 uppercase font-semibold mb-1.5 block">Día</label>
-                    <select value={newDisp.diaSemana} onChange={e => setNewDisp(p => ({ ...p, diaSemana: +e.target.value }))}
-                      className="w-full bg-slate-800 border border-slate-600 rounded-xl px-3 py-2.5 text-white text-sm focus:border-yellow-500 focus:outline-none">
-                      {DIAS.map((d, i) => <option key={i} value={i}>{d}</option>)}
-                    </select>
-                  </div>
-                  <div>
+                  {!newDisp.todaLaSemana && (
+                    <div>
+                      <label className="text-xs text-gray-400 uppercase font-semibold mb-1.5 block">Día</label>
+                      <select value={newDisp.diaSemana} onChange={e => setNewDisp(p => ({ ...p, diaSemana: +e.target.value }))}
+                        className="w-full bg-slate-800 border border-slate-600 rounded-xl px-3 py-2.5 text-white text-sm focus:border-yellow-500 focus:outline-none">
+                        {DIAS.map((d, i) => <option key={i} value={i}>{d}</option>)}
+                      </select>
+                    </div>
+                  )}
+                  <div className={newDisp.todaLaSemana ? 'col-span-2' : ''}>
                     <label className="text-xs text-gray-400 uppercase font-semibold mb-1.5 block">Intervalo de turno</label>
                     <select value={newDisp.duracionSlot} onChange={e => setNewDisp(p => ({ ...p, duracionSlot: +e.target.value }))}
                       className="w-full bg-slate-800 border border-slate-600 rounded-xl px-3 py-2.5 text-white text-sm focus:border-yellow-500 focus:outline-none">
@@ -570,6 +630,34 @@ export default function ConfigAgendaPage() {
                     <input type="text" value={newDisp.consultorio} onChange={e => setNewDisp(p => ({ ...p, consultorio: e.target.value }))}
                       placeholder="Ej: Consultorio 2" className="w-full bg-slate-800 border border-slate-600 rounded-xl px-3 py-2.5 text-white text-sm placeholder-gray-600 focus:border-yellow-500 focus:outline-none" />
                   </div>
+                </div>
+
+                {/* Vigencia (rango de fechas opcional) */}
+                <div className="border-t border-slate-700/50 pt-4">
+                  <label className="text-xs text-gray-400 uppercase font-semibold mb-2 block flex items-center gap-1.5">
+                    <Calendar size={11} /> Vigencia <span className="text-gray-600 normal-case font-normal">(opcional)</span>
+                  </label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs text-gray-500 mb-1 block">Desde</label>
+                      <input type="date" value={newDisp.fechaDesde}
+                        min={today()}
+                        onChange={e => setNewDisp(p => ({ ...p, fechaDesde: e.target.value }))}
+                        className="w-full bg-slate-800 border border-slate-600 rounded-xl px-3 py-2.5 text-white text-sm focus:border-yellow-500 focus:outline-none" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500 mb-1 block">Hasta</label>
+                      <input type="date" value={newDisp.fechaHasta}
+                        min={newDisp.fechaDesde || today()}
+                        onChange={e => setNewDisp(p => ({ ...p, fechaHasta: e.target.value }))}
+                        className="w-full bg-slate-800 border border-slate-600 rounded-xl px-3 py-2.5 text-white text-sm focus:border-yellow-500 focus:outline-none" />
+                    </div>
+                  </div>
+                  {newDisp.fechaDesde && newDisp.fechaHasta && (
+                    <p className="text-xs text-yellow-400/80 mt-1.5">
+                      Esta franja aplica del {new Date(newDisp.fechaDesde + 'T12:00:00').toLocaleDateString('es-CO', { day: 'numeric', month: 'long' })} al {new Date(newDisp.fechaHasta + 'T12:00:00').toLocaleDateString('es-CO', { day: 'numeric', month: 'long' })}
+                    </p>
+                  )}
                 </div>
               </div>
 

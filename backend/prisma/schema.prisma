@@ -514,10 +514,12 @@ model DisponibilidadMedico {
   sede         String?  @default("Principal")
   tipoAtencion String?  @default("CONSULTA")
   consultorio  String?
-  activo       Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  medico       User     @relation(fields: [medicoId], references: [id], onDelete: Cascade)
+  activo       Boolean   @default(true)
+  fechaDesde   DateTime?
+  fechaHasta   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  medico       User      @relation(fields: [medicoId], references: [id], onDelete: Cascade)
 
   @@index([medicoId])
   @@index([diaSemana])

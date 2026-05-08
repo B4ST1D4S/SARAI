@@ -13,6 +13,8 @@ export interface CreateDisponibilidadRequest {
   sede?: string;
   tipoAtencion?: string;
   consultorio?: string;
+  fechaDesde?: string;     // ISO date, vigencia desde
+  fechaHasta?: string;     // ISO date, vigencia hasta
 }
 
 export interface CreateBloqueRequest {
@@ -46,7 +48,14 @@ export async function createDisponibilidad(data: CreateDisponibilidadRequest) {
   if (existe) {
     throw new Error(`Ya existe disponibilidad en ese horario para el día ${data.diaSemana}`);
   }
-  return prisma.disponibilidadMedico.create({ data: { ...data, duracionSlot: data.duracionSlot ?? 60 } });
+  return prisma.disponibilidadMedico.create({
+    data: {
+      ...data,
+      duracionSlot: data.duracionSlot ?? 60,
+      fechaDesde: data.fechaDesde ? new Date(data.fechaDesde) : undefined,
+      fechaHasta: data.fechaHasta ? new Date(data.fechaHasta) : undefined,
+    },
+  });
 }
 
 export async function updateDisponibilidad(id: string, data: Partial<CreateDisponibilidadRequest>) {
