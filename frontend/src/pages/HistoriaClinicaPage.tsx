@@ -609,7 +609,7 @@ export default function HistoriaClinicaPage({
               <div className="p-6 max-w-4xl">
               <div id="hc-secciones" className="space-y-6">
 
-                {/* 1 */
+                {/* 1 */}
                 <SecCard id="motivo-consulta" num={1} title="Motivo de Consulta" emoji="💬" done={done['motivo-consulta']}>
                   <Ta label="Motivo / Queja Principal *" rows={3} value={form.motivoConsulta}
                     onChange={e => s('motivoConsulta', e.target.value)} required
@@ -852,7 +852,7 @@ export default function HistoriaClinicaPage({
 
               </div>{/* fin ordenes-secciones */}
               </div>
-            </div>{/* fin panel derecho */
+            </div>{/* fin panel derecho */}
 
           </div>{/* fin flex paneles */}
 

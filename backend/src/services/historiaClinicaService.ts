@@ -43,7 +43,7 @@ export async function createHistoriaClinica(data: CreateHistoriaClinicaRequest) 
           tratamientoRecomendado: data.tratamientoRecomendado,
           fotos: data.fotos || [],
           ...(data.datosExtendidos || {}),
-        },,
+        },
         version: 1,
         hashIntegridad: 'hash_' + Date.now(),
       },

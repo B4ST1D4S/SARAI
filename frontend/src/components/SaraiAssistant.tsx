@@ -158,18 +158,62 @@ export default function SaraiAssistant({ onCamposDetectados, token, contexto, on
     setEstado(e);
   }, []);
 
-  // ── Check Whisper health ──────────────────────────────────────────────────
+  // ── Check Whisper health con reintentos y timeout mejorado ────────────────
   useEffect(() => {
     const HEALTH_URL = WHISPER_URL.replace('/transcribir', '/health');
-    const check = () => {
-      fetch(HEALTH_URL, { signal: AbortSignal.timeout(4000) })
-        .then(r => r.ok ? setWhisperStatus('online') : setWhisperStatus('offline'))
-        .catch(() => setWhisperStatus('offline'));
+    const TIMEOUT_MS = 3000; // 3 segundos máximo
+    const RETRY_OFFLINE_MS = 8000; // reintentar cada 8s si offline
+    const RETRY_ONLINE_MS = 45000; // revisar cada 45s si online
+    
+    let abortController: AbortController | null = null;
+    let timeoutHandle: NodeJS.Timeout | null = null;
+    
+    const check = async () => {
+      try {
+        abortController = new AbortController();
+        timeoutHandle = setTimeout(() => abortController?.abort(), TIMEOUT_MS);
+        
+        const response = await fetch(HEALTH_URL, {
+          method: 'GET',
+          signal: abortController.signal,
+          cache: 'no-store', // evitar caché que pueda dar falsos positivos
+        });
+        
+        if (timeoutHandle) clearTimeout(timeoutHandle);
+        
+        if (response.ok) {
+          setWhisperStatus('online');
+          console.log('[SARAI] ✅ Whisper Online');
+        } else {
+          setWhisperStatus('offline');
+          console.warn(`[SARAI] ⚠️ Whisper Health Check: HTTP ${response.status}`);
+        }
+      } catch (err: any) {
+        if (timeoutHandle) clearTimeout(timeoutHandle);
+        
+        if (err.name === 'AbortError') {
+          console.warn('[SARAI] ⚠️ Whisper Health Check Timeout (3s)');
+        } else {
+          console.error('[SARAI] ⚠️ Whisper Health Check Error:', err.message);
+        }
+        setWhisperStatus('offline');
+      } finally {
+        abortController = null;
+        timeoutHandle = null;
+      }
     };
+    
+    // Ejecutar check inmediatamente
     check();
-    // Reintentar cada 8s si offline, cada 30s si online (reducir spam)
-    const interval = setInterval(check, whisperStatus === 'online' ? 30000 : 8000);
-    return () => clearInterval(interval);
+    
+    // Reintentar según el estado actual
+    const interval = setInterval(check, whisperStatus === 'online' ? RETRY_ONLINE_MS : RETRY_OFFLINE_MS);
+    
+    return () => {
+      clearInterval(interval);
+      if (abortController) abortController.abort();
+      if (timeoutHandle) clearTimeout(timeoutHandle);
+    };
   }, [whisperStatus]);
 
   // ── Barras animadas con nivel real de audio ───────────────────────────────
@@ -256,6 +300,24 @@ export default function SaraiAssistant({ onCamposDetectados, token, contexto, on
 
   // ── Iniciar grabación ─────────────────────────────────────────────────────
   const iniciarGrabacion = useCallback(async () => {
+    // ── Validación Pre-grabación ──────────────────────────────────────────────
+
+    // 1. Verificar que Whisper está online
+    if (whisperStatus !== 'online') {
+      setError(
+        whisperStatus === 'offline' 
+          ? '❌ Whisper no está disponible. Inicia el servicio: python whisper_service/main.py'
+          : '⏳ Whisper se está conectando... espera 3 segundos'
+      );
+      return;
+    }
+
+    // 2. Verificar que el navegador soporta getUserMedia
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setError('❌ Tu navegador no soporta grabación de audio. Usa Chrome, Edge o Firefox recientes.');
+      return;
+    }
+
     setError('');
     setResultado('');
     setTranscripcion('');
@@ -268,6 +330,12 @@ export default function SaraiAssistant({ onCamposDetectados, token, contexto, on
       try {
         const devices = await navigator.mediaDevices.enumerateDevices();
         const mics = devices.filter(d => d.kind === 'audioinput');
+        
+        if (mics.length === 0) {
+          setError('❌ No se detectó ningún micrófono en tu sistema. Conecta un micrófono e intenta de nuevo.');
+          return;
+        }
+
         const EXCLUIR = ['mezcla', 'stereo mix', 'what u hear', 'wave out', 'loopback'];
         const micReal = mics.find(d =>
           d.label && !EXCLUIR.some(ex => d.label.toLowerCase().includes(ex))
@@ -297,6 +365,54 @@ export default function SaraiAssistant({ onCamposDetectados, token, contexto, on
       // Log del dispositivo capturado para diagnóstico
       const track = stream.getAudioTracks()[0];
       console.log('[SARAI] Dispositivo de audio:', track?.label, track?.getSettings());
+      
+      // ── Validación de micrófono activo (pre-grabación) ────────────────────────
+      // Verificar que el micrófono está capturando audio antes de comenzar
+      const validarMicrofonoActivo = await new Promise<boolean>((resolve) => {
+        try {
+          const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+          const analyser = audioContext.createAnalyser();
+          const source = audioContext.createMediaStreamSource(stream);
+          source.connect(analyser);
+          analyser.fftSize = 256;
+          
+          let checkCount = 0;
+          const maxChecks = 10; // 1 segundo (100ms × 10)
+          let tieneAudio = false;
+          
+          const validateInterval = setInterval(() => {
+            const dataArray = new Uint8Array(analyser.frequencyBinCount);
+            analyser.getByteFrequencyData(dataArray);
+            const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
+            
+            if (average > 5) tieneAudio = true;
+            checkCount++;
+            
+            if (checkCount >= maxChecks) {
+              clearInterval(validateInterval);
+              audioContext.close().catch(() => {});
+              resolve(tieneAudio);
+            }
+          }, 100);
+        } catch (err) {
+          console.warn('[SARAI] Error validando micrófono:', err);
+          resolve(true); // permitir de todas formas si hay error
+        }
+      });
+      
+      if (!validarMicrofonoActivo) {
+        // Micrófono silenciado o desconectado
+        stream.getTracks().forEach(track => track.stop());
+        setError(
+          '⚠️ El micrófono no está capturando audio.\n\n' +
+          'Verifica en Windows:\n' +
+          '• Configuración → Sonido → Entrada\n' +
+          '• Asegúrate que el micrófono correcto está seleccionado\n' +
+          '• Sube el volumen del micrófono al 80-100%\n' +
+          '• Desactiva "mejoras de audio" en propiedades'
+        );
+        return;
+      }
 
       const mimeType =
         ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/ogg']
@@ -328,14 +444,14 @@ export default function SaraiAssistant({ onCamposDetectados, token, contexto, on
       }, 1000);
     } catch (err: any) {
       if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-        setError('Micrófono bloqueado. Haz clic en el candado de la URL → Micrófono → Permitir → recarga la página.');
+        setError('❌ Micrófono bloqueado. Haz clic en el candado de la URL → Micrófono → Permitir → recarga la página.');
       } else if (err.name === 'NotFoundError') {
-        setError('No se encontró micrófono. Conecta un micrófono e intenta de nuevo.');
+        setError('❌ No se encontró micrófono. Conecta un micrófono e intenta de nuevo.');
       } else {
-        setError(`Error de micrófono: ${err.message}`);
+        setError(`❌ Error de micrófono: ${err.message}`);
       }
     }
-  }, [setEst, iniciarVisualizador]);
+  }, [setEst, iniciarVisualizador, whisperStatus]);
 
   // ── Detener, enviar a Whisper, luego a Gemma ──────────────────────────────
   const detenerYAnalizar = useCallback(() => {
