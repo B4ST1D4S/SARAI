@@ -1,76 +1,165 @@
-﻿import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { createHistoriaClinica, getAllPacientes, getHistoriasMedico } from '../services/api';
+﻿/**
+ * HistoriaClinicaPage.tsx — v2
+ * Historia Clínica Completa · Resolución 1995/1999 · Colombia
+ * Diseño: EMR moderno, scroll continuo, diligenciamiento fluido
+ * Incluye: 12 secciones HC + 4 secciones Órdenes Médicas
+ */
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { motion } from 'framer-motion';
+import {
+  CheckCircle, Plus, Trash2, Save, Printer,
+} from 'lucide-react';
+import {
+  createHistoriaClinica, getAllPacientes, getHistoriasMedico, updateHistoriaClinica,
+} from '../services/api';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tipos
 // ─────────────────────────────────────────────────────────────────────────────
+interface ApodiagItem  { id: string; tipo: string; descripcion: string; urgente: boolean; }
+interface ProcQxItem   { id: string; codigoCups: string; nombre: string; prioridad: string; anestesia: string; observaciones: string; }
+interface MedItem      { id: string; nombre: string; dosis: string; frecuencia: string; duracion: string; via: string; observaciones: string; }
+interface IntercItem   { id: string; especialidad: string; prioridad: string; motivo: string; observaciones: string; }
+
 interface FormHC {
-  pacienteId: string;
-  tipoHistoria: string;
-  tipoConsulta: string;
-  // Anamnesis
-  quejaPrincipal: string;
-  historiaEnfermedad: string;
-  // Antecedentes (Res. 1995/1999)
-  antecedentesFamiliares: string;
-  antecedentesPersonales: string;
-  antecedentesQuirurgicos: string;
-  medicamentosActuales: string;
-  alergias: string;
-  habitosToxicos: string;
-  // Revision por sistemas
-  revisionSistemas: string;
-  // Examen fisico
-  examenFisico: string;
-  // Signos vitales
-  presionArterial: string;
-  frecuenciaCardiaca: string;
-  frecuenciaRespiratoria: string;
-  temperatura: string;
-  peso: string;
-  talla: string;
-  imc: string;
-  // Evaluacion estetica
-  procedimientoPropuesto: string;
-  zonasIntervencion: string;
-  observacionesAntropometricas: string;
-  // Diagnostico y plan
-  diagnostico: string;
-  tratamientoRecomendado: string;
-  planQuirurgico: string;
-  // Consentimiento y otros
-  riesgosInformados: string;
-  observaciones: string;
+  pacienteId: string; tipoConsulta: string; tipoHistoria: string;
+  // 2. Motivo
+  motivoConsulta: string; historiaEnfermedad: string;
+  // 3. Signos vitales
+  peso: string; talla: string; imc: string; temperatura: string;
+  frecuenciaCardiaca: string; frecuenciaRespiratoria: string;
+  taSistolica: string; taDiastolica: string; saturacionO2: string; glicemia: string;
+  // 4. Antecedentes personales
+  antPatologicos: string; antFarmacologicos: string; antQuirurgicos: string;
+  antAlergicos: string; antToxicos: string; antHospitalarios: string;
+  // 5. Antecedentes familiares
+  antFamHTA: boolean; antFamDiabetes: boolean; antFamCancer: boolean;
+  antFamCardiopatias: boolean; antFamOtros: string;
+  // 6. Gineco
+  fum: string; gestaciones: string; partos: string; cesareas: string;
+  abortos: string; planificacion: string; menopausia: boolean;
+  // 7. Evolución Cx
+  procedimientoRealizado: string; evolucionCx: string; complicacionesCx: string;
+  recomendacionesCx: string; evolucionPostop: string;
+  // 8. Finalidad (RIPS)
+  finalidadAtencion: string;
+  // 9. Origen
+  origenAtencion: string;
+  // 10. Diagnóstico
+  diagnosticoPrincipal: string; codigoCie10: string;
+  diagnosticosRelacionados: string; tipoDiagnostico: string;
+  // 11. Plan
+  conducta: string; incapacidadDias: string; procedimientosPlan: string; seguimiento: string;
+  // 12. Recomendaciones
+  recomendacionesMed: string;
+  // Órdenes
+  apoyosDiag: ApodiagItem[];
+  procedimientosQx: ProcQxItem[];
+  medicamentos: MedItem[];
+  interconsultas: IntercItem[];
 }
 
-const FORM_INICIAL: FormHC = {
-  pacienteId: '', tipoHistoria: 'ANAMNESIS', tipoConsulta: 'INICIAL',
-  quejaPrincipal: '', historiaEnfermedad: '',
-  antecedentesFamiliares: '', antecedentesPersonales: '', antecedentesQuirurgicos: '',
-  medicamentosActuales: '', alergias: '', habitosToxicos: '',
-  revisionSistemas: '', examenFisico: '',
-  presionArterial: '', frecuenciaCardiaca: '', frecuenciaRespiratoria: '',
-  temperatura: '', peso: '', talla: '', imc: '',
-  procedimientoPropuesto: '', zonasIntervencion: '', observacionesAntropometricas: '',
-  diagnostico: '', tratamientoRecomendado: '', planQuirurgico: '',
-  riesgosInformados: '', observaciones: '',
+const BLANK: FormHC = {
+  pacienteId: '', tipoConsulta: 'INICIAL', tipoHistoria: 'ANAMNESIS',
+  motivoConsulta: '', historiaEnfermedad: '',
+  peso: '', talla: '', imc: '', temperatura: '',
+  frecuenciaCardiaca: '', frecuenciaRespiratoria: '',
+  taSistolica: '', taDiastolica: '', saturacionO2: '', glicemia: '',
+  antPatologicos: '', antFarmacologicos: '', antQuirurgicos: '',
+  antAlergicos: '', antToxicos: '', antHospitalarios: '',
+  antFamHTA: false, antFamDiabetes: false, antFamCancer: false,
+  antFamCardiopatias: false, antFamOtros: '',
+  fum: '', gestaciones: '', partos: '', cesareas: '',
+  abortos: '', planificacion: '', menopausia: false,
+  procedimientoRealizado: '', evolucionCx: '', complicacionesCx: '',
+  recomendacionesCx: '', evolucionPostop: '',
+  finalidadAtencion: 'D',
+  origenAtencion: 'CE',
+  diagnosticoPrincipal: '', codigoCie10: '',
+  diagnosticosRelacionados: '', tipoDiagnostico: 'CONFIRMADO',
+  conducta: '', incapacidadDias: '', procedimientosPlan: '', seguimiento: '',
+  recomendacionesMed: '',
+  apoyosDiag: [], procedimientosQx: [], medicamentos: [], interconsultas: [],
 };
 
-const SECCIONES = ['Datos Generales', 'Anamnesis', 'Antecedentes', 'Examen Fisico', 'Evaluacion Estetica', 'Diagnostico y Plan'];
+// ─────────────────────────────────────────────────────────────────────────────
+// Secciones
+// ─────────────────────────────────────────────────────────────────────────────
+const SECCIONES_HC = [
+  { id: 'motivo-consulta', label: 'Motivo de Consulta',     num: 1  },
+  { id: 'signos-vitales',  label: 'Signos Vitales',         num: 2  },
+  { id: 'antec-pers',      label: 'Antec. Personales',      num: 3  },
+  { id: 'antec-fam',       label: 'Antec. Familiares',      num: 4  },
+  { id: 'antec-gineco',    label: 'Gineco Obstétrico',      num: 5  },
+  { id: 'evolucion-cx',    label: 'Evolución Cirugía',      num: 6  },
+  { id: 'finalidad',       label: 'Finalidad de Atención',  num: 7  },
+  { id: 'origen',          label: 'Origen de Atención',     num: 8  },
+  { id: 'diagnostico',     label: 'Impresión Diagnóstica',  num: 9  },
+  { id: 'plan',            label: 'Plan Terapéutico',       num: 10 },
+  { id: 'recomendaciones', label: 'Recomendaciones',        num: 11 },
+];
+const SECCIONES_OM = [
+  { id: 'apoyos-diag',   label: 'Apoyos Diagnósticos',    num: 12 },
+  { id: 'proc-qx',       label: 'Procedimientos Qx',      num: 13 },
+  { id: 'medicamentos',  label: 'Formulación Meds',       num: 14 },
+  { id: 'interconsulta', label: 'Interconsulta',          num: 15 },
+];
+const ALL_SECCIONES = [...SECCIONES_HC, ...SECCIONES_OM];
 
-const inputCls = 'w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-yellow-500/60 focus:bg-white/[0.07] transition-all resize-none';
-const labelCls = 'block text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1';
+// ─────────────────────────────────────────────────────────────────────────────
+// Mini-componentes reutilizables
+// ─────────────────────────────────────────────────────────────────────────────
+const ic = 'w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-yellow-500/60 focus:bg-white/[0.07] transition-all resize-none';
+const lc = 'block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1';
 
-function Campo({ label, children }: { label: string; children: React.ReactNode }) {
+const Lb  = ({ t }: { t: string }) => <label className={lc}>{t}</label>;
+const F   = ({ label, children }: { label: string; children: React.ReactNode }) => (
+  <div><Lb t={label} />{children}</div>
+);
+const Inp = ({ label, ...p }: { label: string } & React.InputHTMLAttributes<HTMLInputElement>) => (
+  <F label={label}><input {...p} className={`${ic} ${p.className || ''}`} /></F>
+);
+const Ta  = ({ label, rows = 3, ...p }: { label: string; rows?: number } & React.TextareaHTMLAttributes<HTMLTextAreaElement>) => (
+  <F label={label}><textarea rows={rows} {...p} className={`${ic} ${p.className || ''}`} /></F>
+);
+const Sel = ({ label, children, ...p }: { label: string } & React.SelectHTMLAttributes<HTMLSelectElement> & { children: React.ReactNode }) => (
+  <F label={label}><select {...p} className={ic}>{children}</select></F>
+);
+const Chk = ({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) => (
+  <label className="flex items-center gap-2 cursor-pointer py-1 group">
+    <div
+      onClick={() => onChange(!checked)}
+      className={`w-4 h-4 rounded border flex items-center justify-center transition-all cursor-pointer ${checked ? 'bg-yellow-500 border-yellow-500' : 'border-white/20 bg-white/5 group-hover:border-yellow-500/50'}`}
+    >
+      {checked && <span className="text-[8px] text-slate-900 font-bold">✓</span>}
+    </div>
+    <span className="text-xs text-gray-400 group-hover:text-gray-300 transition-colors select-none">{label}</span>
+  </label>
+);
+
+function SecCard({ id, num, title, emoji, done, children }: {
+  id: string; num: number; title: string; emoji: string;
+  done?: boolean; children: React.ReactNode;
+}) {
   return (
-    <div>
-      <label className={labelCls}>{label}</label>
-      {children}
+    <div id={id} className="bg-white/[0.02] border border-white/5 rounded-2xl overflow-hidden scroll-mt-6">
+      <div className="flex items-center gap-3 px-5 py-3.5 border-b border-white/5 bg-white/[0.015]">
+        <span className="text-base select-none">{emoji}</span>
+        <span className="w-5 h-5 rounded bg-yellow-500/15 flex items-center justify-center text-yellow-400 text-[9px] font-bold shrink-0">{num}</span>
+        <h3 className="text-sm font-bold text-white flex-1">{title}</h3>
+        {done && <CheckCircle size={14} className="text-emerald-400 shrink-0" />}
+      </div>
+      <div className="p-5 space-y-4">{children}</div>
     </div>
   );
 }
 
+function RowCard({ children }: { children: React.ReactNode }) {
+  return <div className="flex items-start gap-3 bg-white/[0.015] border border-white/5 rounded-xl p-3">{children}</div>;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Componente principal
 // ─────────────────────────────────────────────────────────────────────────────
 export default function HistoriaClinicaPage({
   onNavegar,
@@ -78,66 +167,151 @@ export default function HistoriaClinicaPage({
   onShowFormChange,
   seccionExterna,
   onSeccionChange,
+  onSeccionActivaChange,
   onRegisterCampos,
   pacienteIdExterno,
 }: {
   onNavegar?: (pagina: string) => void;
   showFormExternal?: boolean;
   onShowFormChange?: (v: boolean) => void;
-  seccionExterna?: number;
-  onSeccionChange?: (n: number) => void;
+  seccionExterna?: string;
+  onSeccionChange?: (id: string) => void;
+  onSeccionActivaChange?: (id: string) => void;
   onRegisterCampos?: (fn: ((c: Record<string, string>) => void) | null) => void;
   pacienteIdExterno?: string;
 } = {}) {
-  const [pacientes, setPacientes] = useState<any[]>([]);
-  const [historias, setHistorias] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-  // Estado inicializado desde props externas (SARAI global) para evitar parpadeo
-  const [showForm, setShowFormState] = useState(showFormExternal ?? false);
-  const [seccionActiva, setSeccionActivaState] = useState(seccionExterna ?? 0);
-  const [guardado, setGuardado] = useState(false);
-  const [form, setForm] = useState<FormHC>(FORM_INICIAL);
+  const [pacientes,  setPacientes]  = useState<any[]>([]);
+  const [historias,  setHistorias]  = useState<any[]>([]);
+  const [showForm,   setShowFormS]  = useState(showFormExternal ?? false);
+  const [secActiva,  setSecActiva]  = useState<string>('motivo-consulta');
+  const [form,       setForm]       = useState<FormHC>(BLANK);
+  const [guardado,   setGuardado]   = useState(false);
+  const [loading,    setLoading]    = useState(false);
+  const [autoMsg,    setAutoMsg]    = useState(false);
+  const [errMsg,     setErrMsg]     = useState('');
+  const [showPrintModal, setShowPrintModal] = useState(false);
+  const savedIdRef   = useRef<string | null>(null);
+  const autoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const token        = localStorage.getItem('accessToken') || '';
 
-  // Wrappers que sincronizan estado local ↔ App.tsx
-  const setShowForm = (v: boolean) => { setShowFormState(v); onShowFormChange?.(v); };
-  const setSeccionActiva = (n: number) => { setSeccionActivaState(n); onSeccionChange?.(n); };
-  const token = localStorage.getItem('accessToken') || '';
+  // Evitar unused-variable warnings
+  void onNavegar;
+  void onSeccionChange;
 
-  const set = (campo: keyof FormHC, valor: string) =>
-    setForm((prev) => ({ ...prev, [campo]: valor }));
+  const setShowForm = (v: boolean) => { setShowFormS(v); onShowFormChange?.(v); };
 
-  // IMC auto
+  // Notificar sección activa al padre (para contexto SARAI)
+  useEffect(() => { onSeccionActivaChange?.(secActiva); }, [secActiva]);
+
+  // Setter tipado
+  const s = <K extends keyof FormHC>(k: K, v: FormHC[K]) =>
+    setForm(p => ({ ...p, [k]: v }));
+
+  // IMC automático
   useEffect(() => {
-    const p = parseFloat(form.peso);
-    const t = parseFloat(form.talla) / 100;
-    if (p > 0 && t > 0) set('imc', (p / (t * t)).toFixed(1));
+    const p = parseFloat(form.peso), t = parseFloat(form.talla) / 100;
+    if (p > 0 && t > 0) s('imc', (p / (t * t)).toFixed(1));
   }, [form.peso, form.talla]);
 
+  // Cargar datos iniciales
   useEffect(() => {
-    getAllPacientes(1, 100, token).then((r) => {
+    getAllPacientes(1, 200, token).then(r => {
       if (r.data) setPacientes((r.data as any).pacientes || []);
     });
     cargarHistorias();
   }, []);
 
-  // Sincronizar showForm desde SARAI global (App.tsx)
+  // Sync desde props externas
+  useEffect(() => { if (showFormExternal !== undefined) setShowFormS(showFormExternal); }, [showFormExternal]);
   useEffect(() => {
-    if (showFormExternal !== undefined) setShowFormState(showFormExternal);
-  }, [showFormExternal]);
-
-  // Sincronizar sección activa desde SARAI global (App.tsx)
-  useEffect(() => {
-    if (seccionExterna !== undefined) setSeccionActivaState(seccionExterna);
-  }, [seccionExterna]);
-
-  // Cuando llega un paciente desde Agenda Profesional → pre-cargar y abrir formulario
-  useEffect(() => {
-    if (pacienteIdExterno) {
-      setForm((prev) => ({ ...prev, pacienteId: pacienteIdExterno }));
-      setShowForm(true);
-      setSeccionActiva(0);
+    if (seccionExterna) {
+      // Asegurar que el formulario esté abierto antes de intentar scroll
+      if (!showForm) {
+        setShowFormS(true);
+        onShowFormChange?.(true);
+      }
+      setTimeout(() => scrollTo(seccionExterna), 120);
     }
+  }, [seccionExterna]);
+  useEffect(() => {
+    if (pacienteIdExterno) { s('pacienteId', pacienteIdExterno); setShowForm(true); }
   }, [pacienteIdExterno]);
+
+  // Build payload
+  const buildPayload = useCallback(() => ({
+    pacienteId: form.pacienteId,
+    tipoHistoria: form.tipoHistoria,
+    tipoConsulta: form.tipoConsulta,
+    quejaPrincipal: form.motivoConsulta,
+    historiaEnfermedad: form.historiaEnfermedad,
+    observacionesAntropometricas: form.evolucionCx,
+    diagnostico: form.diagnosticoPrincipal,
+    tratamientoRecomendado: form.conducta,
+    datosExtendidos: {
+      signosVitales: {
+        peso: form.peso, talla: form.talla, imc: form.imc,
+        temperatura: form.temperatura, frecuenciaCardiaca: form.frecuenciaCardiaca,
+        frecuenciaRespiratoria: form.frecuenciaRespiratoria,
+        taSistolica: form.taSistolica, taDiastolica: form.taDiastolica,
+        saturacionO2: form.saturacionO2, glicemia: form.glicemia,
+      },
+      antecedentesPersonales: {
+        patologicos: form.antPatologicos, farmacologicos: form.antFarmacologicos,
+        quirurgicos: form.antQuirurgicos, alergicos: form.antAlergicos,
+        toxicos: form.antToxicos, hospitalarios: form.antHospitalarios,
+      },
+      antecedentesFamiliares: {
+        hta: form.antFamHTA, diabetes: form.antFamDiabetes,
+        cancer: form.antFamCancer, cardiopatias: form.antFamCardiopatias,
+        otros: form.antFamOtros,
+      },
+      antecedentesGineco: {
+        fum: form.fum, gestaciones: form.gestaciones, partos: form.partos,
+        cesareas: form.cesareas, abortos: form.abortos,
+        planificacion: form.planificacion, menopausia: form.menopausia,
+      },
+      evolucionCx: {
+        procedimientoRealizado: form.procedimientoRealizado,
+        evolucion: form.evolucionCx, complicaciones: form.complicacionesCx,
+        recomendaciones: form.recomendacionesCx, evolucionPostop: form.evolucionPostop,
+      },
+      finalidadAtencion: form.finalidadAtencion,
+      origenAtencion: form.origenAtencion,
+      diagnostico: {
+        principal: form.diagnosticoPrincipal, codigoCie10: form.codigoCie10,
+        relacionados: form.diagnosticosRelacionados, tipo: form.tipoDiagnostico,
+      },
+      planTerapeutico: {
+        conducta: form.conducta, incapacidadDias: form.incapacidadDias,
+        procedimientos: form.procedimientosPlan, seguimiento: form.seguimiento,
+      },
+      recomendaciones: form.recomendacionesMed,
+      ordenesMedicas: {
+        apoyosDiagnosticos: form.apoyosDiag,
+        procedimientosQx:   form.procedimientosQx,
+        medicamentos:       form.medicamentos,
+        interconsultas:     form.interconsultas,
+      },
+    },
+  }), [form]);
+
+  // Autoguardado con debounce 3s
+  useEffect(() => {
+    if (!form.pacienteId || !form.motivoConsulta) return;
+    if (autoTimerRef.current) clearTimeout(autoTimerRef.current);
+    autoTimerRef.current = setTimeout(async () => {
+      const payload = buildPayload();
+      let r: any;
+      if (savedIdRef.current) {
+        r = await updateHistoriaClinica(savedIdRef.current, payload, token);
+      } else {
+        r = await createHistoriaClinica(payload, token);
+        if (!r?.error && r?.data) savedIdRef.current = (r.data as any).id;
+      }
+      if (!r?.error) { setAutoMsg(true); setTimeout(() => setAutoMsg(false), 2000); }
+    }, 3000);
+    return () => { if (autoTimerRef.current) clearTimeout(autoTimerRef.current); };
+  }, [form, buildPayload]);
 
   const cargarHistorias = async () => {
     setLoading(true);
@@ -148,438 +322,615 @@ export default function HistoriaClinicaPage({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!form.pacienteId) {
+      setErrMsg('Seleccione un paciente antes de guardar');
+      setTimeout(() => setErrMsg(''), 3000);
+      // Scroll to top of form
+      document.getElementById('hc-scroll-panel')?.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    if (!form.motivoConsulta) {
+      setErrMsg('El motivo de consulta es obligatorio');
+      setTimeout(() => setErrMsg(''), 3000);
+      scrollTo('motivo-consulta');
+      return;
+    }
+    setErrMsg('');
     setLoading(true);
-    const payload = {
-      pacienteId: form.pacienteId,
-      tipoHistoria: form.tipoHistoria,
-      tipoConsulta: form.tipoConsulta,
-      quejaPrincipal: form.quejaPrincipal,
-      historiaEnfermedad: form.historiaEnfermedad,
-      observacionesAntropometricas: form.observacionesAntropometricas,
-      diagnostico: form.diagnostico,
-      tratamientoRecomendado: form.tratamientoRecomendado,
-      // Campos extendidos en JSON
-      datosExtendidos: {
-        antecedentesFamiliares: form.antecedentesFamiliares,
-        antecedentesPersonales: form.antecedentesPersonales,
-        antecedentesQuirurgicos: form.antecedentesQuirurgicos,
-        medicamentosActuales: form.medicamentosActuales,
-        alergias: form.alergias,
-        habitosToxicos: form.habitosToxicos,
-        revisionSistemas: form.revisionSistemas,
-        examenFisico: form.examenFisico,
-        signosVitales: {
-          presionArterial: form.presionArterial,
-          frecuenciaCardiaca: form.frecuenciaCardiaca,
-          frecuenciaRespiratoria: form.frecuenciaRespiratoria,
-          temperatura: form.temperatura,
-          peso: form.peso,
-          talla: form.talla,
-          imc: form.imc,
-        },
-        procedimientoPropuesto: form.procedimientoPropuesto,
-        zonasIntervencion: form.zonasIntervencion,
-        planQuirurgico: form.planQuirurgico,
-        riesgosInformados: form.riesgosInformados,
-        observaciones: form.observaciones,
-      },
-    };
-
-    const r = await createHistoriaClinica(payload, token);
-    if (!r.error) {
-      setGuardado(true);
-      setForm(FORM_INICIAL);
-      setSeccionActiva(0);
+    const payload = buildPayload();
+    let r: any;
+    if (savedIdRef.current) {
+      r = await updateHistoriaClinica(savedIdRef.current, payload, token);
+    } else {
+      r = await createHistoriaClinica(payload, token);
+    }
+    if (!r?.error) {
+      savedIdRef.current = null;
       cargarHistorias();
-      setTimeout(() => { setGuardado(false); setShowForm(false); }, 2500);
+      setShowPrintModal(true); // Modal de impresión maneja el cierre
     }
     setLoading(false);
   };
 
-  // SARAI completa campos automaticamente
-  const handleCamposSarai = (campos: Record<string, string>) => {
-    setForm((prev) => {
-      const nuevo = { ...prev };
-      const mapa: Record<string, keyof FormHC> = {
-        quejaPrincipal:          'quejaPrincipal',
+  // SARAI: mapeo de campos de voz a form
+  const handleCamposSarai = useCallback((campos: Record<string, string>) => {
+    setForm(prev => {
+      const n = { ...prev };
+      const mapa: Partial<Record<string, keyof FormHC>> = {
+        quejaPrincipal:          'motivoConsulta',
         historiaEnfermedad:      'historiaEnfermedad',
-        antecedentesFamiliares:  'antecedentesFamiliares',
-        antecedentesPersonales:  'antecedentesPersonales',
-        antecedentesQuirurgicos: 'antecedentesQuirurgicos',
-        antecedentesEsteticos:   'antecedentesQuirurgicos', // mapea al mismo campo por ahora
-        medicamentosActuales:    'medicamentosActuales',
-        alergias:                'alergias',
-        habitosToxicos:          'habitosToxicos',
-        revisionSistemas:        'revisionSistemas',
-        examenFisico:            'examenFisico',
-        presionArterial:         'presionArterial',
+        antecedentesFamiliares:  'antFamOtros',
+        antecedentesPersonales:  'antPatologicos',
+        antecedentesQuirurgicos: 'antQuirurgicos',
+        antecedentesEsteticos:   'antQuirurgicos',
+        medicamentosActuales:    'antFarmacologicos',
+        alergias:                'antAlergicos',
+        habitosToxicos:          'antToxicos',
+        examenFisico:            'historiaEnfermedad',
+        presionArterial:         'taSistolica',
         frecuenciaCardiaca:      'frecuenciaCardiaca',
         frecuenciaRespiratoria:  'frecuenciaRespiratoria',
         temperatura:             'temperatura',
         peso:                    'peso',
         talla:                   'talla',
-        diagnostico:             'diagnostico',
-        planTratamiento:         'tratamientoRecomendado',
-        procedimientoPropuesto:  'procedimientoPropuesto',
-        recomendaciones:         'observaciones',
-        observaciones:           'observaciones',
-        consentimientoExplicacion: 'observaciones', // mapea a observaciones hasta que exista campo propio
+        diagnostico:             'diagnosticoPrincipal',
+        planTratamiento:         'conducta',
+        procedimientoPropuesto:  'procedimientoRealizado',
+        recomendaciones:         'recomendacionesMed',
+        observaciones:           'recomendacionesMed',
+        consentimientoExplicacion: 'recomendacionesMed',
       };
       Object.entries(campos).forEach(([k, v]) => {
-        if (mapa[k] && v) (nuevo as any)[mapa[k]] = v;
+        if (mapa[k] && v) (n as any)[mapa[k]!] = v;
       });
-      // Signos vitales si vienen en objeto
-      if ((campos as any).signosVitales) {
-        const sv = (campos as any).signosVitales;
-        if (sv.presionArterial)       nuevo.presionArterial = sv.presionArterial;
-        if (sv.frecuenciaCardiaca)    nuevo.frecuenciaCardiaca = sv.frecuenciaCardiaca;
-        if (sv.frecuenciaRespiratoria) nuevo.frecuenciaRespiratoria = sv.frecuenciaRespiratoria;
-        if (sv.temperatura)           nuevo.temperatura = sv.temperatura;
-        if (sv.peso)                  nuevo.peso = sv.peso;
-        if (sv.talla)                 nuevo.talla = sv.talla;
+      const sv = (campos as any).signosVitales;
+      if (sv) {
+        if (sv.peso)                  n.peso = sv.peso;
+        if (sv.talla)                 n.talla = sv.talla;
+        if (sv.temperatura)           n.temperatura = sv.temperatura;
+        if (sv.frecuenciaCardiaca)    n.frecuenciaCardiaca = sv.frecuenciaCardiaca;
+        if (sv.frecuenciaRespiratoria) n.frecuenciaRespiratoria = sv.frecuenciaRespiratoria;
       }
-      return nuevo;
+      return n;
     });
-  };
+  }, []);
 
-  const progreso = SECCIONES.length;
-
-  // Registrar manejador de campos con SARAI global en App.tsx
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     onRegisterCampos?.(handleCamposSarai);
     return () => onRegisterCampos?.(null);
-  }, []);
-  const completadas = [
-    !!(form.pacienteId && form.tipoConsulta),
-    !!(form.quejaPrincipal && form.historiaEnfermedad),
-    !!(form.antecedentesPersonales || form.antecedentesFamiliares),
-    !!(form.examenFisico || form.presionArterial),
-    !!(form.procedimientoPropuesto || form.observacionesAntropometricas),
-    !!(form.diagnostico && form.tratamientoRecomendado),
-  ];
-  const porcentaje = Math.round((completadas.filter(Boolean).length / progreso) * 100);
+  }, [onRegisterCampos, handleCamposSarai]);
 
+  // Impresión separada por body-class
+  const printHC = () => {
+    const panel = document.getElementById('hc-scroll-panel');
+    const prev = panel?.style.cssText || '';
+    if (panel) { panel.style.overflow = 'visible'; panel.style.height = 'auto'; panel.style.maxHeight = 'none'; }
+    document.body.classList.add('print-hc');
+    window.print();
+    document.body.classList.remove('print-hc');
+    if (panel) { panel.style.cssText = prev; }
+  };
+  const printOrdenes = () => {
+    const panel = document.getElementById('hc-scroll-panel');
+    const prev = panel?.style.cssText || '';
+    if (panel) { panel.style.overflow = 'visible'; panel.style.height = 'auto'; panel.style.maxHeight = 'none'; }
+    document.body.classList.add('print-ordenes');
+    window.print();
+    document.body.classList.remove('print-ordenes');
+    if (panel) { panel.style.cssText = prev; }
+  };
+
+  const scrollTo = (id: string) => {
+    setSecActiva(id);
+    setTimeout(() => {
+      const panel = document.getElementById('hc-scroll-panel');
+      const el    = document.getElementById(id);
+      if (!panel || !el) return;
+      // Acumula offsetTop subiendo por offsetParent hasta llegar al panel
+      let offset = 0;
+      let node: HTMLElement | null = el;
+      while (node && node !== panel) {
+        offset += node.offsetTop;
+        node = node.offsetParent as HTMLElement | null;
+      }
+      panel.scrollTo({ top: offset - 12, behavior: 'smooth' });
+    }, 0);
+  };
+
+  const done: Record<string, boolean> = {
+    'motivo-consulta': !!form.motivoConsulta,
+    'signos-vitales':  !!(form.peso && form.talla),
+    'antec-pers':      !!(form.antPatologicos || form.antQuirurgicos),
+    'antec-fam':       !!(form.antFamOtros || form.antFamHTA || form.antFamDiabetes),
+    'antec-gineco':    !!form.fum,
+    'evolucion-cx':    !!(form.procedimientoRealizado || form.evolucionCx),
+    'finalidad':       !!form.finalidadAtencion,
+    'origen':          !!form.origenAtencion,
+    'diagnostico':     !!form.diagnosticoPrincipal,
+    'plan':            !!form.conducta,
+    'recomendaciones': !!form.recomendacionesMed,
+  };
+  const porcentaje = Math.round(
+    (Object.values(done).filter(Boolean).length / Object.keys(done).length) * 100
+  );
+
+  const uid = () => Math.random().toString(36).slice(2);
+  const today = new Date().toISOString().slice(0, 10);
+
+  // ─────────────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-[#080a0f] p-3 sm:p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* ── Header ── */}
-        <div className="flex items-center justify-between mb-5 sm:mb-8 gap-2">
-          <div className="min-w-0">
-            <h1 className="text-lg sm:text-2xl lg:text-3xl font-black text-white tracking-tight">
-              Historia <span className="bg-gradient-to-r from-yellow-400 to-amber-500 bg-clip-text text-transparent">Clinica</span>
-            </h1>
-            <p className="text-gray-600 text-[10px] sm:text-sm mt-0.5 truncate">{historias.length} registros</p>
-          </div>
+    <div className="h-screen overflow-hidden flex flex-col bg-[#080a0f]">
+
+      {/* ══ TOP BAR ══ */}
+      <div className="flex-shrink-0 flex items-center justify-between px-5 py-3 border-b border-white/[0.06] bg-white/[0.015]">
+        <div className="flex items-center gap-3">
+          <h1 className="text-lg font-black text-white tracking-tight">
+            Historia <span className="bg-gradient-to-r from-yellow-400 to-amber-500 bg-clip-text text-transparent">Clínica</span>
+          </h1>
+          {!showForm && <span className="text-[10px] text-gray-600 border border-white/10 rounded-full px-2 py-0.5">{historias.length} registros</span>}
+        </div>
+        <div className="flex items-center gap-2">
+
           <button
-            onClick={() => { setShowForm(!showForm); setSeccionActiva(0); }}
-            className={`px-5 py-2.5 rounded-xl font-bold text-sm transition-all ${
+            onClick={() => setShowForm(!showForm)}
+            className={`px-4 py-2 rounded-xl font-bold text-xs transition-all ${
               showForm
                 ? 'bg-white/5 border border-white/10 text-gray-400 hover:text-white'
                 : 'bg-gradient-to-r from-yellow-500 to-amber-600 text-slate-900 hover:from-yellow-400 hover:to-amber-500 shadow-lg shadow-yellow-500/20'
             }`}
           >
-            {showForm ? 'Cancelar' : '+ Nueva Historia'}
+            {showForm ? '✕ Cancelar' : '+ Nueva Historia'}
           </button>
         </div>
+      </div>
 
-        <AnimatePresence>
-          {showForm && (
-            <motion.div
-              initial={{ opacity: 0, y: -16 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -16 }}
-              className="mb-8"
-            >
-              <form onSubmit={handleSubmit}>
-                <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
-                  {/* ── Columna lateral: SARAI + navegacion ── */}
-                  <div className="xl:col-span-1 space-y-4">
+      {/* ══ MODO DASHBOARD (formulario) ══ */}
+      {showForm && (
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
 
-                    {/* Progreso */}
-                    <div className="bg-white/[0.03] border border-white/5 rounded-2xl p-4">
-                      <div className="flex items-center justify-between mb-3">
-                        <span className="text-xs text-gray-500 font-semibold uppercase tracking-wider">Completado</span>
-                        <span className="text-yellow-400 font-bold text-sm">{porcentaje}%</span>
-                      </div>
-                      <div className="w-full bg-white/5 rounded-full h-1.5 mb-4">
-                        <motion.div
-                          animate={{ width: `${porcentaje}%` }}
-                          className="h-full bg-gradient-to-r from-yellow-400 to-amber-500 rounded-full"
-                        />
-                      </div>
-                      <nav className="space-y-1">
-                        {SECCIONES.map((s, i) => (
-                          <button
-                            type="button"
-                            key={s}
-                            onClick={() => setSeccionActiva(i)}
-                            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs transition-all ${
-                              seccionActiva === i
-                                ? 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20'
-                                : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'
-                            }`}
-                          >
-                            <span className={`w-4 h-4 rounded-full border flex items-center justify-center text-[9px] font-bold flex-shrink-0 ${
-                              completadas[i]
-                                ? 'border-emerald-500 bg-emerald-500/20 text-emerald-400'
-                                : seccionActiva === i
-                                ? 'border-yellow-500 text-yellow-400'
-                                : 'border-white/20 text-gray-700'
-                            }`}>
-                              {completadas[i] ? '✓' : i + 1}
-                            </span>
-                            {s}
-                          </button>
-                        ))}
-                      </nav>
-                    </div>
+          {/* Barra de datos del paciente */}
+          <div className="flex-shrink-0 grid grid-cols-2 lg:grid-cols-4 gap-3 px-5 py-3 border-b border-white/[0.06] bg-white/[0.01]">
+            <F label="Paciente *">
+              <select value={form.pacienteId} onChange={e => s('pacienteId', e.target.value)} required className={ic}>
+                <option value="">Seleccionar paciente...</option>
+                {pacientes.map((p: any) => (
+                  <option key={p.id} value={p.id}>{p.nombreCompleto} — {p.numeroDocumento}</option>
+                ))}
+              </select>
+            </F>
+            <Sel label="Tipo de Consulta *" value={form.tipoConsulta} onChange={e => s('tipoConsulta', e.target.value)}>
+              <option value="INICIAL">Consulta Inicial</option>
+              <option value="SEGUIMIENTO">Seguimiento</option>
+              <option value="CONTROL">Control Post-Op</option>
+              <option value="URGENCIA">Urgencia</option>
+              <option value="VALORACION">Valoración Pre-Qx</option>
+            </Sel>
+            <Sel label="Tipo de Historia" value={form.tipoHistoria} onChange={e => s('tipoHistoria', e.target.value)}>
+              <option value="ANAMNESIS">Anamnesis</option>
+              <option value="EXAMEN_FISICO">Examen Físico</option>
+              <option value="DIAGNOSTICO">Diagnóstico</option>
+              <option value="PLAN">Plan Quirúrgico</option>
+              <option value="SEGUIMIENTO">Seguimiento Post-Op</option>
+              <option value="EVOLUCION">Evolución</option>
+            </Sel>
+            <div>
+              <label className={lc}>Fecha</label>
+              <input readOnly value={today} className={`${ic} opacity-50 cursor-not-allowed`} />
+            </div>
+          </div>
 
-                    {/* Acciones */}
-                    <div className="space-y-2">
-                      <button
-                        type="submit"
-                        disabled={loading || !form.pacienteId || !form.quejaPrincipal}
-                        className="w-full py-3 rounded-xl font-bold text-sm bg-gradient-to-r from-yellow-500 to-amber-600 text-slate-900 hover:from-yellow-400 hover:to-amber-500 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-lg shadow-yellow-500/20"
-                      >
-                        {loading ? 'Guardando...' : guardado ? '✓ Guardada' : 'Guardar Historia'}
-                      </button>
-                      {seccionActiva < SECCIONES.length - 1 && (
-                        <button
-                          type="button"
-                          onClick={() => setSeccionActiva(seccionActiva + 1)}
-                          className="w-full py-2.5 rounded-xl font-semibold text-sm bg-white/5 border border-white/10 text-gray-400 hover:text-white hover:bg-white/10 transition-all"
-                        >
-                          Siguiente seccion
-                        </button>
-                      )}
-                    </div>
-                  </div>
+          {/* ── Paneles: nav izquierda + formulario derecha ── */}
+          <div className="flex flex-1 overflow-hidden">
 
-                  {/* ── Columna principal: formulario ── */}
-                  <div className="xl:col-span-3 bg-white/[0.02] border border-white/5 rounded-2xl p-6">
-                    <h3 className="text-base font-bold text-white mb-5 flex items-center gap-2">
-                      <span className="w-6 h-6 rounded-lg bg-yellow-500/20 border border-yellow-500/30 flex items-center justify-center text-yellow-400 text-xs font-bold">
-                        {seccionActiva + 1}
-                      </span>
-                      {SECCIONES[seccionActiva]}
-                    </h3>
+            {/* ══ PANEL IZQUIERDO ══ */}
+            <div className="w-48 flex-shrink-0 flex flex-col border-r border-white/[0.08] bg-[#0b0d14]">
 
-                    <AnimatePresence mode="wait">
-                      <motion.div
-                        key={seccionActiva}
-                        initial={{ opacity: 0, x: 12 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, x: -12 }}
-                        transition={{ duration: 0.2 }}
-                        className="space-y-4"
-                      >
-                        {/* ── Seccion 0: Datos Generales ── */}
-                        {seccionActiva === 0 && (
-                          <>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              <Campo label="Paciente *">
-                                <select
-                                  value={form.pacienteId}
-                                  onChange={(e) => set('pacienteId', e.target.value)}
-                                  required
-                                  className={inputCls}
-                                >
-                                  <option value="">Seleccionar paciente...</option>
-                                  {pacientes.map((p: any) => (
-                                    <option key={p.id} value={p.id}>
-                                      {p.nombreCompleto} — {p.numeroDocumento}
-                                    </option>
-                                  ))}
-                                </select>
-                              </Campo>
-                              <Campo label="Tipo de Consulta *">
-                                <select value={form.tipoConsulta} onChange={(e) => set('tipoConsulta', e.target.value)} className={inputCls}>
-                                  <option value="INICIAL">Consulta Inicial</option>
-                                  <option value="SEGUIMIENTO">Seguimiento</option>
-                                  <option value="CONTROL">Control Post-Operatorio</option>
-                                  <option value="URGENCIA">Urgencia</option>
-                                  <option value="VALORACION">Valoracion Pre-Quirurgica</option>
-                                </select>
-                              </Campo>
-                            </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              <Campo label="Tipo de Historia">
-                                <select value={form.tipoHistoria} onChange={(e) => set('tipoHistoria', e.target.value)} className={inputCls}>
-                                  <option value="ANAMNESIS">Anamnesis</option>
-                                  <option value="EXAMEN_FISICO">Examen Fisico</option>
-                                  <option value="DIAGNOSTICO">Diagnostico</option>
-                                  <option value="PLAN">Plan Quirurgico</option>
-                                  <option value="SEGUIMIENTO">Seguimiento Post-Op</option>
-                                  <option value="EVOLUCION">Evolucion</option>
-                                </select>
-                              </Campo>
-                            </div>
-                          </>
-                        )}
-
-                        {/* ── Seccion 1: Anamnesis ── */}
-                        {seccionActiva === 1 && (
-                          <>
-                            <Campo label="Motivo de Consulta / Queja Principal *">
-                              <textarea rows={2} value={form.quejaPrincipal} onChange={(e) => set('quejaPrincipal', e.target.value)} required placeholder="Describa el motivo principal por el que consulta el paciente..." className={inputCls} />
-                            </Campo>
-                            <Campo label="Historia de la Enfermedad Actual">
-                              <textarea rows={5} value={form.historiaEnfermedad} onChange={(e) => set('historiaEnfermedad', e.target.value)} placeholder="Descripcion cronologica de la enfermedad o situacion actual, tiempo de evolucion, sintomas asociados..." className={inputCls} />
-                            </Campo>
-                          </>
-                        )}
-
-                        {/* ── Seccion 2: Antecedentes ── */}
-                        {seccionActiva === 2 && (
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <Campo label="Antecedentes Familiares">
-                              <textarea rows={3} value={form.antecedentesFamiliares} onChange={(e) => set('antecedentesFamiliares', e.target.value)} placeholder="Enfermedades hereditarias, familiares de primer grado..." className={inputCls} />
-                            </Campo>
-                            <Campo label="Antecedentes Personales Patologicos">
-                              <textarea rows={3} value={form.antecedentesPersonales} onChange={(e) => set('antecedentesPersonales', e.target.value)} placeholder="Enfermedades cronicas, hospitalizaciones previas..." className={inputCls} />
-                            </Campo>
-                            <Campo label="Antecedentes Quirurgicos">
-                              <textarea rows={3} value={form.antecedentesQuirurgicos} onChange={(e) => set('antecedentesQuirurgicos', e.target.value)} placeholder="Cirugias previas, fecha aproximada, complicaciones..." className={inputCls} />
-                            </Campo>
-                            <Campo label="Medicamentos Actuales">
-                              <textarea rows={3} value={form.medicamentosActuales} onChange={(e) => set('medicamentosActuales', e.target.value)} placeholder="Nombre del medicamento, dosis, frecuencia..." className={inputCls} />
-                            </Campo>
-                            <Campo label="Alergias Conocidas">
-                              <textarea rows={2} value={form.alergias} onChange={(e) => set('alergias', e.target.value)} placeholder="Alergias a medicamentos, alimentos, latex..." className={inputCls} />
-                            </Campo>
-                            <Campo label="Habitos Toxicos">
-                              <textarea rows={2} value={form.habitosToxicos} onChange={(e) => set('habitosToxicos', e.target.value)} placeholder="Tabaco, alcohol, sustancias psicoactivas..." className={inputCls} />
-                            </Campo>
-                            <div className="md:col-span-2">
-                              <Campo label="Revision por Sistemas">
-                                <textarea rows={4} value={form.revisionSistemas} onChange={(e) => set('revisionSistemas', e.target.value)} placeholder="Cardiovascular, respiratorio, digestivo, neurologico, endocrino, musculoesqueletico, dermato..." className={inputCls} />
-                              </Campo>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* ── Seccion 3: Examen Fisico ── */}
-                        {seccionActiva === 3 && (
-                          <>
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                              <Campo label="Presion Arterial (mmHg)">
-                                <input type="text" value={form.presionArterial} onChange={(e) => set('presionArterial', e.target.value)} placeholder="120/80" className={inputCls} />
-                              </Campo>
-                              <Campo label="Frec. Cardiaca (lpm)">
-                                <input type="number" value={form.frecuenciaCardiaca} onChange={(e) => set('frecuenciaCardiaca', e.target.value)} placeholder="72" className={inputCls} />
-                              </Campo>
-                              <Campo label="Frec. Respiratoria (rpm)">
-                                <input type="number" value={form.frecuenciaRespiratoria} onChange={(e) => set('frecuenciaRespiratoria', e.target.value)} placeholder="16" className={inputCls} />
-                              </Campo>
-                              <Campo label="Temperatura (C)">
-                                <input type="number" step="0.1" value={form.temperatura} onChange={(e) => set('temperatura', e.target.value)} placeholder="36.5" className={inputCls} />
-                              </Campo>
-                              <Campo label="Peso (kg)">
-                                <input type="number" step="0.1" value={form.peso} onChange={(e) => set('peso', e.target.value)} placeholder="65.0" className={inputCls} />
-                              </Campo>
-                              <Campo label="Talla (cm)">
-                                <input type="number" value={form.talla} onChange={(e) => set('talla', e.target.value)} placeholder="165" className={inputCls} />
-                              </Campo>
-                              <Campo label="IMC (auto)">
-                                <input readOnly value={form.imc} className={`${inputCls} opacity-60 cursor-not-allowed`} placeholder="---" />
-                              </Campo>
-                            </div>
-                            <Campo label="Examen Fisico Detallado">
-                              <textarea rows={6} value={form.examenFisico} onChange={(e) => set('examenFisico', e.target.value)} placeholder="Descripcion detallada del examen fisico por sistemas. Estado general, cabeza y cuello, torax, abdomen, extremidades, piel..." className={inputCls} />
-                            </Campo>
-                          </>
-                        )}
-
-                        {/* ── Seccion 4: Evaluacion Estetica ── */}
-                        {seccionActiva === 4 && (
-                          <>
-                            <Campo label="Procedimiento Estetico Propuesto">
-                              <input type="text" value={form.procedimientoPropuesto} onChange={(e) => set('procedimientoPropuesto', e.target.value)} placeholder="Ej: Rinoplastia abierta, Liposuccion abdominal..." className={inputCls} />
-                            </Campo>
-                            <Campo label="Zonas de Intervencion">
-                              <textarea rows={2} value={form.zonasIntervencion} onChange={(e) => set('zonasIntervencion', e.target.value)} placeholder="Descripcion anatomica de las zonas a intervenir..." className={inputCls} />
-                            </Campo>
-                            <Campo label="Observaciones Antropometricas y Esteticas">
-                              <textarea rows={5} value={form.observacionesAntropometricas} onChange={(e) => set('observacionesAntropometricas', e.target.value)} placeholder="Medidas, proporciones, asimetrias, ptosis, tono muscular, calidad de la piel, IMC relacion con procedimiento..." className={inputCls} />
-                            </Campo>
-                          </>
-                        )}
-
-                        {/* ── Seccion 5: Diagnostico y Plan ── */}
-                        {seccionActiva === 5 && (
-                          <>
-                            <Campo label="Diagnostico (Impresion Diagnostica) *">
-                              <textarea rows={3} value={form.diagnostico} onChange={(e) => set('diagnostico', e.target.value)} placeholder="Diagnostico principal y secundarios con codigo CIE-10 si aplica..." className={inputCls} />
-                            </Campo>
-                            <Campo label="Tratamiento y Conducta *">
-                              <textarea rows={3} value={form.tratamientoRecomendado} onChange={(e) => set('tratamientoRecomendado', e.target.value)} placeholder="Plan de manejo, medicamentos formulados, indicaciones..." className={inputCls} />
-                            </Campo>
-                            <Campo label="Plan Quirurgico">
-                              <textarea rows={3} value={form.planQuirurgico} onChange={(e) => set('planQuirurgico', e.target.value)} placeholder="Tecnica quirurgica, tipo de anestesia, duracion estimada, hospitalizacion..." className={inputCls} />
-                            </Campo>
-                            <Campo label="Riesgos Informados al Paciente">
-                              <textarea rows={3} value={form.riesgosInformados} onChange={(e) => set('riesgosInformados', e.target.value)} placeholder="Riesgos generales y especificos informados..." className={inputCls} />
-                            </Campo>
-                            <Campo label="Observaciones Adicionales">
-                              <textarea rows={2} value={form.observaciones} onChange={(e) => set('observaciones', e.target.value)} placeholder="Indicaciones para el paciente, proxima cita, examenes solicitados..." className={inputCls} />
-                            </Campo>
-                          </>
-                        )}
-                      </motion.div>
-                    </AnimatePresence>
-                  </div>
+              {/* barra de progreso */}
+              <div className="px-4 pt-4 pb-2">
+                <div className="flex justify-between items-center mb-1">
+                  <span className="text-[9px] text-gray-600 font-bold uppercase tracking-widest">Progreso</span>
+                  <span className="text-[10px] text-yellow-400 font-bold">{porcentaje}%</span>
                 </div>
-              </form>
-            </motion.div>
-          )}
-        </AnimatePresence>
+                <div className="w-full bg-white/5 rounded-full h-[3px]">
+                  <motion.div animate={{ width: `${porcentaje}%` }} transition={{ duration: 0.4 }}
+                    className="h-full bg-gradient-to-r from-yellow-400 to-amber-500 rounded-full" />
+                </div>
+              </div>
 
-        {/* ── Lista de historias ── */}
-        <div className="space-y-3">
-          <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wider">Historias Recientes</h2>
-          {loading && !showForm && (
-            <div className="text-center py-12 text-gray-700">Cargando...</div>
-          )}
-          {!loading && historias.length === 0 && (
-            <div className="text-center py-16 bg-white/[0.02] rounded-2xl border border-white/5">
-              <p className="text-gray-600 text-4xl mb-3">H</p>
-              <p className="text-gray-500 font-semibold">Sin historias clinicas</p>
-              <p className="text-gray-700 text-sm">Crea la primera con el boton de arriba o usa SARAI</p>
+              {/* nav secciones */}
+              <div className="flex-1 overflow-y-auto px-2 pb-4">
+                <p className="text-[9px] text-gray-600 font-bold uppercase tracking-widest px-2 pt-3 pb-1">Historia Clínica</p>
+                {SECCIONES_HC.map(sec => (
+                  <button key={sec.id} type="button" onClick={() => scrollTo(sec.id)}
+                    className={`w-full text-left px-3 py-2 text-xs rounded-md transition-all flex items-center gap-2 ${
+                      secActiva === sec.id
+                        ? 'bg-yellow-500/10 text-yellow-300 font-semibold border-l-2 border-yellow-400'
+                        : 'text-gray-500 hover:text-gray-200 hover:bg-white/[0.04] border-l-2 border-transparent'
+                    }`}>
+                    {done[sec.id]
+                      ? <CheckCircle size={10} className="text-emerald-400 shrink-0" />
+                      : <span className="text-[9px] text-gray-600 w-3 text-center shrink-0">{sec.num}</span>
+                    }
+                    {sec.label}
+                  </button>
+                ))}
+
+                <p className="text-[9px] text-blue-500/60 font-bold uppercase tracking-widest px-2 pt-4 pb-1">Órdenes Médicas</p>
+                {SECCIONES_OM.map(sec => (
+                  <button key={sec.id} type="button" onClick={() => scrollTo(sec.id)}
+                    className={`w-full text-left px-3 py-2 text-xs rounded-md transition-all flex items-center gap-2 ${
+                      secActiva === sec.id
+                        ? 'bg-blue-500/10 text-blue-300 font-semibold border-l-2 border-blue-400'
+                        : 'text-gray-500 hover:text-gray-200 hover:bg-white/[0.04] border-l-2 border-transparent'
+                    }`}>
+                    <span className="text-[9px] text-gray-600 w-3 text-center shrink-0">{sec.num}</span>
+                    {sec.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* guardar + imprimir fijo abajo */}
+              <div className="flex-shrink-0 p-3 border-t border-white/[0.06] space-y-2">
+                <button type="submit"
+                  disabled={loading}
+                  className="w-full py-2 rounded-lg font-bold text-xs bg-gradient-to-r from-yellow-500 to-amber-600 text-slate-900 hover:from-yellow-400 hover:to-amber-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-1.5">
+                  {loading
+                    ? <><span className="w-3 h-3 border-2 border-slate-900/30 border-t-slate-900 rounded-full animate-spin" /> Guardando…</>
+                    : guardado ? <><CheckCircle size={12} /> Guardada ✓</>
+                    : <><Save size={12} /> Guardar Historia</>}
+                </button>
+                <button
+                  type="button"
+                  onClick={printHC}
+                  className="w-full py-2 rounded-lg font-bold text-xs bg-yellow-500/10 border border-yellow-500/30 text-yellow-300 hover:bg-yellow-500/20 hover:border-yellow-400 transition-all flex items-center justify-center gap-1.5"
+                >
+                  <Printer size={12} /> Imprimir HC
+                </button>
+                <button
+                  type="button"
+                  onClick={printOrdenes}
+                  className="w-full py-2 rounded-lg font-bold text-xs bg-blue-500/10 border border-blue-500/30 text-blue-300 hover:bg-blue-500/20 hover:border-blue-400 transition-all flex items-center justify-center gap-1.5"
+                >
+                  <Printer size={12} /> Imprimir Órdenes
+                </button>
+                {autoMsg && (
+                  <p className="text-center text-[9px] text-emerald-400 flex items-center justify-center gap-1">
+                    <CheckCircle size={8} /> Autoguardado
+                  </p>
+                )}
+                {errMsg && (
+                  <p className="text-center text-[9px] text-red-400 leading-tight">{errMsg}</p>
+                )}
+              </div>
+            </div>
+
+            {/* ══ PANEL DERECHO: todas las secciones ══ */}
+            <div id="hc-scroll-panel" className="flex-1 overflow-y-auto bg-[#080a0f]">
+              <div className="p-6 max-w-4xl">
+              <div id="hc-secciones" className="space-y-6">
+
+                {/* 1 */}
+                <SecCard id="motivo-consulta" num={1} title="Motivo de Consulta" emoji="💬" done={done['motivo-consulta']}>
+                  <Ta label="Motivo / Queja Principal *" rows={3} value={form.motivoConsulta}
+                    onChange={e => s('motivoConsulta', e.target.value)} required
+                    placeholder="Describa el motivo principal por el que consulta el paciente..." />
+                  <Ta label="Historia de la Enfermedad Actual" rows={6} value={form.historiaEnfermedad}
+                    onChange={e => s('historiaEnfermedad', e.target.value)}
+                    placeholder="Descripción cronológica, tiempo de evolución, síntomas asociados, tratamientos previos..." />
+                </SecCard>
+
+                {/* 2 */}
+                <SecCard id="signos-vitales" num={2} title="Signos Vitales" emoji="❤️" done={done['signos-vitales']}>
+                  <div className="grid grid-cols-3 lg:grid-cols-5 gap-3">
+                    <Inp label="Peso (kg)" type="number" step="0.1" value={form.peso} onChange={e => s('peso', e.target.value)} placeholder="65.0" />
+                    <Inp label="Talla (cm)" type="number" value={form.talla} onChange={e => s('talla', e.target.value)} placeholder="165" />
+                    <div>
+                      <label className={lc}>IMC (auto)</label>
+                      <div className="flex items-center gap-1">
+                        <input readOnly value={form.imc} className={`${ic} opacity-60 cursor-not-allowed`} placeholder="---" />
+                        {form.imc && <span className={`text-[9px] font-bold px-1 py-0.5 rounded shrink-0 ${
+                          parseFloat(form.imc)<18.5?'bg-blue-500/20 text-blue-300':parseFloat(form.imc)<25?'bg-emerald-500/20 text-emerald-300':parseFloat(form.imc)<30?'bg-yellow-500/20 text-yellow-300':'bg-red-500/20 text-red-300'
+                        }`}>{parseFloat(form.imc)<18.5?'Bajo':parseFloat(form.imc)<25?'Normal':parseFloat(form.imc)<30?'Sobrepeso':'Obesidad'}</span>}
+                      </div>
+                    </div>
+                    <Inp label="Temp (°C)" type="number" step="0.1" value={form.temperatura} onChange={e => s('temperatura', e.target.value)} placeholder="36.5" />
+                    <Inp label="FC (lpm)" type="number" value={form.frecuenciaCardiaca} onChange={e => s('frecuenciaCardiaca', e.target.value)} placeholder="72" />
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <Inp label="FR (rpm)" type="number" value={form.frecuenciaRespiratoria} onChange={e => s('frecuenciaRespiratoria', e.target.value)} placeholder="16" />
+                    <Inp label="TA Sist. (mmHg)" type="number" value={form.taSistolica} onChange={e => s('taSistolica', e.target.value)} placeholder="120" />
+                    <Inp label="TA Diast. (mmHg)" type="number" value={form.taDiastolica} onChange={e => s('taDiastolica', e.target.value)} placeholder="80" />
+                    <Inp label="SatO₂ (%)" type="number" step="0.1" value={form.saturacionO2} onChange={e => s('saturacionO2', e.target.value)} placeholder="98" />
+                  </div>
+                  <div className="w-44"><Inp label="Glicemia (mg/dL)" type="number" value={form.glicemia} onChange={e => s('glicemia', e.target.value)} placeholder="90" /></div>
+                </SecCard>
+
+                {/* 3 */}
+                <SecCard id="antec-pers" num={3} title="Antecedentes Personales" emoji="📁" done={done['antec-pers']}>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <Ta label="Patológicos" rows={3} value={form.antPatologicos} onChange={e => s('antPatologicos', e.target.value)} placeholder="HTA, DM2, cardiopatías..." />
+                    <Ta label="Farmacológicos" rows={3} value={form.antFarmacologicos} onChange={e => s('antFarmacologicos', e.target.value)} placeholder="Medicamentos actuales, dosis..." />
+                    <Ta label="Quirúrgicos" rows={3} value={form.antQuirurgicos} onChange={e => s('antQuirurgicos', e.target.value)} placeholder="Cirugías previas, fecha, complicaciones..." />
+                    <Ta label="Alérgicos" rows={3} value={form.antAlergicos} onChange={e => s('antAlergicos', e.target.value)} placeholder="Medicamentos, alimentos, látex..." />
+                    <Ta label="Tóxicos" rows={2} value={form.antToxicos} onChange={e => s('antToxicos', e.target.value)} placeholder="Tabaco, alcohol, SPA..." />
+                    <Ta label="Hospitalarios" rows={2} value={form.antHospitalarios} onChange={e => s('antHospitalarios', e.target.value)} placeholder="Hospitalizaciones previas..." />
+                  </div>
+                </SecCard>
+
+                {/* 4 */}
+                <SecCard id="antec-fam" num={4} title="Antecedentes Familiares" emoji="👨‍👩‍👧" done={done['antec-fam']}>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-1">
+                    <Chk label="HTA"          checked={form.antFamHTA}         onChange={v => s('antFamHTA', v)} />
+                    <Chk label="Diabetes"     checked={form.antFamDiabetes}     onChange={v => s('antFamDiabetes', v)} />
+                    <Chk label="Cáncer"       checked={form.antFamCancer}       onChange={v => s('antFamCancer', v)} />
+                    <Chk label="Cardiopatías" checked={form.antFamCardiopatias} onChange={v => s('antFamCardiopatias', v)} />
+                  </div>
+                  <Ta label="Otros antecedentes familiares" rows={3} value={form.antFamOtros} onChange={e => s('antFamOtros', e.target.value)} placeholder="Enfermedades genéticas, mentales, otras..." />
+                </SecCard>
+
+                {/* 5 */}
+                <SecCard id="antec-gineco" num={5} title="Antecedentes Gineco Obstétricos" emoji="🌸" done={done['antec-gineco']}>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                    <Inp label="FUM" type="date" value={form.fum} onChange={e => s('fum', e.target.value)} />
+                    <Inp label="Gestaciones (G)" type="number" min="0" value={form.gestaciones} onChange={e => s('gestaciones', e.target.value)} placeholder="0" />
+                    <Inp label="Partos (P)" type="number" min="0" value={form.partos} onChange={e => s('partos', e.target.value)} placeholder="0" />
+                    <Inp label="Cesáreas (C)" type="number" min="0" value={form.cesareas} onChange={e => s('cesareas', e.target.value)} placeholder="0" />
+                    <Inp label="Abortos (A)" type="number" min="0" value={form.abortos} onChange={e => s('abortos', e.target.value)} placeholder="0" />
+                    <Inp label="Planificación" value={form.planificacion} onChange={e => s('planificacion', e.target.value)} placeholder="ACO, DIU, condón..." />
+                  </div>
+                  <Chk label="Menopausia" checked={form.menopausia} onChange={v => s('menopausia', v)} />
+                </SecCard>
+
+                {/* 6 */}
+                <SecCard id="evolucion-cx" num={6} title="Evolución Cirugía Plástica y Estética" emoji="✂️" done={done['evolucion-cx']}>
+                  <Inp label="Procedimiento Realizado" value={form.procedimientoRealizado} onChange={e => s('procedimientoRealizado', e.target.value)} placeholder="Ej: Rinoplastia abierta, liposucción abdominal..." />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <Ta label="Evolución" rows={3} value={form.evolucionCx} onChange={e => s('evolucionCx', e.target.value)} placeholder="Evolución postoperatoria..." />
+                    <Ta label="Complicaciones" rows={3} value={form.complicacionesCx} onChange={e => s('complicacionesCx', e.target.value)} placeholder="Complicaciones presentes o ausentes..." />
+                    <Ta label="Recomendaciones Quirúrgicas" rows={3} value={form.recomendacionesCx} onChange={e => s('recomendacionesCx', e.target.value)} placeholder="Cuidados del área intervenida..." />
+                    <Ta label="Evolución Postoperatoria" rows={3} value={form.evolucionPostop} onChange={e => s('evolucionPostop', e.target.value)} placeholder="Cicatrización, edema, resultado..." />
+                  </div>
+                </SecCard>
+
+                {/* 7 */}
+                <SecCard id="finalidad" num={7} title="Finalidad de Atención" emoji="🎯" done={done['finalidad']}>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
+                    {[{v:'P',l:'P — Promoción y Mantenimiento'},{v:'V',l:'V — Prevención'},{v:'D',l:'D — Diagnóstico'},{v:'T',l:'T — Tratamiento'},{v:'R',l:'R — Rehabilitación'},{v:'C',l:'C — Cuidado Paliativo'},{v:'E',l:'E — Educación'},{v:'I',l:'I — Investigación'}].map(({v,l}) => (
+                      <label key={v} className="flex items-center gap-2 cursor-pointer group py-1">
+                        <input type="radio" name="finalidad" value={v} checked={form.finalidadAtencion===v} onChange={() => s('finalidadAtencion',v)} className="accent-yellow-500" />
+                        <span className={`text-xs ${form.finalidadAtencion===v?'text-yellow-300 font-semibold':'text-gray-400 group-hover:text-gray-300'}`}>{l}</span>
+                      </label>
+                    ))}
+                  </div>
+                </SecCard>
+
+                {/* 8 */}
+                <SecCard id="origen" num={8} title="Origen de Atención" emoji="📍" done={done['origen']}>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {[{v:'CE',l:'Consulta Externa'},{v:'UR',l:'Urgencias'},{v:'HO',l:'Hospitalización'},{v:'RE',l:'Remisión'},{v:'PA',l:'Particular'},{v:'TM',l:'Telemedicina'}].map(({v,l}) => (
+                      <label key={v} className="flex items-center gap-2 cursor-pointer group py-1">
+                        <input type="radio" name="origen" value={v} checked={form.origenAtencion===v} onChange={() => s('origenAtencion',v)} className="accent-yellow-500" />
+                        <span className={`text-xs ${form.origenAtencion===v?'text-yellow-300 font-semibold':'text-gray-400 group-hover:text-gray-300'}`}>{l}</span>
+                      </label>
+                    ))}
+                  </div>
+                </SecCard>
+
+                {/* 9 */}
+                <SecCard id="diagnostico" num={9} title="Impresión Diagnóstica" emoji="🔬" done={done['diagnostico']}>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <Inp label="Diagnóstico Principal *" value={form.diagnosticoPrincipal} onChange={e => s('diagnosticoPrincipal', e.target.value)} required placeholder="Diagnóstico principal..." />
+                    <Inp label="Código CIE-10" value={form.codigoCie10} onChange={e => s('codigoCie10', e.target.value)} placeholder="Ej: Z41.1" />
+                  </div>
+                  <Ta label="Diagnósticos Relacionados" rows={2} value={form.diagnosticosRelacionados} onChange={e => s('diagnosticosRelacionados', e.target.value)} placeholder="Comorbilidades con CIE-10..." />
+                  <Sel label="Tipo de Diagnóstico" value={form.tipoDiagnostico} onChange={e => s('tipoDiagnostico', e.target.value)}>
+                    <option value="CONFIRMADO">Confirmado</option>
+                    <option value="PRESUNTIVO">Presuntivo / Sospecha</option>
+                    <option value="DESCARTADO">Descartado</option>
+                  </Sel>
+                </SecCard>
+
+                {/* 10 */}
+                <SecCard id="plan" num={10} title="Plan Terapéutico" emoji="📋" done={done['plan']}>
+                  <Ta label="Conducta / Manejo" rows={4} value={form.conducta} onChange={e => s('conducta', e.target.value)} placeholder="Plan de manejo, indicaciones terapéuticas..." />
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <Inp label="Incapacidad (días)" type="number" min="0" value={form.incapacidadDias} onChange={e => s('incapacidadDias', e.target.value)} placeholder="0" />
+                    <div className="sm:col-span-2">
+                      <Inp label="Procedimientos a Realizar" value={form.procedimientosPlan} onChange={e => s('procedimientosPlan', e.target.value)} placeholder="Código CUPS..." />
+                    </div>
+                  </div>
+                  <Ta label="Seguimiento" rows={2} value={form.seguimiento} onChange={e => s('seguimiento', e.target.value)} placeholder="Control en X días/semanas..." />
+                </SecCard>
+
+                {/* 11 */}
+                <SecCard id="recomendaciones" num={11} title="Recomendaciones Médicas" emoji="📝" done={done['recomendaciones']}>
+                  <Ta label="Recomendaciones al Paciente" rows={7} value={form.recomendacionesMed} onChange={e => s('recomendacionesMed', e.target.value)} placeholder="Indicaciones de cuidado, actividad física, señales de alarma..." />
+                </SecCard>
+
+              </div>{/* fin hc-secciones */}
+              <div id="ordenes-secciones" className="space-y-6 mt-6">
+
+                {/* 12 */}
+                <SecCard id="apoyos-diag" num={12} title="Solicitud Apoyos Diagnósticos" emoji="🧪" done={form.apoyosDiag.length > 0}>
+                  <div className="space-y-2">
+                    {form.apoyosDiag.map(item => (
+                      <RowCard key={item.id}>
+                        <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-2">
+                          <select value={item.tipo} onChange={e => s('apoyosDiag', form.apoyosDiag.map(x => x.id===item.id?{...x,tipo:e.target.value}:x))} className={ic}>
+                            <option value="LAB">Laboratorio</option>
+                            <option value="IMAGEN">Imagen Diagnóstica</option>
+                            <option value="ESPECIALIZADA">Ayuda Especializada</option>
+                          </select>
+                          <div className="sm:col-span-2">
+                            <input className={ic} value={item.descripcion} onChange={e => s('apoyosDiag', form.apoyosDiag.map(x => x.id===item.id?{...x,descripcion:e.target.value}:x))} placeholder="Descripción..." />
+                          </div>
+                        </div>
+                        <div className="flex flex-col items-center gap-1 shrink-0">
+                          <label className="flex items-center gap-1 text-[10px] text-gray-500 cursor-pointer">
+                            <input type="checkbox" className="accent-red-500" checked={item.urgente} onChange={e => s('apoyosDiag', form.apoyosDiag.map(x => x.id===item.id?{...x,urgente:e.target.checked}:x))} /> Urgente
+                          </label>
+                          <button type="button" onClick={() => s('apoyosDiag', form.apoyosDiag.filter(x => x.id!==item.id))} className="text-gray-600 hover:text-red-400"><Trash2 size={13} /></button>
+                        </div>
+                      </RowCard>
+                    ))}
+                    <button type="button" onClick={() => s('apoyosDiag', [...form.apoyosDiag, {id:uid(),tipo:'LAB',descripcion:'',urgente:false}])}
+                      className="flex items-center gap-2 text-xs text-blue-400 hover:text-blue-300 px-3 py-2 border border-dashed border-blue-500/30 rounded-xl w-full justify-center">
+                      <Plus size={12} /> Agregar apoyo diagnóstico
+                    </button>
+                  </div>
+                </SecCard>
+
+                {/* 13 */}
+                <SecCard id="proc-qx" num={13} title="Solicitud Procedimientos Quirúrgicos" emoji="🏥" done={form.procedimientosQx.length > 0}>
+                  <div className="space-y-2">
+                    {form.procedimientosQx.map(item => (
+                      <RowCard key={item.id}>
+                        <div className="flex-1 grid grid-cols-2 gap-2">
+                          <input className={ic} value={item.codigoCups} onChange={e => s('procedimientosQx', form.procedimientosQx.map(x => x.id===item.id?{...x,codigoCups:e.target.value}:x))} placeholder="Código CUPS" />
+                          <input className={ic} value={item.nombre} onChange={e => s('procedimientosQx', form.procedimientosQx.map(x => x.id===item.id?{...x,nombre:e.target.value}:x))} placeholder="Nombre procedimiento..." />
+                          <select value={item.prioridad} onChange={e => s('procedimientosQx', form.procedimientosQx.map(x => x.id===item.id?{...x,prioridad:e.target.value}:x))} className={ic}>
+                            <option value="ELECTIVA">Electiva</option><option value="PREFERENTE">Preferente</option><option value="URGENTE">Urgente</option>
+                          </select>
+                          <input className={ic} value={item.anestesia} onChange={e => s('procedimientosQx', form.procedimientosQx.map(x => x.id===item.id?{...x,anestesia:e.target.value}:x))} placeholder="Tipo anestesia..." />
+                          <div className="col-span-2"><input className={ic} value={item.observaciones} onChange={e => s('procedimientosQx', form.procedimientosQx.map(x => x.id===item.id?{...x,observaciones:e.target.value}:x))} placeholder="Observaciones..." /></div>
+                        </div>
+                        <button type="button" onClick={() => s('procedimientosQx', form.procedimientosQx.filter(x => x.id!==item.id))} className="text-gray-600 hover:text-red-400 shrink-0 mt-1"><Trash2 size={13} /></button>
+                      </RowCard>
+                    ))}
+                    <button type="button" onClick={() => s('procedimientosQx', [...form.procedimientosQx, {id:uid(),codigoCups:'',nombre:'',prioridad:'ELECTIVA',anestesia:'',observaciones:''}])}
+                      className="flex items-center gap-2 text-xs text-blue-400 hover:text-blue-300 px-3 py-2 border border-dashed border-blue-500/30 rounded-xl w-full justify-center">
+                      <Plus size={12} /> Agregar procedimiento
+                    </button>
+                  </div>
+                </SecCard>
+
+                {/* 14 */}
+                <SecCard id="medicamentos" num={14} title="Formulación Medicamentos" emoji="💊" done={form.medicamentos.length > 0}>
+                  <div className="space-y-2">
+                    {form.medicamentos.map(item => (
+                      <RowCard key={item.id}>
+                        <div className="flex-1 grid grid-cols-2 sm:grid-cols-3 gap-2">
+                          <div className="col-span-2 sm:col-span-3"><input className={ic} value={item.nombre} onChange={e => s('medicamentos', form.medicamentos.map(x => x.id===item.id?{...x,nombre:e.target.value}:x))} placeholder="Medicamento (nombre genérico)..." /></div>
+                          <input className={ic} value={item.dosis} onChange={e => s('medicamentos', form.medicamentos.map(x => x.id===item.id?{...x,dosis:e.target.value}:x))} placeholder="Dosis" />
+                          <input className={ic} value={item.frecuencia} onChange={e => s('medicamentos', form.medicamentos.map(x => x.id===item.id?{...x,frecuencia:e.target.value}:x))} placeholder="Frecuencia" />
+                          <input className={ic} value={item.duracion} onChange={e => s('medicamentos', form.medicamentos.map(x => x.id===item.id?{...x,duracion:e.target.value}:x))} placeholder="Duración" />
+                          <input className={ic} value={item.via} onChange={e => s('medicamentos', form.medicamentos.map(x => x.id===item.id?{...x,via:e.target.value}:x))} placeholder="Vía" />
+                          <div className="col-span-2"><input className={ic} value={item.observaciones} onChange={e => s('medicamentos', form.medicamentos.map(x => x.id===item.id?{...x,observaciones:e.target.value}:x))} placeholder="Observaciones..." /></div>
+                        </div>
+                        <button type="button" onClick={() => s('medicamentos', form.medicamentos.filter(x => x.id!==item.id))} className="text-gray-600 hover:text-red-400 shrink-0 mt-1"><Trash2 size={13} /></button>
+                      </RowCard>
+                    ))}
+                    <button type="button" onClick={() => s('medicamentos', [...form.medicamentos, {id:uid(),nombre:'',dosis:'',frecuencia:'',duracion:'',via:'',observaciones:''}])}
+                      className="flex items-center gap-2 text-xs text-blue-400 hover:text-blue-300 px-3 py-2 border border-dashed border-blue-500/30 rounded-xl w-full justify-center">
+                      <Plus size={12} /> Agregar medicamento
+                    </button>
+                  </div>
+                </SecCard>
+
+                {/* 15 */}
+                <SecCard id="interconsulta" num={15} title="Solicitud de Interconsulta" emoji="👨‍⚕️" done={form.interconsultas.length > 0}>
+                  <div className="space-y-2">
+                    {form.interconsultas.map(item => (
+                      <RowCard key={item.id}>
+                        <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <input className={ic} value={item.especialidad} onChange={e => s('interconsultas', form.interconsultas.map(x => x.id===item.id?{...x,especialidad:e.target.value}:x))} placeholder="Especialidad destino..." />
+                          <select value={item.prioridad} onChange={e => s('interconsultas', form.interconsultas.map(x => x.id===item.id?{...x,prioridad:e.target.value}:x))} className={ic}>
+                            <option value="URGENTE">Urgente</option><option value="PREFERENTE">Preferente</option><option value="PROGRAMADA">Programada</option>
+                          </select>
+                          <input className={ic} value={item.motivo} onChange={e => s('interconsultas', form.interconsultas.map(x => x.id===item.id?{...x,motivo:e.target.value}:x))} placeholder="Motivo..." />
+                          <input className={ic} value={item.observaciones} onChange={e => s('interconsultas', form.interconsultas.map(x => x.id===item.id?{...x,observaciones:e.target.value}:x))} placeholder="Observaciones..." />
+                        </div>
+                        <button type="button" onClick={() => s('interconsultas', form.interconsultas.filter(x => x.id!==item.id))} className="text-gray-600 hover:text-red-400 shrink-0 mt-1"><Trash2 size={13} /></button>
+                      </RowCard>
+                    ))}
+                    <button type="button" onClick={() => s('interconsultas', [...form.interconsultas, {id:uid(),especialidad:'',prioridad:'PROGRAMADA',motivo:'',observaciones:''}])}
+                      className="flex items-center gap-2 text-xs text-blue-400 hover:text-blue-300 px-3 py-2 border border-dashed border-blue-500/30 rounded-xl w-full justify-center">
+                      <Plus size={12} /> Agregar interconsulta
+                    </button>
+                  </div>
+                </SecCard>
+
+              </div>{/* fin ordenes-secciones */}
+              </div>
+            </div>{/* fin panel derecho */}
+
+          </div>{/* fin flex paneles */}
+
+          {/* ══ MODAL: opciones de impresión tras guardar ══ */}
+          {showPrintModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                className="bg-[#0d0f14] border border-white/10 rounded-3xl p-8 w-full max-w-sm shadow-2xl mx-4"
+              >
+                <div className="text-center mb-6">
+                  <div className="w-16 h-16 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto mb-4">
+                    <CheckCircle size={32} className="text-emerald-400" />
+                  </div>
+                  <h3 className="text-xl font-black text-white mb-1">Historia Guardada ✓</h3>
+                  <p className="text-gray-500 text-sm">¿Desea imprimir algún documento?</p>
+                </div>
+                <div className="space-y-3">
+                  <button
+                    type="button"
+                    onClick={() => { printHC(); setShowPrintModal(false); setForm(BLANK); setGuardado(false); setShowForm(false); }}
+                    className="w-full py-3 rounded-xl font-bold text-sm bg-gradient-to-r from-yellow-500 to-amber-600 text-slate-900 hover:from-yellow-400 hover:to-amber-500 flex items-center justify-center gap-2"
+                  >
+                    <Printer size={15} /> Imprimir Historia Clínica
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { printOrdenes(); setShowPrintModal(false); setForm(BLANK); setGuardado(false); setShowForm(false); }}
+                    className="w-full py-3 rounded-xl font-bold text-sm bg-blue-500/10 border border-blue-500/30 text-blue-300 hover:bg-blue-500/20 flex items-center justify-center gap-2"
+                  >
+                    <Printer size={15} /> Imprimir Órdenes Médicas
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setShowPrintModal(false); setForm(BLANK); setGuardado(false); setShowForm(false); }}
+                    className="w-full py-3 rounded-xl font-bold text-sm bg-white/5 border border-white/10 text-gray-400 hover:text-white flex items-center justify-center"
+                  >
+                    Cerrar sin imprimir
+                  </button>
+                </div>
+              </motion.div>
             </div>
           )}
-          {historias.map((h: any) => (
-            <motion.div
-              key={h.id}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="bg-white/[0.02] border border-white/5 rounded-xl px-5 py-4 flex items-center justify-between hover:border-yellow-500/20 hover:bg-white/[0.04] transition-all group"
-            >
-              <div className="flex items-center gap-4">
-                <div className="w-9 h-9 rounded-lg bg-yellow-500/10 border border-yellow-500/20 flex items-center justify-center text-yellow-400 text-xs font-bold flex-shrink-0">
-                  HC
+        </form>
+      )}{/* fin showForm */}
+
+      {/* ══ MODO LISTA ══ */}
+      {!showForm && (
+        <div className="flex-1 overflow-y-auto p-5">
+          <h2 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Historias Recientes</h2>
+          {loading && !historias.length && <div className="text-gray-600 text-sm py-4">Cargando...</div>}
+          {!loading && !historias.length && (
+            <div className="text-center py-12 text-gray-700">
+              <p className="text-4xl mb-2">📋</p>
+              <p className="text-sm">Sin historias clínicas registradas</p>
+            </div>
+          )}
+          <div className="space-y-2">
+            {historias.map((h: any) => (
+              <motion.div key={h.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+                className="bg-white/[0.02] border border-white/5 rounded-xl px-5 py-4 flex items-center justify-between hover:border-yellow-500/20 hover:bg-white/[0.04] transition-all">
+                <div className="flex items-center gap-4">
+                  <div className="w-9 h-9 rounded-lg bg-yellow-500/10 border border-yellow-500/20 flex items-center justify-center text-yellow-400 text-xs font-bold shrink-0">HC</div>
+                  <div>
+                    <p className="text-white font-semibold text-sm">{h.paciente?.nombreCompleto || 'Paciente'}</p>
+                    <p className="text-gray-600 text-xs">{h.tipoHistoria} · {(h.contenido as any)?.tipoConsulta || h.tipoConsulta} · {new Date(h.fechaCreacion || h.createdAt).toLocaleDateString('es-CO',{year:'numeric',month:'short',day:'numeric'})}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-white font-semibold text-sm">{h.paciente?.nombreCompleto || 'Paciente'}</p>
-                  <p className="text-gray-600 text-xs">{h.tipoHistoria} • {h.tipoConsulta || (h.contenido as any)?.tipoConsulta} • {new Date(h.createdAt).toLocaleDateString('es-CO', { year:'numeric', month:'short', day:'numeric' })}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold ${
-                  h.entregada
-                    ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
-                    : 'bg-yellow-500/10 border-yellow-500/20 text-yellow-400'
-                }`}>
-                  {h.entregada ? 'Entregada' : 'Pendiente'}
+                <span className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold ${h.entregadoEn?'bg-emerald-500/10 border-emerald-500/20 text-emerald-400':'bg-yellow-500/10 border-yellow-500/20 text-yellow-400'}`}>
+                  {h.entregadoEn ? 'Entregada' : 'Pendiente'}
                 </span>
-                <p className="text-gray-700 text-xs truncate max-w-48 hidden md:block">
-                  {(h.contenido as any)?.quejaPrincipal || ''}
-                </p>
-              </div>
-            </motion.div>
-          ))}
+              </motion.div>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
+
     </div>
   );
 }

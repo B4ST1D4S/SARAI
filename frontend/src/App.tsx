@@ -49,6 +49,13 @@ const NAV_SECTIONS = [
       { id: 'crm',            label: 'CRM',            sym: 'R' },
       { id: 'facturacion',    label: 'Facturacion',    sym: 'B' },
       { id: 'plantillas',     label: 'Plantillas',     sym: 'L' },
+      { id: 'impresion',      label: 'Central Impresión', sym: 'I' },
+    ],
+  },
+  {
+    label: 'ADMINISTRACIÓN',
+    items: [
+      { id: 'admin', label: 'Parametrización', sym: 'X' },
     ],
   },
   {
@@ -232,7 +239,8 @@ function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [historiaShowForm, setHistoriaShowForm] = useState(false);
-  const [historiaSeccion, setHistoriaSeccion] = useState(0);
+  const [historiaSeccion, setHistoriaSeccion] = useState<string>('motivo-consulta');
+  const [historiaSeccionActiva, setHistoriaSeccionActiva] = useState<string>('motivo-consulta');
   const [historiaPacienteId, setHistoriaPacienteId] = useState<string | undefined>(undefined);
   const camposHandlerRef = useRef<((c: Record<string, string>) => void) | null>(null);
   // Ref para currentPage — evita stale closure en callbacks de SARAI
@@ -323,6 +331,7 @@ function App() {
               onShowFormChange={setHistoriaShowForm}
               seccionExterna={historiaSeccion}
               onSeccionChange={setHistoriaSeccion}
+              onSeccionActivaChange={setHistoriaSeccionActiva}
               onRegisterCampos={(fn) => { camposHandlerRef.current = fn; }}
               pacienteIdExterno={historiaPacienteId}
             />
@@ -338,7 +347,7 @@ function App() {
               onAbrirHistoriaPaciente={(pacienteId, _nombre) => {
                 setHistoriaPacienteId(pacienteId);
                 setHistoriaShowForm(true);
-                setHistoriaSeccion(0);
+                setHistoriaSeccion('motivo-consulta');
                 setCurrentPage('historia');
               }}
             />
@@ -348,6 +357,7 @@ function App() {
           {currentPage === 'crm'                 && <CRMPage />}
           {currentPage === 'facturacion'         && <FacturacionPage />}
           {currentPage === 'plantillas'          && <PlantillasPage />}
+          {currentPage === 'impresion'           && <CentralImpresionPage />}
           {currentPage === 'mapa-corporal'       && <MapaCorporalPage />}
           {currentPage === 'body3d-test'         && <Body3DTestPage />}
           {currentPage === 'usuarios'            && <UsuariosPage />}
@@ -358,17 +368,25 @@ function App() {
       <SaraiAssistant
         onCamposDetectados={(campos) => camposHandlerRef.current?.(campos)}
         token={localStorage.getItem('accessToken') || ''}
-        contexto={currentPage === 'historia' ? 'Historia clinica' : undefined}
+        contexto={
+          currentPage === 'historia'
+            ? `Historia clinica - seccion activa: ${historiaSeccionActiva}`
+            : currentPage
+        }
         onNavegar={(pagina) => {
           setCurrentPage(pagina);
         }}
         onAbrirNuevaHistoria={() => {
           setHistoriaShowForm(true);
-          setHistoriaSeccion(0);
+          setHistoriaSeccion('motivo-consulta');
           setCurrentPage('historia');
         }}
-        onIrSeccion={(n) => {
-          if (currentPageRef.current === 'historia') setHistoriaSeccion(n);
+        onIrSeccion={(id) => {
+          if (currentPageRef.current !== 'historia') setCurrentPage('historia');
+          setHistoriaSeccion(id);
+        }}
+        onImprimir={() => {
+          window.print();
         }}
       />
     </div>

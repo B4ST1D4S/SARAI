@@ -12,27 +12,51 @@ interface SaraiAssistantProps {
   contexto?: string;
   onNavegar?: (pagina: string) => void;
   onAbrirNuevaHistoria?: () => void;   // abre el formulario de nueva HC
-  onIrSeccion?: (seccion: number) => void; // navega a sección dentro del form
+  onIrSeccion?: (id: string) => void;  // navega a sección HC por ID del DOM
+  onImprimir?: () => void;             // imprime la vista actual
 }
 
 // Mapa de comandos de voz → página
 // ⚠️ ORDEN IMPORTA: entradas más específicas (con más palabras) deben ir ANTES
 //    que las genéricas para evitar que 'agenda' capture 'agenda profesional'.
 const COMANDOS_NAV = [
-  { palabras: ['dashboard', 'inicio', 'panel principal', 'panel'],              pagina: 'dashboard',          label: 'Dashboard' },
-  { palabras: ['pacientes', 'lista pacientes'],                                  pagina: 'pacientes',          label: 'Pacientes' },
-  { palabras: ['historia clínica', 'historia clinica', 'historial', 'historia'], pagina: 'historia',           label: 'Historia Clínica' },
-  // Agenda Profesional ANTES de Agenda para evitar colisión con la palabra 'agenda'
-  { palabras: ['agenda profesional', 'agenda del médico', 'agenda del medico', 'agenda medico'], pagina: 'agendaProfesional', label: 'Agenda Profesional' },
-  { palabras: ['agenda paciente', 'agenda del paciente', 'agenda', 'citas'],    pagina: 'agenda',             label: 'Agenda' },
-  { palabras: ['quirófano', 'quirofano', 'cirujano', 'vista cirujano'],          pagina: 'vista-cirujano',     label: 'Quirófano' },
-  { palabras: ['seguimiento', 'follow up', 'followup'],                          pagina: 'followup',           label: 'Seguimiento' },
-  { palabras: ['consentimiento', 'consentimientos'],                             pagina: 'consentimiento',     label: 'Consentimiento' },
-  { palabras: ['crm', 'gestión', 'gestion'],                                    pagina: 'crm',                label: 'CRM' },
-  { palabras: ['facturación', 'facturacion', 'facturas', 'factura'],             pagina: 'facturacion',        label: 'Facturación' },
-  { palabras: ['plantillas', 'plantilla'],                                       pagina: 'plantillas',         label: 'Plantillas' },
-  { palabras: ['fotos', 'fotografías', 'fotografias'],                          pagina: 'fotos',              label: 'Fotos' },
-  { palabras: ['mapa corporal', 'mapa', 'cuerpo'],                              pagina: 'mapa-corporal',      label: 'Mapa Corporal' },
+  { palabras: ['dashboard', 'inicio', 'panel principal', 'panel'],                                             pagina: 'dashboard',          label: 'Dashboard' },
+  { palabras: ['pacientes', 'lista pacientes', 'lista de pacientes'],                                          pagina: 'pacientes',          label: 'Pacientes' },
+  { palabras: ['historia clínica', 'historia clinica', 'historial', 'historia'],                              pagina: 'historia',           label: 'Historia Clínica' },
+  // Agenda Profesional ANTES de Agenda para evitar colisión
+  { palabras: ['agenda profesional', 'agenda del médico', 'agenda del medico', 'agenda medico'],              pagina: 'agendaProfesional',  label: 'Agenda Profesional' },
+  { palabras: ['configurar agenda', 'config agenda', 'configuracion agenda', 'configuración agenda'],         pagina: 'config-agenda',      label: 'Config Agenda' },
+  { palabras: ['agenda paciente', 'agenda del paciente', 'agenda', 'citas'],                                  pagina: 'agenda',             label: 'Agenda Paciente' },
+  { palabras: ['admisión', 'admision', 'admitir'],                                                            pagina: 'admision',           label: 'Admisión' },
+  { palabras: ['quirófano', 'quirofano', 'cirujano', 'vista cirujano', 'sala de cirugía', 'sala cirugia'],   pagina: 'vista-cirujano',     label: 'Quirófano' },
+  { palabras: ['seguimiento', 'follow up', 'followup', 'control'],                                            pagina: 'followup',           label: 'Seguimiento' },
+  { palabras: ['consentimiento', 'consentimientos', 'consentimiento informado'],                              pagina: 'consentimiento',     label: 'Consentimiento' },
+  { palabras: ['crm', 'gestión de relaciones', 'gestion de relaciones'],                                     pagina: 'crm',                label: 'CRM' },
+  { palabras: ['facturación', 'facturacion', 'facturas', 'factura'],                                         pagina: 'facturacion',        label: 'Facturación' },
+  { palabras: ['plantillas', 'plantilla'],                                                                    pagina: 'plantillas',         label: 'Plantillas' },
+  { palabras: ['fotos', 'fotografías', 'fotografias', 'galería', 'galeria'],                                 pagina: 'fotos',              label: 'Fotos' },
+  { palabras: ['mapa corporal', 'mapa del cuerpo', 'mapa'],                                                   pagina: 'mapa-corporal',      label: 'Mapa Corporal' },
+  { palabras: ['admin', 'administración', 'administracion', 'parametrización', 'parametrizacion', 'sistema'], pagina: 'admin',              label: 'Administración' },
+];
+
+// Mapa de secciones de Historia Clínica → IDs del DOM
+// ⚠️ Palabras más específicas primero para evitar colisiones
+const SECCIONES_HC_VOZ: { palabras: string[]; id: string; label: string }[] = [
+  { palabras: ['motivo de consulta', 'motivo', 'queja principal', 'queja'],                            id: 'motivo-consulta', label: 'Motivo de Consulta'    },
+  { palabras: ['signos vitales', 'signos', 'vitales', 'presion arterial', 'frecuencia cardiaca'],      id: 'signos-vitales',  label: 'Signos Vitales'        },
+  { palabras: ['antecedentes personales', 'antecedentes personales'],                                  id: 'antec-pers',      label: 'Antec. Personales'     },
+  { palabras: ['antecedentes familiares', 'familiares', 'familia'],                                    id: 'antec-fam',       label: 'Antec. Familiares'     },
+  { palabras: ['gineco', 'ginecologico', 'ginecoobstetrico', 'obstetricia', 'fum', 'menstruacion'],    id: 'antec-gineco',    label: 'Gineco Obstétrico'     },
+  { palabras: ['evolucion cirugia', 'evolucion cirugia plastica', 'evolucion estetica', 'postoperatorio', 'postop'], id: 'evolucion-cx', label: 'Evolución Cirugía' },
+  { palabras: ['finalidad de atencion', 'finalidad'],                                                  id: 'finalidad',       label: 'Finalidad de Atención' },
+  { palabras: ['origen de atencion', 'origen'],                                                        id: 'origen',          label: 'Origen de Atención'    },
+  { palabras: ['diagnostico', 'impresion diagnostica', 'cie diez', 'cie10', 'diagnostico principal'],  id: 'diagnostico',     label: 'Diagnóstico'           },
+  { palabras: ['plan terapeutico', 'plan', 'conducta', 'tratamiento', 'manejo'],                       id: 'plan',            label: 'Plan Terapéutico'      },
+  { palabras: ['recomendaciones', 'recomendacion', 'indicaciones'],                                    id: 'recomendaciones', label: 'Recomendaciones'        },
+  { palabras: ['apoyos diagnosticos', 'laboratorio', 'laboratorios', 'examenes', 'imagen diagnostica'], id: 'apoyos-diag',    label: 'Apoyos Diagnósticos'   },
+  { palabras: ['procedimientos quirurgicos', 'procedimiento quirurgico', 'procedimiento qx'],          id: 'proc-qx',         label: 'Procedimientos Qx'     },
+  { palabras: ['medicamentos', 'formulacion', 'medicamento', 'medicina', 'farmaco'],                   id: 'medicamentos',    label: 'Formulación Meds'      },
+  { palabras: ['interconsulta', 'interconsultas', 'especialista', 'especialidad'],                     id: 'interconsulta',   label: 'Interconsulta'         },
 ];
 
 const PALABRAS_ACTIVACION = ['sarai', 'hey sarai', 'oye sarai', 'grabar', 'iniciar grabación', 'iniciar grabacion', 'escuchar'];
@@ -56,7 +80,7 @@ function fmt(s: number) {
 
 type Estado = 'esperando' | 'grabando' | 'transcribiendo' | 'procesando' | 'listo' | 'error';
 
-export default function SaraiAssistant({ onCamposDetectados, token, contexto, onNavegar, onAbrirNuevaHistoria, onIrSeccion }: SaraiAssistantProps) {
+export default function SaraiAssistant({ onCamposDetectados, token, contexto, onNavegar, onAbrirNuevaHistoria, onIrSeccion, onImprimir }: SaraiAssistantProps) {
   const [estado, setEstado]               = useState<Estado>('esperando');
   const [transcripcion, setTranscripcion] = useState('');
   const [resultado, setResultado]         = useState('');
@@ -134,18 +158,62 @@ export default function SaraiAssistant({ onCamposDetectados, token, contexto, on
     setEstado(e);
   }, []);
 
-  // ── Check Whisper health ──────────────────────────────────────────────────
+  // ── Check Whisper health con reintentos y timeout mejorado ────────────────
   useEffect(() => {
     const HEALTH_URL = WHISPER_URL.replace('/transcribir', '/health');
-    const check = () => {
-      fetch(HEALTH_URL, { signal: AbortSignal.timeout(4000) })
-        .then(r => r.ok ? setWhisperStatus('online') : setWhisperStatus('offline'))
-        .catch(() => setWhisperStatus('offline'));
+    const TIMEOUT_MS = 3000; // 3 segundos máximo
+    const RETRY_OFFLINE_MS = 8000; // reintentar cada 8s si offline
+    const RETRY_ONLINE_MS = 45000; // revisar cada 45s si online
+    
+    let abortController: AbortController | null = null;
+    let timeoutHandle: NodeJS.Timeout | null = null;
+    
+    const check = async () => {
+      try {
+        abortController = new AbortController();
+        timeoutHandle = setTimeout(() => abortController?.abort(), TIMEOUT_MS);
+        
+        const response = await fetch(HEALTH_URL, {
+          method: 'GET',
+          signal: abortController.signal,
+          cache: 'no-store', // evitar caché que pueda dar falsos positivos
+        });
+        
+        if (timeoutHandle) clearTimeout(timeoutHandle);
+        
+        if (response.ok) {
+          setWhisperStatus('online');
+          console.log('[SARAI] ✅ Whisper Online');
+        } else {
+          setWhisperStatus('offline');
+          console.warn(`[SARAI] ⚠️ Whisper Health Check: HTTP ${response.status}`);
+        }
+      } catch (err: any) {
+        if (timeoutHandle) clearTimeout(timeoutHandle);
+        
+        if (err.name === 'AbortError') {
+          console.warn('[SARAI] ⚠️ Whisper Health Check Timeout (3s)');
+        } else {
+          console.error('[SARAI] ⚠️ Whisper Health Check Error:', err.message);
+        }
+        setWhisperStatus('offline');
+      } finally {
+        abortController = null;
+        timeoutHandle = null;
+      }
     };
+    
+    // Ejecutar check inmediatamente
     check();
-    // Reintentar cada 8s si offline, cada 30s si online (reducir spam)
-    const interval = setInterval(check, whisperStatus === 'online' ? 30000 : 8000);
-    return () => clearInterval(interval);
+    
+    // Reintentar según el estado actual
+    const interval = setInterval(check, whisperStatus === 'online' ? RETRY_ONLINE_MS : RETRY_OFFLINE_MS);
+    
+    return () => {
+      clearInterval(interval);
+      if (abortController) abortController.abort();
+      if (timeoutHandle) clearTimeout(timeoutHandle);
+    };
   }, [whisperStatus]);
 
   // ── Barras animadas con nivel real de audio ───────────────────────────────
@@ -232,6 +300,24 @@ export default function SaraiAssistant({ onCamposDetectados, token, contexto, on
 
   // ── Iniciar grabación ─────────────────────────────────────────────────────
   const iniciarGrabacion = useCallback(async () => {
+    // ── Validación Pre-grabación ──────────────────────────────────────────────
+
+    // 1. Verificar que Whisper está online
+    if (whisperStatus !== 'online') {
+      setError(
+        whisperStatus === 'offline' 
+          ? '❌ Whisper no está disponible. Inicia el servicio: python whisper_service/main.py'
+          : '⏳ Whisper se está conectando... espera 3 segundos'
+      );
+      return;
+    }
+
+    // 2. Verificar que el navegador soporta getUserMedia
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setError('❌ Tu navegador no soporta grabación de audio. Usa Chrome, Edge o Firefox recientes.');
+      return;
+    }
+
     setError('');
     setResultado('');
     setTranscripcion('');
@@ -244,6 +330,12 @@ export default function SaraiAssistant({ onCamposDetectados, token, contexto, on
       try {
         const devices = await navigator.mediaDevices.enumerateDevices();
         const mics = devices.filter(d => d.kind === 'audioinput');
+        
+        if (mics.length === 0) {
+          setError('❌ No se detectó ningún micrófono en tu sistema. Conecta un micrófono e intenta de nuevo.');
+          return;
+        }
+
         const EXCLUIR = ['mezcla', 'stereo mix', 'what u hear', 'wave out', 'loopback'];
         const micReal = mics.find(d =>
           d.label && !EXCLUIR.some(ex => d.label.toLowerCase().includes(ex))
@@ -273,6 +365,54 @@ export default function SaraiAssistant({ onCamposDetectados, token, contexto, on
       // Log del dispositivo capturado para diagnóstico
       const track = stream.getAudioTracks()[0];
       console.log('[SARAI] Dispositivo de audio:', track?.label, track?.getSettings());
+      
+      // ── Validación de micrófono activo (pre-grabación) ────────────────────────
+      // Verificar que el micrófono está capturando audio antes de comenzar
+      const validarMicrofonoActivo = await new Promise<boolean>((resolve) => {
+        try {
+          const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+          const analyser = audioContext.createAnalyser();
+          const source = audioContext.createMediaStreamSource(stream);
+          source.connect(analyser);
+          analyser.fftSize = 256;
+          
+          let checkCount = 0;
+          const maxChecks = 10; // 1 segundo (100ms × 10)
+          let tieneAudio = false;
+          
+          const validateInterval = setInterval(() => {
+            const dataArray = new Uint8Array(analyser.frequencyBinCount);
+            analyser.getByteFrequencyData(dataArray);
+            const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
+            
+            if (average > 5) tieneAudio = true;
+            checkCount++;
+            
+            if (checkCount >= maxChecks) {
+              clearInterval(validateInterval);
+              audioContext.close().catch(() => {});
+              resolve(tieneAudio);
+            }
+          }, 100);
+        } catch (err) {
+          console.warn('[SARAI] Error validando micrófono:', err);
+          resolve(true); // permitir de todas formas si hay error
+        }
+      });
+      
+      if (!validarMicrofonoActivo) {
+        // Micrófono silenciado o desconectado
+        stream.getTracks().forEach(track => track.stop());
+        setError(
+          '⚠️ El micrófono no está capturando audio.\n\n' +
+          'Verifica en Windows:\n' +
+          '• Configuración → Sonido → Entrada\n' +
+          '• Asegúrate que el micrófono correcto está seleccionado\n' +
+          '• Sube el volumen del micrófono al 80-100%\n' +
+          '• Desactiva "mejoras de audio" en propiedades'
+        );
+        return;
+      }
 
       const mimeType =
         ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/ogg']
@@ -304,14 +444,14 @@ export default function SaraiAssistant({ onCamposDetectados, token, contexto, on
       }, 1000);
     } catch (err: any) {
       if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-        setError('Micrófono bloqueado. Haz clic en el candado de la URL → Micrófono → Permitir → recarga la página.');
+        setError('❌ Micrófono bloqueado. Haz clic en el candado de la URL → Micrófono → Permitir → recarga la página.');
       } else if (err.name === 'NotFoundError') {
-        setError('No se encontró micrófono. Conecta un micrófono e intenta de nuevo.');
+        setError('❌ No se encontró micrófono. Conecta un micrófono e intenta de nuevo.');
       } else {
-        setError(`Error de micrófono: ${err.message}`);
+        setError(`❌ Error de micrófono: ${err.message}`);
       }
     }
-  }, [setEst, iniciarVisualizador]);
+  }, [setEst, iniciarVisualizador, whisperStatus]);
 
   // ── Detener, enviar a Whisper, luego a Gemma ──────────────────────────────
   const detenerYAnalizar = useCallback(() => {
@@ -546,21 +686,19 @@ export default function SaraiAssistant({ onCamposDetectados, token, contexto, on
         }
       }
 
-      // ── PASO 7: Secciones del formulario de Historia Clínica ──────────────
-      // Solo palabras muy específicas — sin ambigüedad con módulos
-      const SECCIONES_VOZ = [
-        { palabras: ['datos generales'],                                      idx: 0 },
-        { palabras: ['anamnesis', 'motivo de consulta', 'queja principal'],   idx: 1 },
-        { palabras: ['antecedentes'],                                         idx: 2 },
-        { palabras: ['examen fisico', 'signos vitales'],                      idx: 3 },
-        { palabras: ['evaluacion estetica', 'procedimiento estetico'],        idx: 4 },
-        { palabras: ['diagnostico y plan', 'plan quirurgico'],                idx: 5 },
-      ];
-      const NOMBRES_SEC = ['Datos Generales', 'Anamnesis', 'Antecedentes', 'Examen Físico', 'Evaluación Estética', 'Diagnóstico y Plan'];
-      for (const s of SECCIONES_VOZ) {
-        if (s.palabras.some(p => navCmd.includes(normalizarTexto(p)))) {
-          setUltimoComando(`→ Sección: ${NOMBRES_SEC[s.idx]}`);
-          onIrSeccion?.(s.idx);
+      // ── PASO 7: Imprimir ──────────────────────────────────────────────────
+      if (['imprimir', 'imprime', 'print', 'imprimir historia', 'imprimir ordenes'].some(p => navCmd.includes(p))) {
+        setUltimoComando('🖨 Imprimiendo...');
+        onImprimir?.();
+        setTimeout(() => setUltimoComando(''), 3000);
+        return;
+      }
+
+      // ── PASO 8: Secciones del formulario de Historia Clínica ──────────────
+      for (const sec of SECCIONES_HC_VOZ) {
+        if (sec.palabras.some(p => navCmd.includes(normalizarTexto(p)))) {
+          setUltimoComando(`→ HC: ${sec.label}`);
+          onIrSeccion?.(sec.id);
           setTimeout(() => setUltimoComando(''), 3000);
           return;
         }
