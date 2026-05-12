@@ -3,6 +3,14 @@ node_modules/
 /.pnp
 .pnp.js
 
+# Python virtual environments
+.venv/
+venv/
+env/
+__pycache__/
+*.pyc
+*.pyo
+
 # Testing
 /coverage
 

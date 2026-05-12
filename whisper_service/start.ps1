@@ -16,6 +16,11 @@ if (-not (Test-Path $pythonExe)) {
     }
 }
 
+# Limpiar variables SSL conflictivas de XAMPP
+$env:REQUESTS_CA_BUNDLE = ""
+$env:SSL_CERT_FILE = ""
+$env:CURL_CA_BUNDLE = ""
+
 # Instalar dependencias si no están instaladas
 $fasterWhisper = "$venvPath\Lib\site-packages\faster_whisper"
 if (-not (Test-Path $fasterWhisper)) {
