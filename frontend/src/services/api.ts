@@ -3,7 +3,7 @@
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
 interface RequestOptions {
-  method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
+  method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
   body?: any;
   headers?: Record<string, string>;
   token?: string;
@@ -255,3 +255,83 @@ export async function cancelarCitaApi(citaId: string, token: string) {
 export async function updateCitaEstado(citaId: string, estado: string, token: string) {
   return apiCall(`/citas/${citaId}`, { method: 'PUT', body: { estado }, token });
 }
+
+// ============================================
+// USUARIOS ENDPOINTS
+// ============================================
+
+export interface CreateUserRequest {
+  username: string;
+  password: string;
+  nombre: string;
+  apellido: string;
+  email?: string;
+  telefono?: string;
+  rol: string;
+  especialidad?: string;
+  // Campos para profesionales (MEDICO, AUXILIAR)
+  tipoDocumento?: string;
+  numeroDocumento?: string;
+  registroProfesional?: string;
+  registroMedico?: string;
+  firmaBase64?: string;
+}
+
+export interface UpdateUserRequest extends Partial<Omit<CreateUserRequest, 'password'>> {
+  password?: string;
+}
+
+export async function createUsuario(data: CreateUserRequest, token: string) {
+  return apiCall('/usuarios', {
+    method: 'POST',
+    body: data,
+    token,
+  });
+}
+
+export async function getAllUsuarios(token: string) {
+  return apiCall('/usuarios', {
+    method: 'GET',
+    token,
+  });
+}
+
+export async function getUsuarioById(id: string, token: string) {
+  return apiCall(`/usuarios/${id}`, {
+    method: 'GET',
+    token,
+  });
+}
+
+export async function updateUsuario(id: string, data: UpdateUserRequest, token: string) {
+  return apiCall(`/usuarios/${id}`, {
+    method: 'PUT',
+    body: data,
+    token,
+  });
+}
+
+export async function toggleUsuarioStatus(id: string, token: string) {
+  return apiCall(`/usuarios/${id}/toggle-status`, {
+    method: 'PATCH',
+    token,
+  });
+}
+
+// ============================================
+// ESPECIALIDADES ENDPOINTS
+// ============================================
+
+export interface EspecialidadItem {
+  id: string;
+  codigo: string;
+  nombre: string;
+}
+
+export async function getEspecialidades(token: string) {
+  return apiCall<EspecialidadItem[]>('/especialidades', {
+    method: 'GET',
+    token,
+  });
+}
+

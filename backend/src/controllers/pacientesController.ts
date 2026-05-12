@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import prisma from '../lib/prisma.js';
 import {
   createPaciente,
   getPacienteById,
@@ -8,8 +8,6 @@ import {
   deletePaciente,
   searchPacientes,
 } from '../services/pacientesService.js';
-
-const prisma = new PrismaClient();
 
 export async function create(req: Request, res: Response): Promise<void> {
   try {

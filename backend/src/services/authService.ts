@@ -1,8 +1,6 @@
-import { PrismaClient } from '@prisma/client';
+import prisma from '../lib/prisma.js';
 import bcrypt from 'bcryptjs';
 import { generateToken, generateRefreshToken, TokenPayload } from '../utils/jwt.js';
-
-const prisma = new PrismaClient();
 
 export interface LoginRequest {
   username: string;
