@@ -18,6 +18,77 @@ html, body, #root {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* ── Estilos de impresión Historia Clínica ───────────────────── */
+@media print {
+  /* Ocultar TODO por defecto */
+  body * { visibility: hidden; }
+
+  /* ─── Imprimir solo HC (secciones 1-11) ─── */
+  body.print-hc #hc-secciones,
+  body.print-hc #hc-secciones * { visibility: visible !important; }
+  body.print-hc #hc-secciones {
+    position: fixed !important;
+    inset: 0 !important;
+    overflow: visible !important;
+    height: auto !important;
+    background: white !important;
+    padding: 16px 20px !important;
+  }
+
+  /* ─── Imprimir solo Órdenes Médicas (secciones 12-15) ─── */
+  body.print-ordenes #ordenes-secciones,
+  body.print-ordenes #ordenes-secciones * { visibility: visible !important; }
+  body.print-ordenes #ordenes-secciones {
+    position: fixed !important;
+    inset: 0 !important;
+    overflow: visible !important;
+    height: auto !important;
+    background: white !important;
+    padding: 16px 20px !important;
+  }
+
+  /* ─── Fallback sin clase: muestra todo el panel ─── */
+  body:not(.print-hc):not(.print-ordenes) #hc-scroll-panel,
+  body:not(.print-hc):not(.print-ordenes) #hc-scroll-panel * { visibility: visible !important; }
+  body:not(.print-hc):not(.print-ordenes) #hc-scroll-panel {
+    position: fixed !important;
+    inset: 0 !important;
+    overflow: visible !important;
+    height: auto !important;
+    background: white !important;
+    padding: 16px 20px !important;
+  }
+
+  /* ─── Estilos comunes para contenido impreso ─── */
+  #hc-secciones [class*="rounded-2xl"],
+  #ordenes-secciones [class*="rounded-2xl"],
+  #hc-scroll-panel [class*="rounded-2xl"] {
+    background: white !important;
+    border: 1px solid #ccc !important;
+    page-break-inside: avoid;
+    margin-bottom: 10px;
+  }
+
+  #hc-secciones *,
+  #ordenes-secciones *,
+  #hc-scroll-panel * { color: #111 !important; background-color: transparent !important; }
+
+  #hc-secciones input, #hc-secciones textarea, #hc-secciones select,
+  #ordenes-secciones input, #ordenes-secciones textarea, #ordenes-secciones select,
+  #hc-scroll-panel input, #hc-scroll-panel textarea, #hc-scroll-panel select {
+    border: 1px solid #aaa !important;
+    font-size: 11px !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  #hc-secciones button,
+  #ordenes-secciones button,
+  #hc-scroll-panel button { display: none !important; }
+
+  @page { margin: 12mm 15mm; size: A4; }
+}
+
 body {
   background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
   color: #e2e8f0;
