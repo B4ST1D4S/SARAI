@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import {
   getMedicoDisponibilidad,
+  getMedicosList,
+  getTiposConsultaMedico,
   postDisponibilidad,
   putDisponibilidad,
   deleteDisponibilidadCtrl,
@@ -17,6 +19,12 @@ router.use(authenticateToken);
 
 // Slots libres para un médico en una fecha (todos los roles)
 router.get('/slots', getSlots);
+
+// Lista de todos los médicos activos (para Config Agenda)
+router.get('/medicos-list', getMedicosList);
+
+// Tipos de consulta compatibles con la especialidad de un médico
+router.get('/tipos-consulta/:medicoId', getTiposConsultaMedico);
 
 // Disponibilidad semanal del médico
 router.get('/medico/:medicoId', getMedicoDisponibilidad);
