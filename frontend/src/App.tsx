@@ -56,11 +56,6 @@ const NAV_SECTIONS = [
     label: 'ADMINISTRACIÓN',
     items: [
       { id: 'admin', label: 'Parametrización', sym: 'X' },
-    ],
-  },
-  {
-    label: 'ADMINISTRACIÓN',
-    items: [
       { id: 'usuarios', label: 'Usuarios', sym: 'V' },
     ],
   },

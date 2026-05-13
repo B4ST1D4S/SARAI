@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
+import prisma from './lib/prisma.js';
 import authRoutes from './routes/auth.js';
 import pacientesRoutes from './routes/pacientes.js';
 import historiaClinicaRoutes from './routes/historiaClinica.js';
