@@ -53,9 +53,10 @@ export async function createDisponibilidad(data: CreateDisponibilidadRequest) {
   });
 
   if (existente) {
+    const { medicoId: _mid, ...updateFields } = newData;
     return prisma.disponibilidadMedico.update({
       where: { id: existente.id },
-      data: newData,
+      data: updateFields,
     });
   }
 
@@ -63,7 +64,12 @@ export async function createDisponibilidad(data: CreateDisponibilidadRequest) {
 }
 
 export async function updateDisponibilidad(id: string, data: Partial<CreateDisponibilidadRequest>) {
-  return prisma.disponibilidadMedico.update({ where: { id }, data });
+  const { medicoId, fechaDesde, fechaHasta, ...rest } = data;
+  const updateData: any = { ...rest };
+  if (medicoId) updateData.medico = { connect: { id: medicoId } };
+  if (fechaDesde !== undefined) updateData.fechaDesde = fechaDesde ? new Date(fechaDesde) : null;
+  if (fechaHasta !== undefined) updateData.fechaHasta = fechaHasta ? new Date(fechaHasta) : null;
+  return prisma.disponibilidadMedico.update({ where: { id }, data: updateData });
 }
 
 export async function deleteDisponibilidad(id: string) {
