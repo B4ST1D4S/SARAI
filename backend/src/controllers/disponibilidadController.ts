@@ -23,13 +23,11 @@ export async function getMedicoDisponibilidad(req: Request, res: Response): Prom
 }
 
 // POST /api/disponibilidad
-// SUPER_ADMIN puede especificar medicoId en el body; otros roles usan su propio id
+// Si se envía medicoId en el body se usa ese; si no, se usa el del usuario autenticado
 export async function postDisponibilidad(req: Request, res: Response): Promise<void> {
   try {
     if (!req.user) { res.status(401).json({ error: 'No autenticado' }); return; }
-    const medicoId = (req.user.rol === 'SUPER_ADMIN' && req.body.medicoId)
-      ? req.body.medicoId
-      : req.user.userId;
+    const medicoId = req.body.medicoId || req.user.userId;
     const d = await createDisponibilidad({ ...req.body, medicoId });
     res.status(201).json({ success: true, disponibilidad: d });
   } catch (error: any) {

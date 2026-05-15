@@ -18,6 +18,8 @@ import PlantillasPage from './pages/PlantillasPage';
 import MapaCorporalPage from './pages/MapaCorporalPage';
 import { Body3DTestPage } from './pages/Body3DTestPage';
 import UsuariosPage from './pages/UsuariosPage';
+import AdminPage from './pages/AdminPage';
+import CentralImpresionPage from './pages/CentralImpresionPage';
 import SaraiAssistant from './components/SaraiAssistant';
 
 const NAV_SECTIONS = [
@@ -356,6 +358,7 @@ function App() {
           {currentPage === 'mapa-corporal'       && <MapaCorporalPage />}
           {currentPage === 'body3d-test'         && <Body3DTestPage />}
           {currentPage === 'usuarios'            && <UsuariosPage />}
+          {currentPage === 'admin'               && <AdminPage />}
         </div>
         </div>
       </main>
