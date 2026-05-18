@@ -21,6 +21,7 @@ import UsuariosPage from './pages/UsuariosPage';
 import AdminPage from './pages/AdminPage';
 import CentralImpresionPage from './pages/CentralImpresionPage';
 import SaraiAssistant from './components/SaraiAssistant';
+import saraiLogo from './assets/logo1.png';
 
 const NAV_SECTIONS = [
   {
@@ -82,150 +83,163 @@ function Sidebar({
   mobileOpen: boolean;
   setMobileOpen: (v: boolean) => void;
 }) {
+  // En móvil el sidebar siempre se muestra expandido cuando está abierto
+  const effectiveCollapsed = mobileOpen ? false : collapsed;
+
   const handleNavClick = (id: string) => {
     setCurrentPage(id);
-    setMobileOpen(false); // cierra drawer en móvil al navegar
+    setMobileOpen(false);
   };
 
   return (
     <>
-      {/* Overlay oscuro en móvil cuando el drawer está abierto */}
       {mobileOpen && (
         <div
           className="fixed inset-0 bg-black/60 z-40 lg:hidden"
           onClick={() => setMobileOpen(false)}
         />
       )}
-    <motion.aside
-      animate={{ width: collapsed ? 68 : 236 }}
-      transition={{ duration: 0.25, ease: 'easeInOut' }}
-      className={`fixed top-0 left-0 h-full z-50 flex flex-col bg-[#0d0f14] border-r border-white/5 shadow-2xl overflow-hidden select-none
-        transition-transform duration-300
-        ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}
-        lg:translate-x-0`}
-    >
-      <div className="flex items-center justify-between px-4 h-14 border-b border-white/5 flex-shrink-0">
-        <AnimatePresence>
-          {!collapsed && (
-            <motion.span
-              initial={{ opacity: 0, x: -8 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -8 }}
-              transition={{ duration: 0.2 }}
-              className="text-xl font-black tracking-tight whitespace-nowrap"
-            >
-              <span className="bg-gradient-to-r from-yellow-400 to-amber-500 bg-clip-text text-transparent">SAR</span>
-              <span className="text-white">AI</span>
-            </motion.span>
-          )}
-        </AnimatePresence>
-        <button
-          onClick={() => setCollapsed(!collapsed)}
-          className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-500 hover:text-yellow-400 hover:bg-yellow-500/10 transition-all ml-auto text-xs font-bold"
-        >
-          {collapsed ? '>>' : '<<'}
-        </button>
-      </div>
-
-      <nav className="flex-1 overflow-y-auto py-3">
-        {NAV_SECTIONS.map((section) => (
-          <div key={section.label} className="mb-2">
-            {!collapsed && (
-              <p className="px-4 mb-1 text-[9px] font-bold text-gray-600 tracking-widest">
-                {section.label}
-              </p>
-            )}
-            {collapsed && <div className="mx-3 mb-1 border-t border-white/5" />}
-            {section.items.map((item) => {
-              const active = currentPage === item.id;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => handleNavClick(item.id)}
-                  title={item.label}
-                  className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium transition-all duration-150 relative group ${
-                    active
-                      ? 'text-yellow-400 bg-yellow-500/[0.08]'
-                      : 'text-gray-500 hover:text-gray-200 hover:bg-white/[0.04]'
-                  }`}
-                >
-                  {active && (
-                    <motion.div
-                      layoutId="pill"
-                      className="absolute left-0 top-1 bottom-1 w-0.5 bg-gradient-to-b from-yellow-400 to-amber-600 rounded-r-full"
-                    />
-                  )}
-                  <span className={`flex-shrink-0 w-5 h-5 rounded flex items-center justify-center text-[10px] font-bold border ${
-                    active
-                      ? 'border-yellow-500/40 bg-yellow-500/10 text-yellow-400'
-                      : 'border-white/10 bg-white/5 text-gray-500 group-hover:text-gray-300'
-                  }`}>
-                    {item.sym}
-                  </span>
-                  <AnimatePresence>
-                    {!collapsed && (
-                      <motion.span
-                        initial={{ opacity: 0, x: -6 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, x: -6 }}
-                        transition={{ duration: 0.15 }}
-                        className="whitespace-nowrap text-[13px]"
-                      >
-                        {item.label}
-                      </motion.span>
-                    )}
-                  </AnimatePresence>
-                  {collapsed && (
-                    <div className="absolute left-full ml-3 px-2.5 py-1.5 bg-slate-800 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50 shadow-xl border border-white/10 transition-opacity duration-150">
-                      {item.label}
-                    </div>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        ))}
-      </nav>
-
-      <div className="border-t border-white/5 p-3 flex-shrink-0">
-        <div className={`flex items-center gap-2.5 ${collapsed ? 'justify-center flex-col' : ''}`}>
-          <div className="w-8 h-8 flex-shrink-0 rounded-full bg-gradient-to-br from-yellow-400 to-amber-600 flex items-center justify-center text-slate-900 font-bold text-xs">
-            {user?.nombre?.[0]}{user?.apellido?.[0]}
-          </div>
-          <AnimatePresence>
-            {!collapsed && (
+      <motion.aside
+        animate={{ width: effectiveCollapsed ? 68 : 236 }}
+        transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+        onMouseEnter={() => setCollapsed(false)}
+        onMouseLeave={() => setCollapsed(true)}
+        className={`fixed top-0 left-0 h-full z-50 flex flex-col bg-[#0d0f14] border-r border-white/5 shadow-2xl overflow-hidden select-none
+          transition-[transform] duration-300 ease-in-out
+          ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}
+          lg:translate-x-0`}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-3 h-14 border-b border-white/5 flex-shrink-0">
+          <AnimatePresence mode="wait">
+            {effectiveCollapsed ? (
               <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="flex-1 min-w-0"
+                key="logo-mini"
+                initial={{ opacity: 0, scale: 0.7 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.7 }}
+                transition={{ duration: 0.2 }}
+                className="w-9 h-9 rounded-xl bg-[#1a1a3e] flex items-center justify-center mx-auto shadow-md overflow-hidden"
               >
-                <p className="text-white text-xs font-semibold truncate">{user?.nombre} {user?.apellido}</p>
-                <p className="text-gray-600 text-[10px] truncate">{user?.especialidad || user?.rol}</p>
+                <img src={saraiLogo} alt="SARAI" className="w-9 h-9 object-cover" />
               </motion.div>
+            ) : (
+              <motion.span
+                key="logo-full"
+                initial={{ opacity: 0, x: -8 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -8 }}
+                transition={{ duration: 0.2 }}
+                className="text-xl font-black tracking-tight whitespace-nowrap pl-1"
+              >
+                <span className="bg-gradient-to-r from-yellow-400 to-amber-500 bg-clip-text text-transparent">SAR</span>
+                <span className="text-white">AI</span>
+              </motion.span>
             )}
           </AnimatePresence>
-          {!collapsed && (
-            <button
-              onClick={handleLogout}
-              title="Cerrar sesion"
-              className="text-gray-600 hover:text-red-400 transition-colors text-xs font-bold px-1.5 py-0.5 rounded border border-white/10 hover:border-red-500/30"
-            >
-              salir
-            </button>
-          )}
-          {collapsed && (
-            <button
-              onClick={handleLogout}
-              title="Cerrar sesion"
-              className="text-gray-600 hover:text-red-400 transition-colors text-[9px] font-bold"
-            >
-              salir
-            </button>
-          )}
         </div>
-      </div>
-    </motion.aside>
+
+        {/* Nav con scrollbar estilizada */}
+        <nav className="flex-1 overflow-y-auto overflow-x-hidden py-3 sidebar-scroll">
+          {NAV_SECTIONS.map((section) => (
+            <div key={section.label} className="mb-2">
+              <AnimatePresence>
+              {!effectiveCollapsed && (
+                  <motion.p
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.15 }}
+                    className="px-4 mb-1 text-[9px] font-bold text-gray-600 tracking-widest whitespace-nowrap"
+                  >
+                    {section.label}
+                  </motion.p>
+                )}
+              </AnimatePresence>
+              {effectiveCollapsed && <div className="mx-3 mb-1 border-t border-white/5" />}
+
+              {section.items.map((item) => {
+                const active = currentPage === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => handleNavClick(item.id)}
+                    title={effectiveCollapsed ? item.label : undefined}
+                    className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium transition-all duration-150 relative group ${
+                      active
+                        ? 'text-yellow-400 bg-yellow-500/[0.08]'
+                        : 'text-gray-500 hover:text-gray-200 hover:bg-white/[0.04]'
+                    }`}
+                  >
+                    {active && (
+                      <motion.div
+                        layoutId="pill"
+                        className="absolute left-0 top-1 bottom-1 w-0.5 bg-gradient-to-b from-yellow-400 to-amber-600 rounded-r-full"
+                        transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
+                      />
+                    )}
+                    <span className={`flex-shrink-0 w-5 h-5 rounded flex items-center justify-center text-[10px] font-bold border transition-colors duration-150 ${
+                      active
+                        ? 'border-yellow-500/40 bg-yellow-500/10 text-yellow-400'
+                        : 'border-white/10 bg-white/5 text-gray-500 group-hover:text-gray-300'
+                    }`}>
+                      {item.sym}
+                    </span>
+                    <AnimatePresence>
+                      {!effectiveCollapsed && (
+                        <motion.span
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          transition={{ duration: 0.18 }}
+                          className="whitespace-nowrap text-[13px]"
+                        >
+                          {item.label}
+                        </motion.span>
+                      )}
+                    </AnimatePresence>
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </nav>
+
+        {/* Footer usuario */}
+        <div className="border-t border-white/5 p-3 flex-shrink-0">
+          <div className={`flex items-center gap-2.5 ${effectiveCollapsed ? 'justify-center' : ''}`}>
+            <div className="w-8 h-8 flex-shrink-0 rounded-full bg-gradient-to-br from-yellow-400 to-amber-600 flex items-center justify-center text-slate-900 font-bold text-xs">
+              {user?.nombre?.[0]}{user?.apellido?.[0]}
+            </div>
+            <AnimatePresence>
+              {!effectiveCollapsed && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1, transition: { delay: 0.05 } }}
+                  exit={{ opacity: 0 }}
+                  className="flex-1 min-w-0"
+                >
+                  <p className="text-white text-xs font-semibold truncate">{user?.nombre} {user?.apellido}</p>
+                  <p className="text-gray-600 text-[10px] truncate">{user?.especialidad || user?.rol}</p>
+                </motion.div>
+              )}
+            </AnimatePresence>
+            <AnimatePresence>
+              {!effectiveCollapsed && (
+                <motion.button
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  onClick={handleLogout}
+                  className="text-gray-600 hover:text-red-400 transition-colors text-xs font-bold px-1.5 py-0.5 rounded border border-white/10 hover:border-red-500/30 whitespace-nowrap"
+                >
+                  salir
+                </motion.button>
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
+      </motion.aside>
     </>
   );
 }
@@ -233,7 +247,7 @@ function Sidebar({
 function App() {
   const [currentPage, setCurrentPage] = useState('auth');
   const [user, setUser] = useState<any>(null);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [historiaShowForm, setHistoriaShowForm] = useState(false);
   const [historiaSeccion, setHistoriaSeccion] = useState<string>('motivo-consulta');
@@ -291,10 +305,9 @@ function App() {
       >
         {/* Wrapper que en lg+ aplica el margin del sidebar */}
         <div
-          className={`min-h-screen ${
+          className={`min-h-screen transition-[margin] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${
             sidebarCollapsed ? 'lg:ml-[68px]' : 'lg:ml-[236px]'
           }`}
-          style={{ transition: 'margin-left 0.25s ease-in-out' }}
         >
         <div className="sticky top-0 z-20 bg-[#080a0f]/90 backdrop-blur-md border-b border-white/5 px-4 sm:px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-3">
