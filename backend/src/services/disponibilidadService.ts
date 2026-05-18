@@ -73,6 +73,38 @@ export async function updateDisponibilidad(id: string, data: Partial<CreateDispo
 }
 
 export async function deleteDisponibilidad(id: string) {
+  const franja = await prisma.disponibilidadMedico.findUnique({ where: { id } });
+  if (!franja) throw new Error('Franja no encontrada');
+
+  // Verificar citas futuras activas que caigan en esta franja
+  const ahora = new Date();
+  const citasFuturas = await prisma.cita.findMany({
+    where: {
+      medicoId: franja.medicoId,
+      estado: { notIn: ['CANCELADA', 'NO_ASISTIO'] },
+      fechaHora: { gte: ahora },
+    },
+    select: { id: true, fechaHora: true },
+  });
+
+  const [hIni, mIni] = franja.horaInicio.split(':').map(Number);
+  const [hFin, mFin] = franja.horaFin.split(':').map(Number);
+  const minIni = hIni * 60 + mIni;
+  const minFin = hFin * 60 + mFin;
+
+  const conCitas = citasFuturas.filter(c => {
+    const d = new Date(c.fechaHora);
+    if (d.getDay() !== franja.diaSemana) return false;
+    const minCita = d.getHours() * 60 + d.getMinutes();
+    return minCita >= minIni && minCita < minFin;
+  });
+
+  if (conCitas.length > 0) {
+    throw new Error(
+      `No se puede eliminar: hay ${conCitas.length} cita${conCitas.length !== 1 ? 's' : ''} activa${conCitas.length !== 1 ? 's' : ''} en esta franja`
+    );
+  }
+
   return prisma.disponibilidadMedico.update({ where: { id }, data: { activo: false } });
 }
 
@@ -101,7 +133,41 @@ export async function deleteBloqueo(id: string) {
   return prisma.bloqueDisponibilidad.delete({ where: { id } });
 }
 
-// ─── SLOTS DISPONIBLES ────────────────────────────────────────────────────
+// ─── FRANJAS CON CONTEO DE CITAS ──────────────────────────────────────────
+// Devuelve todas las franjas activas del médico con cuántas citas futuras activas
+// caen dentro de cada una (para preview antes de eliminar).
+export async function getDisponibilidadesConCitas(medicoId: string) {
+  const franjas = await prisma.disponibilidadMedico.findMany({
+    where: { medicoId, activo: true },
+    orderBy: [{ diaSemana: 'asc' }, { horaInicio: 'asc' }],
+  });
+
+  const ahora = new Date();
+  const citas = await prisma.cita.findMany({
+    where: {
+      medicoId,
+      estado: { notIn: ['CANCELADA', 'NO_ASISTIO'] },
+      fechaHora: { gte: ahora },
+    },
+    select: { id: true, fechaHora: true },
+  });
+
+  return franjas.map(f => {
+    const [hIni, mIni] = f.horaInicio.split(':').map(Number);
+    const [hFin, mFin] = f.horaFin.split(':').map(Number);
+    const minIni = hIni * 60 + mIni;
+    const minFin = hFin * 60 + mFin;
+    const numCitas = citas.filter(c => {
+      const d = new Date(c.fechaHora);
+      if (d.getDay() !== f.diaSemana) return false;
+      const minCita = d.getHours() * 60 + d.getMinutes();
+      return minCita >= minIni && minCita < minFin;
+    }).length;
+    return { ...f, numCitas };
+  });
+}
+
+
 // Dado medicoId + fecha (YYYY-MM-DD), retorna horas libres
 
 export async function getSlotsDisponibles(medicoId: string, fecha: string): Promise<string[]> {
