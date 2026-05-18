@@ -10,6 +10,7 @@ import {
   getBloqueosMedico,
   postBloqueo,
   deleteBloqueoCtrl,
+  getDisponibilidadesConCitasCtrl,
 } from '../controllers/disponibilidadController.js';
 import { authenticateToken, authorizeRole } from '../middleware/auth.js';
 
@@ -25,6 +26,9 @@ router.get('/medicos-list', getMedicosList);
 
 // Tipos de consulta compatibles con la especialidad de un médico
 router.get('/tipos-consulta/:medicoId', getTiposConsultaMedico);
+
+// Franjas con conteo de citas activas (para preview de eliminación)
+router.get('/con-citas/:medicoId', authorizeRole('MEDICO', 'SUPER_ADMIN'), getDisponibilidadesConCitasCtrl);
 
 // Disponibilidad semanal del médico
 router.get('/medico/:medicoId', getMedicoDisponibilidad);

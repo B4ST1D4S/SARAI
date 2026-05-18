@@ -9,6 +9,7 @@ import {
   createBloqueo,
   deleteBloqueo,
   getSlotsDisponibles,
+  getDisponibilidadesConCitas,
 } from '../services/disponibilidadService.js';
 
 // GET /api/disponibilidad/medico/:medicoId
@@ -47,6 +48,7 @@ export async function getMedicosList(req: Request, res: Response): Promise<void>
         especialidad: true,
         registroMedico: true,
         email: true,
+        numeroDocumento: true,
       },
       orderBy: [{ apellido: 'asc' }, { nombre: 'asc' }],
     });
@@ -114,6 +116,17 @@ export async function deleteDisponibilidadCtrl(req: Request, res: Response): Pro
   try {
     await deleteDisponibilidad(req.params.id);
     res.json({ success: true, message: 'Disponibilidad desactivada' });
+  } catch (error: any) {
+    const status = error.message?.startsWith('No se puede eliminar') ? 409 : 500;
+    res.status(status).json({ error: error.message });
+  }
+}
+
+// GET /api/disponibilidad/con-citas/:medicoId
+export async function getDisponibilidadesConCitasCtrl(req: Request, res: Response): Promise<void> {
+  try {
+    const disponibilidades = await getDisponibilidadesConCitas(req.params.medicoId);
+    res.json({ disponibilidades });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
