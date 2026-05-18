@@ -18,6 +18,33 @@ html, body, #root {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* ── Scrollbar sidebar elegante ──────────────────────────────── */
+.sidebar-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+  transition: scrollbar-color 0.3s;
+}
+.sidebar-scroll:hover {
+  scrollbar-color: rgba(250, 204, 21, 0.18) transparent;
+}
+.sidebar-scroll::-webkit-scrollbar {
+  width: 3px;
+}
+.sidebar-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.sidebar-scroll::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 99px;
+  transition: background 0.3s;
+}
+.sidebar-scroll:hover::-webkit-scrollbar-thumb {
+  background: rgba(250, 204, 21, 0.2);
+}
+.sidebar-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(250, 204, 21, 0.4);
+}
+
 /* ── Estilos de impresión Historia Clínica ───────────────────── */
 @media print {
   /* Ocultar TODO por defecto */
