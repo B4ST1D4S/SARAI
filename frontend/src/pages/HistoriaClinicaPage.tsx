@@ -400,25 +400,42 @@ export default function HistoriaClinicaPage({
     return () => onRegisterCampos?.(null);
   }, [onRegisterCampos, handleCamposSarai]);
 
-  // Impresión separada por body-class
-  const printHC = () => {
-    const panel = document.getElementById('hc-scroll-panel');
-    const prev = panel?.style.cssText || '';
-    if (panel) { panel.style.overflow = 'visible'; panel.style.height = 'auto'; panel.style.maxHeight = 'none'; }
-    document.body.classList.add('print-hc');
-    window.print();
-    document.body.classList.remove('print-hc');
-    if (panel) { panel.style.cssText = prev; }
+  // Descarga de PDF desde el backend (sin diálogo de impresión)
+  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+
+  const descargarPDF = async (tipo: 'hc' | 'ordenes') => {
+    const id = savedIdRef.current;
+    if (!id) { setErrMsg('Guarde la historia antes de descargar'); return; }
+    try {
+      const endpoint =
+        tipo === 'hc'
+          ? `${API_BASE}/pdf/historia-clinica/${id}`
+          : `${API_BASE}/pdf/ordenes/${id}`;
+      const response = await fetch(endpoint, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body.error || `Error ${response.status}`);
+      }
+      const blob = await response.blob();
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href     = url;
+      a.download = tipo === 'hc'
+        ? `HistoriaClinica_${id.slice(-6)}.pdf`
+        : `OrdenesMedicas_${id.slice(-6)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      setErrMsg(err.message || 'Error al generar el PDF');
+    }
   };
-  const printOrdenes = () => {
-    const panel = document.getElementById('hc-scroll-panel');
-    const prev = panel?.style.cssText || '';
-    if (panel) { panel.style.overflow = 'visible'; panel.style.height = 'auto'; panel.style.maxHeight = 'none'; }
-    document.body.classList.add('print-ordenes');
-    window.print();
-    document.body.classList.remove('print-ordenes');
-    if (panel) { panel.style.cssText = prev; }
-  };
+
+  const printHC      = () => descargarPDF('hc');
+  const printOrdenes = () => descargarPDF('ordenes');
 
   const scrollTo = (id: string) => {
     setSecActiva(id);
