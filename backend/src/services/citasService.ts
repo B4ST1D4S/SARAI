@@ -15,7 +15,8 @@ const transporter = nodemailer.createTransport({
 export interface CreateCitaRequest {
   pacienteId: string;
   medicoId: string;
-  tipoCita: 'CONSULTA' | 'PREOPERATORIO' | 'POSTOPERATORIO' | 'CONTROL';
+  tipoCita: string;
+  entidadSalud?: string;
   fechaHora: string;
   duracionMinutos?: number;
   motivo?: string;
@@ -37,6 +38,7 @@ export async function createCita(data: CreateCitaRequest) {
         pacienteId: data.pacienteId,
         medicoId: data.medicoId,
         tipoCita: data.tipoCita,
+        entidadSalud: data.entidadSalud,
         fechaHora: new Date(data.fechaHora),
         duracionMinutos: data.duracionMinutos || 60,
         motivo: data.motivo,
@@ -60,10 +62,15 @@ export async function createCita(data: CreateCitaRequest) {
 }
 
 // Obtener citas del médico
-export async function getCitasByMedico(medicoId: string, estado?: string) {
+export async function getCitasByMedico(medicoId: string, estado?: string, fechaInicio?: string, fechaFin?: string) {
   try {
     const where: any = { medicoId };
     if (estado) where.estado = estado;
+    if (fechaInicio || fechaFin) {
+      where.fechaHora = {};
+      if (fechaInicio) where.fechaHora.gte = new Date(fechaInicio);
+      if (fechaFin)    where.fechaHora.lte = new Date(fechaFin);
+    }
 
     const citas = await prisma.cita.findMany({
       where,

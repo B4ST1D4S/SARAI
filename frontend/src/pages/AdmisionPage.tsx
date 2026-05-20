@@ -5,17 +5,20 @@
  */
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Users, UserCheck, Clock, RefreshCw, Bell, CheckCircle, AlertCircle } from 'lucide-react';
-import { getCitasMedico } from '../services/api';
+import { Users, UserCheck, Clock, RefreshCw, Bell, CheckCircle, AlertCircle, Search, X } from 'lucide-react';
+
 
 interface Cita {
   id: string;
   pacienteNombre: string;
   pacienteId: string;
+  tipoDocumento: string;
+  numeroDocumento: string;
   hora: string;
   fecha: string;
   procedimiento: string;
   estado: string;
+  medicoNombre: string;
   turno?: number;
 }
 
@@ -23,33 +26,46 @@ export default function AdmisionPage() {
   const [citas, setCitas] = useState<Cita[]>([]);
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
+  const [filtroPaciente, setFiltroPaciente] = useState('');
+  const [filtroTipo, setFiltroTipo] = useState('');
+  const [filtroProfesional, setFiltroProfesional] = useState('');
 
   const getToken = () => localStorage.getItem('accessToken') || '';
-  const hoy = new Date().toISOString().split('T')[0];
 
   const cargar = async () => {
     setLoading(true);
     const token = getToken();
-    const res = await getCitasMedico(token);
-    if (!res.error && res.data) {
-      const todas = ((res.data as any).citas || []).map((c: any, i: number) => {
+    // Rango LOCAL del día (igual que AgendaPage) para no perder citas por zona horaria
+    const ahora = new Date();
+    const inicioLocal = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 0, 0, 0, 0);
+    const finLocal    = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 23, 59, 59, 999);
+    const res = await fetch(
+      `/api/citas/medico/agenda?fechaInicio=${inicioLocal.toISOString()}&fechaFin=${finLocal.toISOString()}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    if (res.ok) {
+      const data = await res.json();
+      const todas = ((data as any).citas || []).map((c: any, i: number) => {
         const fecha = new Date(c.fechaHora);
         return {
           id: c.id,
           pacienteId: c.paciente?.id || c.pacienteId,
           pacienteNombre: c.paciente?.nombreCompleto || 'Paciente',
+          tipoDocumento: c.paciente?.tipoDocumento || '',
+          numeroDocumento: c.paciente?.numeroDocumento || '',
           fecha: fecha.toISOString().split('T')[0],
           hora: fecha.toTimeString().slice(0, 5),
           procedimiento: c.tipoCita || c.motivo || 'Consulta',
           estado: c.estado,
+          medicoNombre: c.medico ? `${c.medico.nombre || ''} ${c.medico.apellido || ''}`.trim() : '',
           turno: i + 1,
         } as Cita;
       });
-      // Mostrar solo de hoy + estados relevantes
-      const hoyFiltrado = todas.filter((c: Cita) =>
-        c.fecha === hoy && ['CONFIRMADA', 'EN_SALA', 'PENDIENTE'].includes(c.estado)
-      ).sort((a: Cita, b: Cita) => a.hora.localeCompare(b.hora));
-      setCitas(hoyFiltrado);
+      // Filtrar solo estados relevantes (fecha ya viene filtrada por el backend)
+      const filtradas = todas
+        .filter((c: Cita) => ['CONFIRMADA', 'EN_SALA', 'PENDIENTE'].includes(c.estado))
+        .sort((a: Cita, b: Cita) => a.hora.localeCompare(b.hora));
+      setCitas(filtradas);
     }
     setLoading(false);
   };
@@ -76,8 +92,24 @@ export default function AdmisionPage() {
     setTimeout(() => setMsg(null), 4000);
   };
 
-  const enSala = citas.filter(c => c.estado === 'EN_SALA');
-  const enEspera = citas.filter(c => c.estado === 'CONFIRMADA' || c.estado === 'PENDIENTE');
+  // Opciones únicas para los selectores
+  const tiposUnicos = Array.from(new Set(citas.map(c => c.procedimiento))).filter(Boolean);
+  const profesionalesUnicos = Array.from(new Set(citas.map(c => c.medicoNombre))).filter(Boolean);
+
+  const citasFiltradas = citas.filter(c => {
+    const q = filtroPaciente.toLowerCase();
+    const matchPaciente = !filtroPaciente
+      || c.pacienteNombre.toLowerCase().includes(q)
+      || c.numeroDocumento.toLowerCase().includes(q)
+      || c.tipoDocumento.toLowerCase().includes(q);
+    const matchTipo = !filtroTipo || c.procedimiento === filtroTipo;
+    const matchProf = !filtroProfesional || c.medicoNombre === filtroProfesional;
+    return matchPaciente && matchTipo && matchProf;
+  });
+
+  const enSala = citasFiltradas.filter(c => c.estado === 'EN_SALA');
+  const enEspera = citasFiltradas.filter(c => c.estado === 'CONFIRMADA' || c.estado === 'PENDIENTE');
+  const hayFiltros = filtroPaciente || filtroTipo || filtroProfesional;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-3 sm:p-6">
@@ -116,6 +148,52 @@ export default function AdmisionPage() {
           )}
         </AnimatePresence>
 
+        {/* Filtros */}
+        <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
+          className="mb-6 bg-slate-800/40 border border-slate-700/50 rounded-2xl p-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {/* Paciente */}
+            <div className="relative">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+              <input
+                type="text"
+                placeholder="Buscar paciente..."
+                value={filtroPaciente}
+                onChange={e => setFiltroPaciente(e.target.value)}
+                className="w-full bg-slate-900/60 border border-slate-600/50 text-white text-sm rounded-lg pl-8 pr-3 py-2 placeholder-gray-500 focus:outline-none focus:border-cyan-500/50"
+              />
+            </div>
+            {/* Tipo de consulta */}
+            <div className="relative">
+              <select
+                value={filtroTipo}
+                onChange={e => setFiltroTipo(e.target.value)}
+                className="w-full bg-slate-900/60 border border-slate-600/50 text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-cyan-500/50 appearance-none text-white"
+              >
+                <option value="" className="bg-slate-900">Tipo de consulta</option>
+                {tiposUnicos.map(t => <option key={t} value={t} className="bg-slate-900">{t}</option>)}
+              </select>
+            </div>
+            {/* Profesional */}
+            <div className="flex gap-2">
+              <select
+                value={filtroProfesional}
+                onChange={e => setFiltroProfesional(e.target.value)}
+                className="flex-1 bg-slate-900/60 border border-slate-600/50 text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-cyan-500/50 appearance-none text-white"
+              >
+                <option value="" className="bg-slate-900">Profesional</option>
+                {profesionalesUnicos.map(p => <option key={p} value={p} className="bg-slate-900">{p}</option>)}
+              </select>
+              {hayFiltros && (
+                <button onClick={() => { setFiltroPaciente(''); setFiltroTipo(''); setFiltroProfesional(''); }}
+                  className="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-gray-300 rounded-lg text-xs flex items-center gap-1 transition-colors whitespace-nowrap">
+                  <X size={12} /> Limpiar
+                </button>
+              )}
+            </div>
+          </div>
+        </motion.div>
+
         {/* Stats */}
         <div className="grid grid-cols-2 gap-4 mb-8">
           <div className="bg-gradient-to-br from-cyan-500/10 to-blue-600/10 border border-cyan-500/20 rounded-2xl p-5">
@@ -150,12 +228,21 @@ export default function AdmisionPage() {
                   transition={{ delay: i * 0.05 }}
                   className="flex items-center justify-between p-4 bg-cyan-500/5 border border-cyan-500/30 rounded-xl">
                   <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-full bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center">
+                    <div className="w-10 h-10 rounded-full bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center flex-shrink-0">
                       <span className="text-cyan-400 font-bold text-sm">{i + 1}</span>
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <p className="text-white font-semibold">{c.pacienteNombre}</p>
-                      <p className="text-gray-400 text-xs">{c.hora} · {c.procedimiento}</p>
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-0.5">
+                        {c.tipoDocumento && (
+                          <span className="text-gray-400 text-xs">
+                            <span className="text-gray-500">{c.tipoDocumento}</span> {c.numeroDocumento}
+                          </span>
+                        )}
+                        <span className="text-cyan-400/70 text-xs font-medium">{c.procedimiento}</span>
+                        <span className="text-gray-500 text-xs">{c.hora}</span>
+                        {c.medicoNombre && <span className="text-gray-500 text-xs">· Dr. {c.medicoNombre}</span>}
+                      </div>
                     </div>
                   </div>
                   <span className="px-3 py-1 bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 text-xs rounded-full font-semibold">
@@ -183,12 +270,21 @@ export default function AdmisionPage() {
                   transition={{ delay: i * 0.05 }}
                   className="flex items-center justify-between p-4 bg-slate-800/50 border border-slate-700/50 rounded-xl hover:border-yellow-500/30 transition-colors">
                   <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center">
+                    <div className="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center flex-shrink-0">
                       <Users size={18} className="text-gray-400" />
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <p className="text-white font-semibold">{c.pacienteNombre}</p>
-                      <p className="text-gray-400 text-xs">{c.hora} · {c.procedimiento}</p>
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-0.5">
+                        {c.tipoDocumento && (
+                          <span className="text-gray-400 text-xs">
+                            <span className="text-gray-500">{c.tipoDocumento}</span> {c.numeroDocumento}
+                          </span>
+                        )}
+                        <span className="text-yellow-400/70 text-xs font-medium">{c.procedimiento}</span>
+                        <span className="text-gray-500 text-xs">{c.hora}</span>
+                        {c.medicoNombre && <span className="text-gray-500 text-xs">· Dr. {c.medicoNombre}</span>}
+                      </div>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">

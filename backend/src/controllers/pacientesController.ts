@@ -175,3 +175,50 @@ export async function search(req: Request, res: Response): Promise<void> {
     res.status(500).json({ error: error.message || 'Error al buscar pacientes' });
   }
 }
+
+export async function verificarDuplicados(req: Request, res: Response): Promise<void> {
+  try {
+    const { numero, tipo, nombre } = req.query;
+
+    const campoBase = {
+      id: true,
+      numeroDocumento: true,
+      tipoDocumento: true,
+      nombreCompleto: true,
+      fechaNacimiento: true,
+      telefonos: true,
+      email: true,
+    };
+
+    // 1. Mismo número de documento, DISTINTO tipo → posible misma persona registrada con tipo diferente
+    const mismoNumeroOtroTipo = numero
+      ? await prisma.paciente.findMany({
+          where: {
+            numeroDocumento: numero as string,
+            ...(tipo ? { tipoDocumento: { not: tipo as string } } : {}),
+          },
+          select: campoBase,
+        })
+      : [];
+
+    // 2. Mismo nombre completo (búsqueda insensible a mayúsculas) → posible homónimo
+    const mismoNombre =
+      nombre && typeof nombre === 'string' && nombre.trim().length >= 4
+        ? await prisma.paciente.findMany({
+            where: {
+              nombreCompleto: {
+                contains: nombre.trim(),
+                mode: 'insensitive',
+              },
+            },
+            select: campoBase,
+            take: 10,
+          })
+        : [];
+
+    res.json({ mismoNumeroOtroTipo, mismoNombre });
+  } catch (error: any) {
+    console.error('Error en verificarDuplicados:', error);
+    res.status(500).json({ error: error.message || 'Error al verificar duplicados' });
+  }
+}

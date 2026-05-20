@@ -11,46 +11,84 @@ import {
   ArrowRight,
 } from 'lucide-react';
 
+const getToken = () => localStorage.getItem('accessToken') || '';
+const getStoredUser = () => {
+  try { return JSON.parse(localStorage.getItem('user') || '{}'); } catch { return {}; }
+};
+
 export default function DashboardPage() {
   const [stats, setStats] = useState({
-    pacientesHoy: 3,
-    citasProximas: 5,
-    historiasActivas: 12,
-    tasaComplecion: 95,
+    pacientesHoy: 0,
+    citasProximas: 0,
+    historiasActivas: 0,
+    tasaComplecion: 0,
   });
 
-  const [citasProximas, setCitasProximas] = useState([
-    {
-      id: 1,
-      paciente: 'Valeria Gómez',
-      hora: '09:00',
-      procedimiento: 'Rinoplastia',
-      estado: 'Confirmada',
-      color: 'from-emerald-500 to-teal-500',
-    },
-    {
-      id: 2,
-      paciente: 'Carla López',
-      hora: '10:30',
-      procedimiento: 'Liposucción',
-      estado: 'Pendiente',
-      color: 'from-amber-500 to-orange-500',
-    },
-    {
-      id: 3,
-      paciente: 'María García',
-      hora: '14:00',
-      procedimiento: 'Aumento de Glúteos',
-      estado: 'Confirmada',
-      color: 'from-emerald-500 to-teal-500',
-    },
-  ]);
+  const [citasProximas, setCitasProximas] = useState<any[]>([]);
 
+  const storedUser = getStoredUser();
   const user = {
-    nombre: 'Dr. Test',
-    apellido: 'User',
+    nombre: storedUser.nombre || 'Dr.',
+    apellido: storedUser.apellido || '',
     especialidad: 'Cirugía Estética',
   };
+
+  useEffect(() => {
+    const cargarDatos = async () => {
+      const token = getToken();
+      if (!token) return;
+      try {
+        const hoyInicio = new Date(); hoyInicio.setHours(0, 0, 0, 0);
+        const hoyFin = new Date(); hoyFin.setHours(23, 59, 59, 999);
+        const semanaFin = new Date(); semanaFin.setDate(semanaFin.getDate() + 7); semanaFin.setHours(23, 59, 59, 999);
+
+        const [resHoy, resSemana] = await Promise.all([
+          fetch(`/api/citas/medico/agenda?fechaInicio=${hoyInicio.toISOString()}&fechaFin=${hoyFin.toISOString()}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          fetch(`/api/citas/medico/agenda?fechaInicio=${hoyInicio.toISOString()}&fechaFin=${semanaFin.toISOString()}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+        ]);
+
+        const dataHoy = resHoy.ok ? await resHoy.json() : { citas: [] };
+        const dataSemana = resSemana.ok ? await resSemana.json() : { citas: [] };
+        const citasHoy = dataHoy.citas || [];
+        const citasSem = dataSemana.citas || [];
+
+        const confirmadas = citasHoy.filter((c: any) => c.estado === 'CONFIRMADA').length;
+        const tasaComp = citasHoy.length > 0 ? Math.round((confirmadas / citasHoy.length) * 100) : 0;
+
+        setStats({
+          pacientesHoy: citasHoy.length,
+          citasProximas: citasSem.length,
+          historiasActivas: citasHoy.filter((c: any) => c.estado === 'COMPLETADA').length,
+          tasaComplecion: tasaComp,
+        });
+
+        const estadoLabel: Record<string, string> = {
+          CONFIRMADA: 'Confirmada',
+          EN_SALA:    'En Sala',
+          COMPLETADA: 'Atendida',
+          CANCELADA:  'Cancelada',
+          PENDIENTE:  'Pendiente',
+        };
+        const normalizadas = citasSem.map((c: any) => ({
+          id: c.id,
+          paciente: c.paciente?.nombreCompleto || 'Paciente',
+          hora: new Date(c.fechaHora).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: false }),
+          procedimiento: c.tipoCita || c.motivo || 'Consulta',
+          estado: c.estado,
+          estadoLabel: estadoLabel[c.estado] || c.estado,
+        }));
+        normalizadas.sort((a: any, b: any) => a.hora.localeCompare(b.hora));
+        setCitasProximas(normalizadas);
+      } catch (e) {
+        console.error('Error cargando dashboard:', e);
+      }
+    };
+    cargarDatos();
+  }, []);
 
   const cardVariants = {
     hidden: { opacity: 0, y: 20 },
@@ -214,7 +252,13 @@ export default function DashboardPage() {
             </div>
 
             <div className="space-y-4">
-              {citasProximas.map((cita, index) => (
+              {citasProximas.length === 0 ? (
+                <div className="text-center py-10 text-gray-500">
+                  <Calendar size={40} className="mx-auto mb-3 opacity-30" />
+                  <p className="text-sm">No hay citas esta semana</p>
+                </div>
+              ) : (
+                citasProximas.map((cita, index) => (
                 <motion.div
                   key={cita.id}
                   initial={{ opacity: 0, x: -20 }}
@@ -237,12 +281,14 @@ export default function DashboardPage() {
                     <div className="flex items-center gap-1 sm:gap-3 flex-shrink-0">
                       <span
                         className={`px-2 sm:px-4 py-1 sm:py-2 rounded-full font-semibold text-xs ${
-                          cita.estado === 'Confirmada'
-                            ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                            : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                          cita.estado === 'CONFIRMADA' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                          : cita.estado === 'EN_SALA'    ? 'bg-cyan-500/20    text-cyan-400    border border-cyan-500/30'
+                          : cita.estado === 'COMPLETADA' ? 'bg-purple-500/20   text-purple-400  border border-purple-500/30'
+                          : cita.estado === 'CANCELADA'  ? 'bg-red-500/20      text-red-400     border border-red-500/30'
+                          :                               'bg-amber-500/20    text-amber-400   border border-amber-500/30'
                         }`}
                       >
-                        {cita.estado}
+                        {cita.estadoLabel}
                       </span>
                       <button className="p-2 hover:bg-yellow-500/20 rounded-lg transition-colors">
                         <ArrowRight size={20} className="text-yellow-400" />
@@ -250,7 +296,8 @@ export default function DashboardPage() {
                     </div>
                   </div>
                 </motion.div>
-              ))}
+                ))
+              )}
             </div>
           </motion.div>
 

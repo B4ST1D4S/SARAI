@@ -11,6 +11,8 @@ import {
   postBloqueo,
   deleteBloqueoCtrl,
   getDisponibilidadesConCitasCtrl,
+  getMedicosPorTipoCtrl,
+  getDiasDisponiblesCtrl,
 } from '../controllers/disponibilidadController.js';
 import { authenticateToken, authorizeRole } from '../middleware/auth.js';
 
@@ -20,6 +22,12 @@ router.use(authenticateToken);
 
 // Slots libres para un médico en una fecha (todos los roles)
 router.get('/slots', getSlots);
+
+// Días del mes con al menos 1 slot libre
+router.get('/dias-disponibles', getDiasDisponiblesCtrl);
+
+// Médicos que tienen disponibilidad para un tipo de consulta
+router.get('/medicos-por-tipo', getMedicosPorTipoCtrl);
 
 // Lista de todos los médicos activos (para Config Agenda)
 router.get('/medicos-list', getMedicosList);

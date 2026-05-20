@@ -1,8 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { Calendar, Clock, User, CheckCircle, AlertCircle, Plus, Trash2, Stethoscope, Bell } from 'lucide-react';
-import { citasService, initializeMockData } from '../services/mockData';
-import { getCitasMedico, completarCita, cancelarCitaApi } from '../services/api';
+import { Calendar, Clock, User, CheckCircle, Plus, Trash2, Stethoscope, Bell, RefreshCw, Zap } from 'lucide-react';
+import { completarCita } from '../services/api';
 
 interface Cita {
   id: string;
@@ -22,47 +21,55 @@ interface AgendaProfesionalProps {
 }
 
 export default function AgendaProfesionalPage({ onNavegar, onAbrirHistoriaPaciente }: AgendaProfesionalProps = {}) {
-  const hoy = new Date().toISOString().split('T')[0];
-  
+  const hoyDate = new Date();
+  const hoy = `${hoyDate.getFullYear()}-${String(hoyDate.getMonth() + 1).padStart(2, '0')}-${String(hoyDate.getDate()).padStart(2, '0')}`;
+
   const [citas, setCitas] = useState<Cita[]>([]);
   const [selectedDate, setSelectedDate] = useState(hoy);
+  const [loadingCitas, setLoadingCitas] = useState(false);
 
   const getToken = () => localStorage.getItem('accessToken') || '';
 
-  // Cargar citas: API real primero, mock como fallback
-  useEffect(() => {
-    initializeMockData();
-    const cargarCitas = async () => {
+  // Cargar citas por rango de fecha (igual que AgendaPage — sin bug de timezone)
+  const cargarCitas = useCallback(async () => {
+    setLoadingCitas(true);
+    try {
       const token = getToken();
-      if (token) {
-        const res = await getCitasMedico(token);
-        if (!res.error && res.data) {
-          const citasApi = ((res.data as any).citas || []).map((c: any) => {
-            const fecha = new Date(c.fechaHora);
-            return {
-              id: c.id,
-              pacienteId: c.paciente?.id || c.pacienteId,
-              pacienteNombre: c.paciente?.nombreCompleto || 'Paciente',
-              fecha: fecha.toISOString().split('T')[0],
-              hora: fecha.toTimeString().slice(0, 5),
-              duracion: c.duracionMinutos || 60,
-              procedimiento: c.tipoCita || c.motivo || 'Consulta',
-              estado: c.estado === 'COMPLETADA' ? 'ATENDIDA' : c.estado,
-              notas: c.notas || '',
-            } as Cita;
-          });
-          setCitas(citasApi);
-          return;
-        }
-      }
-      // Fallback a mock
-      setCitas(citasService.getAll());
-    };
-    cargarCitas();
-  }, []);
+      const [year, month, day] = selectedDate.split('-').map(Number);
+      const inicioLocal = new Date(year, month - 1, day, 0, 0, 0, 0);
+      const finLocal    = new Date(year, month - 1, day, 23, 59, 59, 999);
+      const res = await fetch(
+        `/api/citas/medico/agenda?fechaInicio=${inicioLocal.toISOString()}&fechaFin=${finLocal.toISOString()}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (!res.ok) throw new Error('Error al obtener citas');
+      const data = await res.json();
+      const lista = (data.citas || []).map((c: any) => {
+        const fecha = new Date(c.fechaHora);
+        return {
+          id: c.id,
+          pacienteId: c.paciente?.id || c.pacienteId,
+          pacienteNombre: c.paciente?.nombreCompleto || 'Paciente',
+          fecha: selectedDate,
+          hora: fecha.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: false }),
+          duracion: c.duracionMinutos || 30,
+          procedimiento: c.tipoCita || c.motivo || 'Consulta',
+          estado: (c.estado === 'COMPLETADA' ? 'ATENDIDA' : c.estado) as Cita['estado'],
+          notas: c.notas || '',
+        } as Cita;
+      });
+      lista.sort((a: Cita, b: Cita) => a.hora.localeCompare(b.hora));
+      setCitas(lista);
+    } catch (e) {
+      console.error('Error cargando citas:', e);
+      setCitas([]);
+    } finally {
+      setLoadingCitas(false);
+    }
+  }, [selectedDate]);
+
+  useEffect(() => { cargarCitas(); }, [cargarCitas]);
   const [showNewCita, setShowNewCita] = useState(false);
-  const [showAssignCita, setShowAssignCita] = useState(false);
-  const [selectedCita, setSelectedCita] = useState<Cita | null>(null);
 
   const [formData, setFormData] = useState({
     pacienteNombre: '',
@@ -72,38 +79,13 @@ export default function AgendaProfesionalPage({ onNavegar, onAbrirHistoriaPacien
     notas: '',
   });
 
-  // Crear nueva cita
-  const handleCrearCita = () => {
-    if (!formData.pacienteNombre || !formData.hora) return;
-
-    const newCita = citasService.create({
-      pacienteNombre: formData.pacienteNombre,
-      fecha: selectedDate,
-      hora: formData.hora,
-      duracion: formData.duracion,
-      procedimiento: formData.procedimiento,
-      estado: 'PENDIENTE',
-      notas: formData.notas,
-      pacienteId: 'temp-' + Date.now(),
-    });
-
-    setCitas(citasService.getAll());
-    setFormData({ pacienteNombre: '', hora: '', duracion: 30, procedimiento: '', notas: '' });
-    setShowNewCita(false);
-  };
-
   // Cambiar estado de cita
   const handleCambiarEstado = async (id: string, nuevoEstado: Cita['estado']) => {
-    // Si se marca como ATENDIDA → llamar API completar + navegar a Historia Clínica
     if (nuevoEstado === 'ATENDIDA') {
       const token = getToken();
       const cita = citas.find((c) => c.id === id);
-      if (token && cita) {
-        await completarCita(id, token);
-      }
-      // Actualizar estado local
+      if (token && cita) await completarCita(id, token);
       setCitas((prev) => prev.map((c) => c.id === id ? { ...c, estado: 'ATENDIDA' } : c));
-      // Navegar a Historia Clínica con el paciente pre-cargado
       if (cita?.pacienteId && onAbrirHistoriaPaciente) {
         onAbrirHistoriaPaciente(cita.pacienteId, cita.pacienteNombre);
       } else if (onNavegar) {
@@ -111,117 +93,213 @@ export default function AgendaProfesionalPage({ onNavegar, onAbrirHistoriaPacien
       }
       return;
     }
-    // Otros cambios de estado: solo actualizar local (mock)
-    citasService.update(id, { estado: nuevoEstado } as any);
-    setCitas(citasService.getAll());
+    if (nuevoEstado === 'CONFIRMADA') {
+      const token = getToken();
+      await fetch(`/api/citas/${id}`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ estado: 'CONFIRMADA' }),
+      });
+      setCitas((prev) => prev.map((c) => c.id === id ? { ...c, estado: 'CONFIRMADA' } : c));
+      return;
+    }
+    setCitas((prev) => prev.map((c) => c.id === id ? { ...c, estado: nuevoEstado } : c));
   };
 
-  // Eliminar cita
-  const handleEliminarCita = (id: string) => {
-    citasService.delete(id);
-    setCitas(citasService.getAll());
+  // Eliminar / cancelar cita
+  const handleEliminarCita = async (id: string) => {
+    const token = getToken();
+    await fetch(`/api/citas/${id}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    setCitas((prev) => prev.filter((c) => c.id !== id));
   };
 
-  // Filtrar citas por fecha
-  const citasHoy = citas.filter((c) => c.fecha === selectedDate).sort((a, b) => a.hora.localeCompare(b.hora));
+  // Estadísticas del día
+  const citasHoy = citas; // ya vienen filtradas por fecha desde la API
+  const totalHoy       = citasHoy.length;
+  const confirmSala    = citasHoy.filter(c => ['CONFIRMADA', 'EN_SALA'].includes(c.estado)).length;
+  const pendientes     = citasHoy.filter(c => c.estado === 'PENDIENTE').length;
+  const atendidas      = citasHoy.filter(c => ['ATENDIDA', 'COMPLETADA'].includes(c.estado)).length;
 
-  const getStatusColor = (estado: Cita['estado']) => {
+  const getEstadoConfig = (estado: Cita['estado']) => {
     switch (estado) {
-      case 'CONFIRMADA': return 'bg-emerald-500/20 border-emerald-500 text-emerald-400';
-      case 'EN_SALA':    return 'bg-cyan-500/20 border-cyan-500 text-cyan-400';
-      case 'ATENDIDA':   return 'bg-blue-500/20 border-blue-500 text-blue-400';
-      case 'PENDIENTE':  return 'bg-yellow-500/20 border-yellow-500 text-yellow-400';
-      case 'CANCELADA':  return 'bg-red-500/20 border-red-500 text-red-400';
-      default:           return 'bg-slate-500/20 border-slate-500 text-slate-400';
+      case 'CONFIRMADA': return { label: '✓ Confirmada',       color: 'text-emerald-400', border: 'border-emerald-500/20 hover:border-emerald-500/60 hover:shadow-emerald-500/20', glow: 'from-emerald-500/10', clock: 'text-emerald-400' };
+      case 'EN_SALA':    return { label: '🏥 En Sala',          color: 'text-cyan-400',    border: 'border-cyan-500/20    hover:border-cyan-500/60    hover:shadow-cyan-500/20',    glow: 'from-cyan-500/10',    clock: 'text-cyan-400'    };
+      case 'ATENDIDA':
+      case 'COMPLETADA': return { label: '✅ Atendida',          color: 'text-purple-400',  border: 'border-purple-500/20  hover:border-purple-500/60  hover:shadow-purple-500/20',  glow: 'from-purple-500/10',  clock: 'text-purple-400'  };
+      case 'CANCELADA':  return { label: '✕ Cancelada',         color: 'text-red-400',     border: 'border-red-500/20     hover:border-red-500/60     hover:shadow-red-500/20',     glow: 'from-red-500/10',     clock: 'text-red-400'     };
+      default:           return { label: '⚠ Pendiente',         color: 'text-orange-400',  border: 'border-orange-500/20  hover:border-orange-500/60  hover:shadow-orange-500/20',  glow: 'from-orange-500/10',  clock: 'text-orange-400'  };
     }
   };
 
-  return (
-    <div className="min-h-screen bg-slate-900 p-3 sm:p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-5 sm:mb-8">
-          <div>
-            <h1 className="text-xl sm:text-3xl lg:text-4xl font-bold text-white mb-1 sm:mb-2">Agenda Profesional</h1>
-            <p className="text-gray-400 text-xs sm:text-sm">Gestiona tus citas y procedimientos</p>
-          </div>
-          <button
-            onClick={() => setShowNewCita(!showNewCita)}
-            className="px-4 py-2 sm:px-6 sm:py-3 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg font-semibold text-sm flex items-center gap-2 transition self-start sm:self-auto"
-          >
-            <Plus size={16} /> Nueva Cita
-          </button>
-        </div>
+  const labelFecha = () => {
+    const [y, m, d] = selectedDate.split('-').map(Number);
+    return new Date(y, m - 1, d).toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  };
 
-        {/* Selector Fecha */}
-        <div className="bg-slate-800 border border-yellow-600/20 rounded-lg p-4 mb-6">
-          <label className="block text-white font-semibold mb-3">Seleccionar Fecha</label>
-          <input
-            type="date"
-            value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
-            className="px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:border-yellow-600 focus:outline-none"
-          />
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-3 sm:p-6">
+      <div className="max-w-7xl mx-auto">
+
+        {/* Header Premium */}
+        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-5 sm:mb-8">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-1.5 sm:w-2 h-8 sm:h-10 bg-gradient-to-b from-yellow-400 to-amber-600 rounded-full flex-shrink-0"></div>
+              <div>
+                <h1 className="text-2xl sm:text-4xl lg:text-5xl font-bold bg-gradient-to-r from-yellow-300 via-yellow-400 to-amber-600 bg-clip-text text-transparent">
+                  Agenda Profesional
+                </h1>
+                <p className="text-gray-400 text-xs sm:text-sm ml-1 flex items-center gap-1.5 mt-0.5">
+                  <Zap size={12} className="text-yellow-500" />
+                  Control de tus citas y procedimientos
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={cargarCitas}
+                className="p-2 text-gray-400 hover:text-yellow-400 transition rounded-xl hover:bg-slate-800/60"
+                title="Actualizar"
+              >
+                <RefreshCw size={18} className={loadingCitas ? 'animate-spin' : ''} />
+              </button>
+              <button
+                onClick={() => setShowNewCita(!showNewCita)}
+                className="px-4 py-2 sm:px-5 sm:py-2.5 bg-gradient-to-r from-yellow-500 to-amber-600 hover:from-yellow-400 hover:to-amber-500 text-slate-900 rounded-xl font-bold text-sm flex items-center gap-2 transition shadow-lg shadow-yellow-500/25"
+              >
+                <Plus size={16} /> Nueva Cita
+              </button>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Selector Fecha + Stats */}
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-6">
+          {/* Selector fecha */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+            className="bg-gradient-to-br from-slate-800/50 to-slate-900/50 border border-yellow-500/20 rounded-xl sm:rounded-2xl p-3 sm:p-5 flex flex-col justify-center"
+          >
+            <p className="text-yellow-400/80 text-[10px] sm:text-xs font-semibold uppercase tracking-wider mb-2">Fecha</p>
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white text-sm focus:border-yellow-500 focus:outline-none focus:ring-1 focus:ring-yellow-500/30"
+            />
+          </motion.div>
+
+          {/* HOY */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}
+            className="group relative bg-gradient-to-br from-slate-800/50 to-slate-900/50 border border-yellow-500/20 rounded-xl sm:rounded-2xl p-3 sm:p-6 hover:border-yellow-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-yellow-500/10 overflow-hidden"
+          >
+            <div className="absolute top-0 right-0 w-16 sm:w-24 h-16 sm:h-24 bg-gradient-to-br from-yellow-500/10 to-transparent rounded-full -mr-8 sm:-mr-12 -mt-8 sm:-mt-12 group-hover:scale-150 transition-transform duration-300"></div>
+            <div className="relative">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-yellow-400/80 text-[9px] sm:text-sm font-semibold uppercase tracking-wider">HOY</p>
+                  <p className="text-2xl sm:text-4xl font-bold text-white mt-1">{totalHoy}</p>
+                </div>
+                <div className="bg-gradient-to-br from-yellow-500/20 to-amber-600/20 p-1.5 sm:p-3 rounded-xl">
+                  <Zap className="text-yellow-400" size={18} />
+                </div>
+              </div>
+            </div>
+          </motion.div>
+
+          {/* Confirm / Sala */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
+            className="group relative bg-gradient-to-br from-slate-800/50 to-slate-900/50 border border-emerald-500/20 rounded-xl sm:rounded-2xl p-3 sm:p-6 hover:border-emerald-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-emerald-500/10 overflow-hidden"
+          >
+            <div className="absolute top-0 right-0 w-16 sm:w-24 h-16 sm:h-24 bg-gradient-to-br from-emerald-500/10 to-transparent rounded-full -mr-8 sm:-mr-12 -mt-8 sm:-mt-12 group-hover:scale-150 transition-transform duration-300"></div>
+            <div className="relative">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-emerald-400/80 text-[9px] sm:text-sm font-semibold uppercase tracking-wider">Confirm./Sala</p>
+                  <p className="text-2xl sm:text-4xl font-bold text-white mt-1">{confirmSala}</p>
+                </div>
+                <div className="bg-gradient-to-br from-emerald-500/20 to-teal-600/20 p-1.5 sm:p-3 rounded-xl">
+                  <CheckCircle className="text-emerald-400" size={18} />
+                </div>
+              </div>
+            </div>
+          </motion.div>
+
+          {/* Pendientes */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
+            className="group relative bg-gradient-to-br from-slate-800/50 to-slate-900/50 border border-orange-500/20 rounded-xl sm:rounded-2xl p-3 sm:p-6 hover:border-orange-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-orange-500/10 overflow-hidden"
+          >
+            <div className="absolute top-0 right-0 w-16 sm:w-24 h-16 sm:h-24 bg-gradient-to-br from-orange-500/10 to-transparent rounded-full -mr-8 sm:-mr-12 -mt-8 sm:-mt-12 group-hover:scale-150 transition-transform duration-300"></div>
+            <div className="relative">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-orange-400/80 text-[9px] sm:text-sm font-semibold uppercase tracking-wider">Pendient.</p>
+                  <p className="text-2xl sm:text-4xl font-bold text-white mt-1">{pendientes}</p>
+                </div>
+                <div className="bg-gradient-to-br from-orange-500/20 to-amber-600/20 p-1.5 sm:p-3 rounded-xl">
+                  <Clock className="text-orange-400" size={18} />
+                </div>
+              </div>
+            </div>
+          </motion.div>
         </div>
 
         {/* Form Nueva Cita */}
         {showNewCita && (
           <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-slate-800 border border-yellow-600/20 rounded-lg p-6 mb-6"
+            initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}
+            className="bg-gradient-to-br from-slate-800/60 to-slate-900/60 border border-yellow-500/30 rounded-2xl p-6 mb-6 shadow-xl"
           >
-            <h2 className="text-xl font-bold text-white mb-4">Crear Nueva Cita</h2>
+            <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+              <Plus size={20} className="text-yellow-400" /> Crear Nueva Cita
+            </h2>
             <div className="grid grid-cols-2 gap-4">
               <input
                 type="text"
                 placeholder="Nombre del Paciente"
                 value={formData.pacienteNombre}
                 onChange={(e) => setFormData({ ...formData, pacienteNombre: e.target.value })}
-                className="px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-gray-500 focus:border-yellow-600"
+                className="px-4 py-2.5 bg-slate-800 border border-slate-600 rounded-xl text-white placeholder-gray-500 focus:border-yellow-500 focus:outline-none focus:ring-1 focus:ring-yellow-500/30"
               />
               <input
                 type="time"
                 value={formData.hora}
                 onChange={(e) => setFormData({ ...formData, hora: e.target.value })}
-                className="px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:border-yellow-600"
+                className="px-4 py-2.5 bg-slate-800 border border-slate-600 rounded-xl text-white focus:border-yellow-500 focus:outline-none"
               />
               <input
                 type="text"
                 placeholder="Procedimiento"
                 value={formData.procedimiento}
                 onChange={(e) => setFormData({ ...formData, procedimiento: e.target.value })}
-                className="px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-gray-500 focus:border-yellow-600"
+                className="px-4 py-2.5 bg-slate-800 border border-slate-600 rounded-xl text-white placeholder-gray-500 focus:border-yellow-500 focus:outline-none"
               />
               <select
                 value={formData.duracion}
                 onChange={(e) => setFormData({ ...formData, duracion: parseInt(e.target.value) })}
-                className="px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:border-yellow-600"
+                className="px-4 py-2.5 bg-slate-800 border border-slate-600 rounded-xl text-white focus:border-yellow-500 focus:outline-none"
               >
-                <option value={15}>15 min</option>
-                <option value={30}>30 min</option>
-                <option value={45}>45 min</option>
-                <option value={60}>1 hora</option>
-                <option value={90}>1.5 horas</option>
-                <option value={120}>2 horas</option>
+                {[15, 30, 45, 60, 90, 120].map(v => (
+                  <option key={v} value={v}>{v < 60 ? `${v} min` : `${v / 60}h`}</option>
+                ))}
               </select>
             </div>
             <textarea
               placeholder="Notas (ayuno, exámenes, etc)"
               value={formData.notas}
               onChange={(e) => setFormData({ ...formData, notas: e.target.value })}
-              className="w-full mt-4 px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-gray-500 focus:border-yellow-600 min-h-20"
+              className="w-full mt-4 px-4 py-2.5 bg-slate-800 border border-slate-600 rounded-xl text-white placeholder-gray-500 focus:border-yellow-500 focus:outline-none min-h-20"
             />
             <div className="flex gap-3 mt-4">
               <button
-                onClick={handleCrearCita}
-                className="flex-1 py-2 bg-yellow-600 hover:bg-yellow-700 text-white font-semibold rounded-lg transition"
-              >
-                Crear Cita
-              </button>
-              <button
                 onClick={() => setShowNewCita(false)}
-                className="flex-1 py-2 bg-slate-700 hover:bg-slate-600 text-white font-semibold rounded-lg transition"
+                className="flex-1 py-2.5 bg-slate-700 hover:bg-slate-600 text-white font-semibold rounded-xl transition"
               >
                 Cancelar
               </button>
@@ -229,175 +307,160 @@ export default function AgendaProfesionalPage({ onNavegar, onAbrirHistoriaPacien
           </motion.div>
         )}
 
-        {/* Resumen del día */}
-        <div className="grid grid-cols-4 gap-4 mb-6">
-          <motion.div
-            whileHover={{ scale: 1.05 }}
-            className="bg-gradient-to-br from-blue-600 to-blue-800 rounded-lg p-4 border border-blue-500/30"
-          >
-            <div className="text-blue-200 text-sm font-semibold mb-2">Citas Hoy</div>
-            <div className="text-3xl font-bold text-white">{citasHoy.length}</div>
-          </motion.div>
-
-          <motion.div
-            whileHover={{ scale: 1.05 }}
-            className="bg-gradient-to-br from-emerald-600 to-emerald-800 rounded-lg p-4 border border-emerald-500/30"
-          >
-            <div className="text-emerald-200 text-sm font-semibold mb-2">Confirmadas</div>
-            <div className="text-3xl font-bold text-white">
-              {citasHoy.filter((c) => c.estado === 'CONFIRMADA').length}
+        {/* Panel de Citas */}
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+          <div className="bg-gradient-to-br from-slate-800/30 to-slate-900/30 border border-slate-700/50 rounded-2xl p-5 sm:p-7">
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-3">
+                <div className="w-1 h-7 bg-gradient-to-b from-yellow-400 to-amber-600 rounded-full"></div>
+                <div>
+                  <h2 className="text-xl sm:text-2xl font-bold text-white">Citas del Día</h2>
+                  <p className="text-gray-400 text-xs capitalize">{labelFecha()}</p>
+                </div>
+              </div>
+              <button onClick={cargarCitas} className="p-2 text-gray-500 hover:text-yellow-400 transition rounded-lg">
+                <RefreshCw size={15} className={loadingCitas ? 'animate-spin' : ''} />
+              </button>
             </div>
-          </motion.div>
 
-          <motion.div
-            whileHover={{ scale: 1.05 }}
-            className="bg-gradient-to-br from-yellow-600 to-yellow-800 rounded-lg p-4 border border-yellow-500/30"
-          >
-            <div className="text-yellow-200 text-sm font-semibold mb-2">Pendientes</div>
-            <div className="text-3xl font-bold text-white">
-              {citasHoy.filter((c) => c.estado === 'PENDIENTE').length}
-            </div>
-          </motion.div>
-
-          <motion.div
-            whileHover={{ scale: 1.05 }}
-            className="bg-gradient-to-br from-purple-600 to-purple-800 rounded-lg p-4 border border-purple-500/30"
-          >
-            <div className="text-purple-200 text-sm font-semibold mb-2">Atendidas</div>
-            <div className="text-3xl font-bold text-white">
-              {citasHoy.filter((c) => c.estado === 'ATENDIDA').length}
-            </div>
-          </motion.div>
-        </div>
-
-        {/* Timeline de Citas */}
-        <div className="bg-slate-800 border border-yellow-600/20 rounded-lg p-6">
-          <h2 className="text-2xl font-bold text-white mb-6">Citas del {selectedDate}</h2>
-
-          {citasHoy.length === 0 ? (
-            <div className="text-center py-12 text-gray-400">
-              <Calendar size={48} className="mx-auto mb-4 opacity-50" />
-              <p>No hay citas programadas para este día</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {citasHoy.map((cita, idx) => (
-                <motion.div
-                  key={cita.id}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: idx * 0.1 }}
-                  className="bg-slate-700/50 border border-slate-600 rounded-lg p-4 hover:border-yellow-600/50 transition"
-                >
-                  <div className="flex justify-between items-start mb-3">
-                    <div className="flex items-center gap-4 flex-1">
-                      <div className="bg-yellow-600/20 rounded-lg p-3">
-                        <Clock className="text-yellow-600" size={24} />
-                      </div>
-                      <div className="flex-1">
-                        <h3 className="text-lg font-bold text-white">{cita.pacienteNombre}</h3>
-                        <p className="text-gray-400 text-sm">{cita.procedimiento}</p>
-                      </div>
-                    </div>
-                    <div className={`px-3 py-1 rounded-full border text-xs font-semibold ${getStatusColor(cita.estado)}`}>
-                      {cita.estado}
-                    </div>
-                  </div>
-
-                  <div className="flex justify-between items-center mb-3 text-gray-300 text-sm">
-                    <span>
-                      ⏰ {cita.hora} ({cita.duracion} min)
-                    </span>
-                    <span className="text-yellow-600 font-semibold">{cita.procedimiento}</span>
-                  </div>
-
-                  {cita.notas && <div className="text-gray-400 text-sm mb-3 bg-slate-600/30 p-2 rounded italic">📝 {cita.notas}</div>}
-
-                  <div className="flex gap-2">
-                    {cita.estado === 'PENDIENTE' && (
-                      <button
-                        onClick={() => handleCambiarEstado(cita.id, 'CONFIRMADA')}
-                        className="flex-1 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded transition"
-                      >
-                        ✓ Confirmar
-                      </button>
-                    )}
-
-                    {/* CU-03: Paciente llega → EN_SALA */}
-                    {cita.estado === 'CONFIRMADA' && (
-                      <button
-                        onClick={async () => {
-                          const token = getToken();
-                          const res = await fetch(`/api/citas/${cita.id}/admision`, {
-                            method: 'POST',
-                            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-                          });
-                          if (res.ok) setCitas(prev => prev.map(c => c.id === cita.id ? { ...c, estado: 'EN_SALA' } : c));
-                        }}
-                        className="flex-1 px-3 py-2 bg-cyan-600 hover:bg-cyan-700 text-white text-sm font-semibold rounded transition flex items-center justify-center gap-2"
-                      >
-                        <Bell size={14} /> Paciente Llegó
-                      </button>
-                    )}
-
-                    {/* CU-04: Llamar paciente → Atender → Historia Clínica */}
-                    {cita.estado === 'EN_SALA' && (
-                      <button
-                        onClick={() => handleCambiarEstado(cita.id, 'ATENDIDA')}
-                        className="flex-1 px-3 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-sm font-semibold rounded transition flex items-center justify-center gap-2 shadow-lg shadow-blue-500/30"
-                      >
-                        <Stethoscope size={16} />
-                        Atender → Historia Clínica
-                      </button>
-                    )}
-
-                    {cita.estado === 'ATENDIDA' && (
-                      <button
-                        disabled
-                        className="flex-1 px-3 py-2 bg-gray-600 text-white text-sm font-semibold rounded"
-                      >
-                        ✅ Atendida
-                      </button>
-                    )}
-
-                    <button
-                      onClick={() => handleEliminarCita(cita.id)}
-                      className="px-3 py-2 bg-red-600/20 hover:bg-red-600/40 text-red-400 rounded transition border border-red-600/30"
+            {loadingCitas ? (
+              <div className="flex items-center justify-center py-14 gap-3 text-gray-500">
+                <RefreshCw size={20} className="animate-spin" />
+                <span className="text-sm">Cargando citas...</span>
+              </div>
+            ) : citasHoy.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-14 text-gray-600 gap-3">
+                <Calendar size={40} className="opacity-30" />
+                <p className="text-sm">Sin citas agendadas para este día</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {citasHoy.map((cita, idx) => {
+                  const cfg = getEstadoConfig(cita.estado);
+                  return (
+                    <motion.div
+                      key={cita.id}
+                      initial={{ opacity: 0, x: 20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.15 + idx * 0.08 }}
+                      whileHover={{ scale: 1.01, x: 6 }}
+                      className={`bg-gradient-to-br from-slate-800/40 to-slate-900/40 rounded-2xl p-5 border transition-all duration-300 group cursor-pointer overflow-hidden relative hover:shadow-2xl ${cfg.border}`}
                     >
-                      <Trash2 size={18} />
-                    </button>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-          )}
-        </div>
+                      <div className={`absolute top-0 right-0 w-20 h-20 rounded-full -mr-10 -mt-10 transition-transform group-hover:scale-150 bg-gradient-to-br ${cfg.glow} to-transparent`}></div>
+                      <div className="relative">
+                        <div className="flex justify-between items-start mb-3">
+                          <div className="flex-1">
+                            <p className={`text-sm uppercase tracking-wider font-semibold mb-2 ${cfg.color}`}>{cfg.label}</p>
+                            <p className="text-white font-bold text-2xl flex items-center gap-2 mb-1">
+                              <Clock size={20} className={cfg.clock} />
+                              {cita.hora}
+                              <span className="text-gray-500 text-sm font-normal">({cita.duracion} min)</span>
+                            </p>
+                          </div>
+                        </div>
+                        <div className="space-y-1.5 mb-4">
+                          <p className="text-white font-semibold flex items-center gap-2 text-base">
+                            <User size={16} className="text-blue-400 flex-shrink-0" />
+                            {cita.pacienteNombre}
+                          </p>
+                          <p className="text-gray-300 text-sm ml-6">{cita.procedimiento}</p>
+                          {cita.notas && (
+                            <p className="text-gray-500 text-xs ml-6 italic">📝 {cita.notas}</p>
+                          )}
+                        </div>
+
+                        {/* Acciones */}
+                        <div className="flex gap-2 mt-3">
+                          {cita.estado === 'PENDIENTE' && (
+                            <button
+                              onClick={() => handleCambiarEstado(cita.id, 'CONFIRMADA')}
+                              className="flex-1 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-sm font-semibold rounded-xl transition shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2"
+                            >
+                              <CheckCircle size={14} /> Confirmar
+                            </button>
+                          )}
+
+                          {cita.estado === 'CONFIRMADA' && (
+                            <button
+                              onClick={async () => {
+                                const token = getToken();
+                                const res = await fetch(`/api/citas/${cita.id}/admision`, {
+                                  method: 'POST',
+                                  headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+                                });
+                                if (res.ok) setCitas(prev => prev.map(c => c.id === cita.id ? { ...c, estado: 'EN_SALA' } : c));
+                              }}
+                              className="flex-1 py-2 bg-gradient-to-r from-cyan-600 to-sky-600 hover:from-cyan-500 hover:to-sky-500 text-white text-sm font-semibold rounded-xl transition shadow-lg shadow-cyan-500/20 flex items-center justify-center gap-2"
+                            >
+                              <Bell size={14} /> Paciente Llegó
+                            </button>
+                          )}
+
+                          {cita.estado === 'EN_SALA' && (
+                            <button
+                              onClick={() => handleCambiarEstado(cita.id, 'ATENDIDA')}
+                              className="flex-1 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-sm font-semibold rounded-xl transition shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2"
+                            >
+                              <Stethoscope size={14} /> Atender → HC
+                            </button>
+                          )}
+
+                          {(cita.estado === 'ATENDIDA' || cita.estado === 'COMPLETADA') && (
+                            <div className="flex-1 py-2 bg-slate-700/50 text-gray-500 text-sm font-semibold rounded-xl flex items-center justify-center gap-2 border border-slate-600/50">
+                              ✅ Atendida
+                            </div>
+                          )}
+
+                          <button
+                            onClick={() => handleEliminarCita(cita.id)}
+                            className="px-3 py-2 bg-red-600/10 hover:bg-red-600/30 text-red-400 rounded-xl transition border border-red-600/20"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </motion.div>
 
         {/* Checklist Preoperatorio */}
-        <div className="bg-slate-800 border border-yellow-600/20 rounded-lg p-6 mt-6">
-          <h2 className="text-2xl font-bold text-white mb-4">📋 Checklist Preoperatorio</h2>
-          <div className="grid grid-cols-2 gap-4">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
+          className="mt-6 bg-gradient-to-br from-slate-800/30 to-slate-900/30 border border-slate-700/50 rounded-2xl p-5 sm:p-7"
+        >
+          <div className="flex items-center gap-3 mb-5">
+            <div className="w-1 h-7 bg-gradient-to-b from-emerald-400 to-teal-600 rounded-full"></div>
+            <h2 className="text-xl sm:text-2xl font-bold text-white">Checklist Preoperatorio</h2>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {[
-              '✓ Consentimiento firmado',
-              '✓ Exámenes de laboratorio',
-              '✓ Fotografías clínicas',
-              '✓ Ayuno confirmado',
-              '✓ Medicación suspendida',
-              '✓ Alergias documentadas',
-              '✓ Autorización anestesia',
-              '✓ Marca quirúrgica lista',
+              { text: 'Consentimiento firmado', icon: '📄' },
+              { text: 'Exámenes de laboratorio', icon: '🧪' },
+              { text: 'Fotografías clínicas', icon: '📷' },
+              { text: 'Ayuno confirmado', icon: '⏰' },
+              { text: 'Medicación suspendida', icon: '💊' },
+              { text: 'Alergias documentadas', icon: '⚠️' },
+              { text: 'Autorización anestesia', icon: '💉' },
+              { text: 'Marca quirúrgica lista', icon: '✏️' },
             ].map((item, idx) => (
-              <div
+              <motion.div
                 key={idx}
-                className="flex items-center gap-3 p-3 bg-slate-700/50 rounded-lg border border-emerald-600/30 hover:border-emerald-600/60 transition cursor-pointer"
+                whileHover={{ scale: 1.03 }}
+                className="flex items-center gap-3 p-3.5 bg-slate-800/40 rounded-xl border border-emerald-600/20 hover:border-emerald-500/50 transition cursor-pointer group"
               >
-                <CheckCircle size={20} className="text-emerald-600 flex-shrink-0" />
-                <span className="text-white text-sm">{item}</span>
-              </div>
+                <span className="text-base">{item.icon}</span>
+                <span className="text-gray-300 group-hover:text-white text-xs sm:text-sm transition">{item.text}</span>
+              </motion.div>
             ))}
           </div>
-        </div>
+        </motion.div>
+
       </div>
     </div>
   );
 }
+

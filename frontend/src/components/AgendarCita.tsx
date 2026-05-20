@@ -5,6 +5,8 @@ import { X, Calendar, Clock, User, FileText, Check, AlertCircle, RefreshCw } fro
 interface AgendarCitaProps {
   pacienteId?: string;
   pacienteNombre?: string;
+  entidadSaludInicial?: string;
+  medicoId?: string;
   onClose: () => void;
   onSuccess?: () => void;
 }
@@ -12,16 +14,24 @@ interface AgendarCitaProps {
 export default function AgendarCita({
   pacienteId = '',
   pacienteNombre = '',
+  entidadSaludInicial = '',
+  medicoId: medicoIdProp = '',
   onClose,
   onSuccess,
 }: AgendarCitaProps) {
   const [formData, setFormData] = useState({
     fecha: '',
     hora: '',
+    tipoConsultaId: '',
     tipoConsulta: 'CONSULTA',
+    entidadSalud: entidadSaludInicial,
     notas: '',
     reminderEmail: true,
   });
+
+  // Tipos de consulta cargados desde la parametrización
+  const [tiposConsultaApi, setTiposConsultaApi] = useState<{ id: string; nombre: string; duracionMinutos: number; clasificacion: string }[]>([]);
+  const [loadingTipos, setLoadingTipos] = useState(false);
 
   const [slots, setSlots] = useState<string[]>([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
@@ -35,14 +45,75 @@ export default function AgendarCita({
     catch { return {}; }
   };
 
-  const tiposConsulta = [
-    { value: 'CONSULTA', label: 'Consulta Inicial' },
-    { value: 'PREOPERATORIO', label: 'Preoperatorio' },
-    { value: 'POSTOPERATORIO', label: 'Postoperatorio' },
-    { value: 'CONTROL', label: 'Control' },
+  // Determinar el medicoId efectivo
+  const getEfectiveMedicoId = () => {
+    if (medicoIdProp) return medicoIdProp;
+    const u = getUser();
+    return u.id || u.userId || '';
+  };
+
+  // ── Cargar tipos de consulta desde la parametrización ─────────────────────
+  useEffect(() => {
+    const mId = getEfectiveMedicoId();
+    if (!mId) return;
+    setLoadingTipos(true);
+    fetch(`/api/disponibilidad/tipos-consulta/${mId}`, {
+      headers: { Authorization: `Bearer ${getToken()}` },
+    })
+      .then(r => r.json())
+      .then(d => {
+        const tipos = d.tiposConsulta || [];
+        setTiposConsultaApi(tipos);
+        // Si hay tipos, pre-seleccionar el primero
+        if (tipos.length > 0) {
+          setFormData(p => ({
+            ...p,
+            tipoConsultaId: tipos[0].id,
+            tipoConsulta: tipos[0].nombre,
+          }));
+        }
+      })
+      .catch(() => {/* fallback a tipos hardcoded abajo */})
+      .finally(() => setLoadingTipos(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Duración del tipo seleccionado (para los slots)
+  const duracionTipoActual = (): number | undefined => {
+    const tipo = tiposConsultaApi.find(t => t.id === formData.tipoConsultaId);
+    return tipo?.duracionMinutos;
+  };
+
+  const tiposConsultaFallback = [
+    { id: 'CONSULTA',       nombre: 'Consulta Inicial',  duracionMinutos: 30, clasificacion: 'consulta' },
+    { id: 'PREOPERATORIO',  nombre: 'Preoperatorio',     duracionMinutos: 45, clasificacion: 'preoperatorio' },
+    { id: 'POSTOPERATORIO', nombre: 'Postoperatorio',    duracionMinutos: 30, clasificacion: 'control' },
+    { id: 'CONTROL',        nombre: 'Control',           duracionMinutos: 20, clasificacion: 'control' },
+    { id: 'PROCEDIMIENTO',  nombre: 'Procedimiento',     duracionMinutos: 90, clasificacion: 'procedimiento' },
+    { id: 'OTRO',           nombre: 'Otro',              duracionMinutos: 60, clasificacion: 'otro' },
   ];
 
-  // ── Cargar slots disponibles cuando cambia la fecha ─────────────────────
+  // Lista efectiva: usa API si hay resultados, sino los hardcoded
+  const tiposEfectivos = tiposConsultaApi.length > 0 ? tiposConsultaApi : tiposConsultaFallback;
+
+  const entidadesSalud = [
+    'Particular',
+    'SURA EPS',
+    'Nueva EPS',
+    'Sanitas EPS',
+    'Compensar EPS',
+    'Coomeva EPS',
+    'Famisanar',
+    'Salud Total',
+    'Medimás EPS',
+    'Coosalud EPS',
+    'Aliansalud',
+    'Emssanar',
+    'Anas Wayuu',
+    'Otro convenio',
+  ];
+
+  // ── Cargar slots disponibles cuando cambia la fecha o el tipo de consulta ──
   useEffect(() => {
     if (!formData.fecha) { setSlots([]); return; }
 
@@ -51,21 +122,22 @@ export default function AgendarCita({
       setFormData(p => ({ ...p, hora: '' }));
       try {
         const user = getUser();
-        const medicoId = user.id || user.userId;
+        const medicoId = getEfectiveMedicoId();
         if (!medicoId) { setSlots([]); return; }
 
         const token = getToken();
-        const res = await fetch(
-          `/api/disponibilidad/slots?medicoId=${medicoId}&fecha=${formData.fecha}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+        const duracion = duracionTipoActual();
+        const url = duracion
+          ? `/api/disponibilidad/slots?medicoId=${medicoId}&fecha=${formData.fecha}&duracion=${duracion}`
+          : `/api/disponibilidad/slots?medicoId=${medicoId}&fecha=${formData.fecha}`;
+
+        const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
 
         if (res.ok) {
           const data = await res.json();
           if (data.slots && data.slots.length > 0) {
             setSlots(data.slots);
           } else {
-            // Sin configuración → horario genérico 09-17
             const genericos: string[] = [];
             for (let h = 9; h < 17; h++) genericos.push(`${String(h).padStart(2, '0')}:00`);
             setSlots(genericos);
@@ -86,7 +158,7 @@ export default function AgendarCita({
 
     cargarSlots();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formData.fecha]);
+  }, [formData.fecha, formData.tipoConsultaId]);
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
@@ -118,8 +190,6 @@ export default function AgendarCita({
       const medicoId = user.id || user.userId;
       if (!medicoId) throw new Error('No se pudo identificar al médico. Recarga la página.');
 
-      const fechaHora = new Date(`${formData.fecha}T${formData.hora}:00`);
-
       const response = await fetch('/api/citas', {
         method: 'POST',
         headers: {
@@ -130,8 +200,9 @@ export default function AgendarCita({
           pacienteId,
           medicoId,
           tipoCita: formData.tipoConsulta,
-          fechaHora: fechaHora.toISOString(),
-          duracionMinutos: 60,
+          entidadSalud: formData.entidadSalud || undefined,
+          fechaHora: `${formData.fecha}T${formData.hora}:00.000Z`,
+          duracionMinutos: duracionTipoActual() || 60,
           motivo: `Cita de ${formData.tipoConsulta}`,
           notas: formData.notas,
         }),
@@ -269,17 +340,59 @@ export default function AgendarCita({
             )}
           </div>
 
-          {/* Tipo de Consulta */}
+          {/* Tipo de Consulta — cards dinámicas desde parametrización */}
           <div>
             <label className="flex items-center gap-2 text-yellow-400 font-semibold mb-3">
               <FileText size={20} /> Tipo de Consulta
+              {loadingTipos && <RefreshCw size={13} className="text-yellow-400 animate-spin ml-1" />}
+              {tiposConsultaApi.length > 0 && (
+                <span className="text-xs text-emerald-400 ml-auto font-normal">Desde parametrización</span>
+              )}
             </label>
-            <select name="tipoConsulta" value={formData.tipoConsulta} onChange={handleInputChange}
-              className="w-full bg-slate-700/50 border border-slate-600/50 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-yellow-500/50 transition">
-              {tiposConsulta.map(t => (
-                <option key={t.value} value={t.value}>{t.label}</option>
+            <div className="grid grid-cols-3 gap-2">
+              {tiposEfectivos.map(t => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => setFormData(p => ({ ...p, tipoConsultaId: t.id, tipoConsulta: t.nombre }))}
+                  className={`flex flex-col items-center gap-1 py-3 px-2 rounded-xl border text-xs font-semibold transition-all ${
+                    formData.tipoConsultaId === t.id
+                      ? 'bg-yellow-500/20 border-yellow-400 text-yellow-300 shadow-md shadow-yellow-500/10'
+                      : 'bg-slate-700/40 border-slate-600/40 text-slate-300 hover:border-slate-500 hover:bg-slate-700/60'
+                  }`}
+                >
+                  <span className="text-xs text-slate-400 font-normal">{t.duracionMinutos}min</span>
+                  <span className="text-center leading-tight">{t.nombre}</span>
+                </button>
+              ))}
+            </div>
+            {formData.tipoConsulta && (
+              <p className="mt-1.5 text-yellow-400/70 text-xs">
+                ✓ {formData.tipoConsulta}
+                {duracionTipoActual() && <span className="ml-1 text-slate-400">· {duracionTipoActual()} min/slot</span>}
+              </p>
+            )}
+          </div>
+
+          {/* Entidad / Plan a cobrar */}
+          <div>
+            <label className="flex items-center gap-2 text-yellow-400 font-semibold mb-3">
+              <User size={20} /> Entidad / Plan a Cobrar
+            </label>
+            <select
+              name="entidadSalud"
+              value={formData.entidadSalud}
+              onChange={handleInputChange}
+              className="w-full bg-slate-700/50 border border-slate-600/50 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-yellow-500/50 transition"
+            >
+              <option value="">— Seleccionar entidad —</option>
+              {entidadesSalud.map(e => (
+                <option key={e} value={e}>{e}</option>
               ))}
             </select>
+            {formData.entidadSalud && (
+              <p className="mt-1.5 text-emerald-400 text-xs">✓ {formData.entidadSalud}</p>
+            )}
           </div>
 
           {/* Notas */}
