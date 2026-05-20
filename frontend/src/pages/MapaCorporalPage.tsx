@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Trash2, RotateCw, Download, TrendingDown, ZoomIn, Calendar, Share2, Eye, Beaker, Box } from 'lucide-react';
+import { Trash2, RotateCw, Download, TrendingDown, Calendar, Plus, Save, ChevronDown, ChevronUp, AlertTriangle, ClipboardList, FileText, Activity, Eye, Box, Share2 } from 'lucide-react';
 import { Body3D } from '../components/Body3D';
 import { createHistoriaClinica } from '../services/api';
 
@@ -10,9 +10,30 @@ interface Mark {
   posicionX: number;
   posicionY: number;
   intensidad: number;
-  fecha: string;
   zona: string;
+  fecha?: string;
+  vista?: 'FRONTAL' | 'POSTERIOR';
   nota?: string;
+}
+
+interface Evolucion {
+  id: string;
+  numeroEvolucion: number;
+  fechaEvolucion: string;
+  planQuirurgico: string;
+  planPrequirurgico: {
+    examenesPrequirurgicos: boolean;
+    valoracionEnfermeria: boolean;
+    valoracionPreanestesica: boolean;
+    otros: string;
+  };
+  observacionesFrontal: string;
+  observacionesPosterior: string;
+  recomendaciones: string;
+  riesgosComplicaciones: string[];
+  finalidadAtencion: string;
+  marcas: Mark[];
+  creadoEn: string;
 }
 
 export default function MapaCorporalPage() {
@@ -32,6 +53,26 @@ export default function MapaCorporalPage() {
   const [view360, setView360] = useState<'TODAS' | 'FRONTAL' | 'POSTERIOR' | 'LATERAL'>('TODAS');
   const [viewType, setViewType] = useState<'2D' | '3D'>('2D');
   const canvasRef = useRef<SVGSVGElement>(null);
+
+  // ── Evolución Cirugía Plástica ──
+  const [evoluciones, setEvoluciones] = useState<Evolucion[]>([]);
+  const [showEvolucionForm, setShowEvolucionForm] = useState(false);
+  const [evolucionForm, setEvolucionForm] = useState({
+    fechaEvolucion: new Date().toISOString().split('T')[0],
+    planQuirurgico: '',
+    planPrequirurgico: {
+      examenesPrequirurgicos: false,
+      valoracionEnfermeria: false,
+      valoracionPreanestesica: false,
+      otros: '',
+    },
+    observacionesFrontal: '',
+    observacionesPosterior: '',
+    recomendaciones: '',
+    riesgosComplicaciones: [] as string[],
+    finalidadAtencion: '',
+  });
+  const [newRiesgo, setNewRiesgo] = useState('');
 
   const marcasTipos = [
     { tipo: 'IMPLANTE_MAMARIO', color: 'from-pink-600 to-pink-500', label: 'Aumento Mamario', icon: '💗', descripcion: 'Implante mamario', rango: 'POST-OP 0-90 días' },
@@ -69,7 +110,7 @@ export default function MapaCorporalPage() {
 
   // Análisis de evolución
   const analyzeEvolution = () => {
-    const marcasOrdenadas = [...marks].sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime());
+    const marcasOrdenadas = [...marks].sort((a, b) => new Date(a.fecha ?? '').getTime() - new Date(b.fecha ?? '').getTime());
     const mejoras: string[] = [];
     
     for (let i = 0; i < marcasOrdenadas.length - 1; i++) {
@@ -163,8 +204,9 @@ export default function MapaCorporalPage() {
     return marcasTipos.find((m) => m.tipo === tipo) || marcasTipos[0];
   };
 
-  const getDaysFromFirst = (fecha: string) => {
-    const first = new Date(marks[0]?.fecha || new Date());
+  const getDaysFromFirst = (fecha: string | undefined) => {
+    if (!fecha) return 0;
+    const first = new Date(marks[0]?.fecha ?? new Date());
     const current = new Date(fecha);
     return Math.ceil((current.getTime() - first.getTime()) / (1000 * 60 * 60 * 24));
   };
@@ -394,7 +436,7 @@ export default function MapaCorporalPage() {
                   </p>
                 ) : (
                   marks
-                    .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())
+                    .sort((a, b) => new Date(b.fecha ?? '').getTime() - new Date(a.fecha ?? '').getTime())
                     .map((mark) => (
                       <motion.div
                         key={mark.id}
@@ -485,7 +527,7 @@ export default function MapaCorporalPage() {
                   <h3 className="text-white font-bold mb-4">Línea de Tiempo</h3>
                   <div className="relative">
                     {[...marks]
-                      .sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime())
+                      .sort((a, b) => new Date(a.fecha ?? '').getTime() - new Date(b.fecha ?? '').getTime())
                       .map((mark, i, arr) => (
                         <div key={mark.id} className="flex gap-4 pb-4">
                           <div className="flex flex-col items-center">
@@ -580,7 +622,383 @@ export default function MapaCorporalPage() {
                 )}
               </motion.div>
 
-              {/* Componente reutilizable para cada vista */}
+              {/* ===== EVOLUCIÓN CIRUGÍA PLÁSTICA ===== */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-slate-800/80 backdrop-blur border border-purple-600/40 rounded-xl overflow-hidden"
+              >
+                {/* Header */}
+                <div className="flex items-center justify-between p-5 border-b border-purple-600/20">
+                  <div className="flex items-center gap-3">
+                    <div className="w-1 h-8 bg-gradient-to-b from-purple-400 to-purple-600 rounded-full" />
+                    <div>
+                      <h3 className="text-white font-bold text-lg">Evolución Cirugía Plástica</h3>
+                      <p className="text-gray-400 text-xs">Control post-operatorio y seguimiento clínico</p>
+                    </div>
+                    {evoluciones.length > 0 && (
+                      <span className="ml-2 px-2 py-0.5 bg-purple-600/30 text-purple-300 text-xs font-bold rounded-full border border-purple-500/30">
+                        {evoluciones.length} evoluciones
+                      </span>
+                    )}
+                  </div>
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => setShowEvolucionForm(!showEvolucionForm)}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold text-sm transition ${
+                      showEvolucionForm
+                        ? 'bg-slate-600 hover:bg-slate-500 text-white'
+                        : 'bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-500 hover:to-purple-600 text-white shadow-lg shadow-purple-900/30'
+                    }`}
+                  >
+                    {showEvolucionForm ? (
+                      <><ChevronUp size={16} /> Cerrar</>
+                    ) : (
+                      <><Plus size={16} /> Nueva Evolución</>
+                    )}
+                  </motion.button>
+                </div>
+
+                {/* Formulario nueva evolución */}
+                <AnimatePresence>
+                  {showEvolucionForm && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="overflow-hidden"
+                    >
+                      <div className="p-5 space-y-5 border-b border-purple-600/20 bg-slate-900/30">
+                        {/* Fecha + N° evolución */}
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="text-xs text-purple-300 font-semibold uppercase tracking-wide mb-1.5 block">📅 Fecha de Control</label>
+                            <input
+                              type="date"
+                              value={evolucionForm.fechaEvolucion}
+                              onChange={e => setEvolucionForm(f => ({ ...f, fechaEvolucion: e.target.value }))}
+                              className="w-full bg-slate-700 border border-slate-600 focus:border-purple-500 text-white rounded-lg px-3 py-2 text-sm outline-none transition"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs text-purple-300 font-semibold uppercase tracking-wide mb-1.5 block">🔢 N° Evolución</label>
+                            <input
+                              type="text"
+                              readOnly
+                              value={`Evolución #${evoluciones.length + 1}`}
+                              className="w-full bg-slate-700/50 border border-slate-600 text-gray-400 rounded-lg px-3 py-2 text-sm cursor-not-allowed"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Plan Quirúrgico */}
+                        <div>
+                          <label className="text-xs text-purple-300 font-semibold uppercase tracking-wide mb-1.5 block">🔪 Plan Quirúrgico / Procedimiento Realizado</label>
+                          <input
+                            type="text"
+                            placeholder="Ej: Liposucción abdominal, Abdominoplastia, Rinoplastia..."
+                            value={evolucionForm.planQuirurgico}
+                            onChange={e => setEvolucionForm(f => ({ ...f, planQuirurgico: e.target.value }))}
+                            className="w-full bg-slate-700 border border-slate-600 focus:border-purple-500 text-white rounded-lg px-3 py-2 text-sm outline-none transition placeholder:text-gray-500"
+                          />
+                        </div>
+
+                        {/* Plan Prequirúrgico */}
+                        <div>
+                          <label className="text-xs text-purple-300 font-semibold uppercase tracking-wide mb-2 block">📋 Plan Prequirúrgico</label>
+                          <div className="grid grid-cols-3 gap-3 mb-3">
+                            {([
+                              { key: 'examenesPrequirurgicos', label: '🧪 Exámenes Prequirúrgicos' },
+                              { key: 'valoracionEnfermeria', label: '💉 Valoración Enfermería' },
+                              { key: 'valoracionPreanestesica', label: '😷 Valoración Preanestésica' },
+                            ] as const).map(({ key, label }) => (
+                              <label key={key} className="flex items-center gap-2 cursor-pointer group">
+                                <input
+                                  type="checkbox"
+                                  checked={evolucionForm.planPrequirurgico[key]}
+                                  onChange={e => setEvolucionForm(f => ({
+                                    ...f,
+                                    planPrequirurgico: { ...f.planPrequirurgico, [key]: e.target.checked },
+                                  }))}
+                                  className="w-4 h-4 accent-purple-500 rounded"
+                                />
+                                <span className="text-sm text-gray-300 group-hover:text-white transition">{label}</span>
+                              </label>
+                            ))}
+                          </div>
+                          <input
+                            type="text"
+                            placeholder="Otros aspectos prequirúrgicos..."
+                            value={evolucionForm.planPrequirurgico.otros}
+                            onChange={e => setEvolucionForm(f => ({
+                              ...f,
+                              planPrequirurgico: { ...f.planPrequirurgico, otros: e.target.value },
+                            }))}
+                            className="w-full bg-slate-700 border border-slate-600 focus:border-purple-500 text-white rounded-lg px-3 py-2 text-sm outline-none transition placeholder:text-gray-500"
+                          />
+                        </div>
+
+                        {/* Observaciones Frontal / Posterior */}
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="text-xs text-purple-300 font-semibold uppercase tracking-wide mb-1.5 block">👀 Observaciones Vista Frontal</label>
+                            <textarea
+                              rows={3}
+                              placeholder="Evolución de cicatriz, edema, hematoma vista frontal..."
+                              value={evolucionForm.observacionesFrontal}
+                              onChange={e => setEvolucionForm(f => ({ ...f, observacionesFrontal: e.target.value }))}
+                              className="w-full bg-slate-700 border border-slate-600 focus:border-purple-500 text-white rounded-lg px-3 py-2 text-sm outline-none transition placeholder:text-gray-500 resize-none"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs text-purple-300 font-semibold uppercase tracking-wide mb-1.5 block">🔙 Observaciones Vista Posterior</label>
+                            <textarea
+                              rows={3}
+                              placeholder="Evolución de cicatriz, edema, hematoma vista posterior..."
+                              value={evolucionForm.observacionesPosterior}
+                              onChange={e => setEvolucionForm(f => ({ ...f, observacionesPosterior: e.target.value }))}
+                              className="w-full bg-slate-700 border border-slate-600 focus:border-purple-500 text-white rounded-lg px-3 py-2 text-sm outline-none transition placeholder:text-gray-500 resize-none"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Riesgos / Complicaciones */}
+                        <div>
+                          <label className="text-xs text-purple-300 font-semibold uppercase tracking-wide mb-1.5 block">⚠️ Riesgos / Complicaciones Identificadas</label>
+                          <div className="flex gap-2 mb-2">
+                            <input
+                              type="text"
+                              placeholder="Agregar riesgo o complicación y presionar Enter..."
+                              value={newRiesgo}
+                              onChange={e => setNewRiesgo(e.target.value)}
+                              onKeyDown={e => {
+                                if (e.key === 'Enter' && newRiesgo.trim()) {
+                                  setEvolucionForm(f => ({ ...f, riesgosComplicaciones: [...f.riesgosComplicaciones, newRiesgo.trim()] }));
+                                  setNewRiesgo('');
+                                }
+                              }}
+                              className="flex-1 bg-slate-700 border border-slate-600 focus:border-purple-500 text-white rounded-lg px-3 py-2 text-sm outline-none transition placeholder:text-gray-500"
+                            />
+                            <motion.button
+                              whileTap={{ scale: 0.95 }}
+                              onClick={() => {
+                                if (newRiesgo.trim()) {
+                                  setEvolucionForm(f => ({ ...f, riesgosComplicaciones: [...f.riesgosComplicaciones, newRiesgo.trim()] }));
+                                  setNewRiesgo('');
+                                }
+                              }}
+                              className="px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm transition"
+                            >
+                              <Plus size={16} />
+                            </motion.button>
+                          </div>
+                          {evolucionForm.riesgosComplicaciones.length > 0 && (
+                            <div className="flex flex-wrap gap-2">
+                              {evolucionForm.riesgosComplicaciones.map((r, i) => (
+                                <span key={i} className="flex items-center gap-1.5 bg-red-900/40 border border-red-700/40 text-red-300 text-xs px-2 py-1 rounded-full">
+                                  <AlertTriangle size={11} /> {r}
+                                  <button
+                                    onClick={() => setEvolucionForm(f => ({ ...f, riesgosComplicaciones: f.riesgosComplicaciones.filter((_, idx) => idx !== i) }))}
+                                    className="ml-0.5 hover:text-white transition"
+                                  >×</button>
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Recomendaciones */}
+                        <div>
+                          <label className="text-xs text-purple-300 font-semibold uppercase tracking-wide mb-1.5 block">💊 Recomendaciones y Plan de Manejo</label>
+                          <textarea
+                            rows={3}
+                            placeholder="Tratamiento, medicación, cuidados post-op, próxima cita..."
+                            value={evolucionForm.recomendaciones}
+                            onChange={e => setEvolucionForm(f => ({ ...f, recomendaciones: e.target.value }))}
+                            className="w-full bg-slate-700 border border-slate-600 focus:border-purple-500 text-white rounded-lg px-3 py-2 text-sm outline-none transition placeholder:text-gray-500 resize-none"
+                          />
+                        </div>
+
+                        {/* Finalidad de Atención */}
+                        <div>
+                          <label className="text-xs text-purple-300 font-semibold uppercase tracking-wide mb-1.5 block">🎯 Finalidad de Atención</label>
+                          <select
+                            value={evolucionForm.finalidadAtencion}
+                            onChange={e => setEvolucionForm(f => ({ ...f, finalidadAtencion: e.target.value }))}
+                            className="w-full bg-slate-700 border border-slate-600 focus:border-purple-500 text-white rounded-lg px-3 py-2 text-sm outline-none transition"
+                          >
+                            <option value="">Seleccionar finalidad...</option>
+                            <option value="CONTROL_POSTOPERATORIO">Control Postoperatorio</option>
+                            <option value="RETIRO_PUNTOS">Retiro de Puntos</option>
+                            <option value="VALORACION_RESULTADO">Valoración de Resultado</option>
+                            <option value="TRATAMIENTO_COMPLICACION">Tratamiento de Complicación</option>
+                            <option value="SEGUIMIENTO_CICATRIZ">Seguimiento de Cicatriz</option>
+                            <option value="ALTA_MEDICA">Alta Médica</option>
+                          </select>
+                        </div>
+
+                        {/* Acciones del formulario */}
+                        <div className="flex justify-end gap-3 pt-2">
+                          <motion.button
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                            onClick={() => {
+                              setEvolucionForm({
+                                fechaEvolucion: new Date().toISOString().split('T')[0],
+                                planQuirurgico: '',
+                                planPrequirurgico: { examenesPrequirurgicos: false, valoracionEnfermeria: false, valoracionPreanestesica: false, otros: '' },
+                                observacionesFrontal: '',
+                                observacionesPosterior: '',
+                                recomendaciones: '',
+                                riesgosComplicaciones: [],
+                                finalidadAtencion: '',
+                              });
+                              setNewRiesgo('');
+                            }}
+                            className="px-4 py-2 bg-slate-600 hover:bg-slate-500 text-white rounded-lg font-semibold text-sm transition"
+                          >
+                            Limpiar
+                          </motion.button>
+                          <motion.button
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                            onClick={() => {
+                              if (!evolucionForm.planQuirurgico && !evolucionForm.observacionesFrontal && !evolucionForm.recomendaciones) return;
+                              const nueva: Evolucion = {
+                                id: Date.now().toString(),
+                                numeroEvolucion: evoluciones.length + 1,
+                                fechaEvolucion: evolucionForm.fechaEvolucion,
+                                planQuirurgico: evolucionForm.planQuirurgico,
+                                planPrequirurgico: evolucionForm.planPrequirurgico,
+                                observacionesFrontal: evolucionForm.observacionesFrontal,
+                                observacionesPosterior: evolucionForm.observacionesPosterior,
+                                recomendaciones: evolucionForm.recomendaciones,
+                                riesgosComplicaciones: evolucionForm.riesgosComplicaciones,
+                                finalidadAtencion: evolucionForm.finalidadAtencion,
+                                marcas: marks,
+                                creadoEn: new Date().toISOString(),
+                              };
+                              setEvoluciones(prev => [nueva, ...prev]);
+                              setShowEvolucionForm(false);
+                              setEvolucionForm({
+                                fechaEvolucion: new Date().toISOString().split('T')[0],
+                                planQuirurgico: '',
+                                planPrequirurgico: { examenesPrequirurgicos: false, valoracionEnfermeria: false, valoracionPreanestesica: false, otros: '' },
+                                observacionesFrontal: '',
+                                observacionesPosterior: '',
+                                recomendaciones: '',
+                                riesgosComplicaciones: [],
+                                finalidadAtencion: '',
+                              });
+                              setNewRiesgo('');
+                            }}
+                            className="px-5 py-2 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-500 hover:to-purple-600 text-white rounded-lg font-semibold text-sm transition shadow-lg shadow-purple-900/30 flex items-center gap-2"
+                          >
+                            <Save size={16} /> Guardar Evolución
+                          </motion.button>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {/* Lista de evoluciones registradas */}
+                <div className="p-5">
+                  {evoluciones.length === 0 ? (
+                    <div className="text-center py-10">
+                      <div className="w-16 h-16 mx-auto mb-3 rounded-full bg-purple-900/30 border border-purple-600/30 flex items-center justify-center">
+                        <ClipboardList size={28} className="text-purple-400" />
+                      </div>
+                      <p className="text-gray-400 text-sm font-semibold">Sin evoluciones registradas</p>
+                      <p className="text-gray-500 text-xs mt-1">Usa "Nueva Evolución" para registrar el seguimiento post-operatorio</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {evoluciones.map(ev => (
+                        <motion.div
+                          key={ev.id}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="bg-slate-700/60 border border-purple-600/20 rounded-xl p-4 hover:border-purple-600/40 transition"
+                        >
+                          {/* Encabezado tarjeta */}
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-600 to-purple-800 border border-purple-400/30 flex items-center justify-center text-white font-bold text-sm shadow">
+                                #{ev.numeroEvolucion}
+                              </div>
+                              <div>
+                                <p className="text-white font-semibold text-sm">{ev.planQuirurgico || 'Sin procedimiento especificado'}</p>
+                                <p className="text-gray-400 text-xs flex items-center gap-1">
+                                  <Calendar size={11} /> {ev.fechaEvolucion}
+                                  {ev.finalidadAtencion && (
+                                    <span className="ml-2 px-2 py-0.5 bg-purple-900/50 text-purple-300 rounded-full text-xs border border-purple-700/30">
+                                      {ev.finalidadAtencion.replace(/_/g, ' ')}
+                                    </span>
+                                  )}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1 text-xs text-gray-500">
+                              <Activity size={12} /> {ev.marcas.length} marcas
+                            </div>
+                          </div>
+
+                          {/* Observaciones */}
+                          <div className="grid grid-cols-2 gap-3 text-xs">
+                            {ev.observacionesFrontal && (
+                              <div className="bg-slate-800/60 rounded-lg p-2.5">
+                                <p className="text-purple-300 font-semibold mb-1">Vista Frontal</p>
+                                <p className="text-gray-300 leading-relaxed">{ev.observacionesFrontal}</p>
+                              </div>
+                            )}
+                            {ev.observacionesPosterior && (
+                              <div className="bg-slate-800/60 rounded-lg p-2.5">
+                                <p className="text-purple-300 font-semibold mb-1">Vista Posterior</p>
+                                <p className="text-gray-300 leading-relaxed">{ev.observacionesPosterior}</p>
+                              </div>
+                            )}
+                            {ev.recomendaciones && (
+                              <div className="bg-slate-800/60 rounded-lg p-2.5 col-span-2">
+                                <p className="text-emerald-300 font-semibold mb-1 flex items-center gap-1"><FileText size={11} /> Recomendaciones</p>
+                                <p className="text-gray-300 leading-relaxed">{ev.recomendaciones}</p>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Riesgos */}
+                          {ev.riesgosComplicaciones.length > 0 && (
+                            <div className="mt-3 flex flex-wrap gap-1.5">
+                              {ev.riesgosComplicaciones.map((r, i) => (
+                                <span key={i} className="flex items-center gap-1 bg-red-900/30 border border-red-700/30 text-red-300 text-xs px-2 py-0.5 rounded-full">
+                                  <AlertTriangle size={10} /> {r}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Checklist prequirúrgico */}
+                          <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                            {ev.planPrequirurgico.examenesPrequirurgicos && (
+                              <span className="text-emerald-400 bg-emerald-900/20 px-2 py-0.5 rounded-full border border-emerald-700/20">✓ Exámenes</span>
+                            )}
+                            {ev.planPrequirurgico.valoracionEnfermeria && (
+                              <span className="text-emerald-400 bg-emerald-900/20 px-2 py-0.5 rounded-full border border-emerald-700/20">✓ Val. Enfermería</span>
+                            )}
+                            {ev.planPrequirurgico.valoracionPreanestesica && (
+                              <span className="text-emerald-400 bg-emerald-900/20 px-2 py-0.5 rounded-full border border-emerald-700/20">✓ Val. Preanestésica</span>
+                            )}
+                            {ev.planPrequirurgico.otros && (
+                              <span className="text-gray-400 bg-slate-800/60 px-2 py-0.5 rounded-full border border-slate-600/30">{ev.planPrequirurgico.otros}</span>
+                            )}
+                          </div>
+                        </motion.div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </motion.div>
             </div>
           </motion.div>
         </motion.div>
