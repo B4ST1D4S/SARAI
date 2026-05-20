@@ -1032,6 +1032,23 @@ interface BodyViewSVGProps {
 
 function BodyViewSVG({ viewLabel, isBack = false, marks, mode, handleBodyClick, getMarkConfig, fullSize = false }: BodyViewSVGProps) {
   const svgRef = useRef<SVGSVGElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Imagen según vista (usar PNG realistas si existen, fallback a SVG)
+  const imageUrl = (() => {
+    if (viewLabel.includes('LATERAL IZQ')) return '/body-left-3d.png';
+    if (viewLabel.includes('LATERAL DER')) return '/body-right-3d.png';
+    if (isBack) return '/body-back-3d.png';
+    return '/body-front-3d.png';
+  })();
+
+  // Imagen SVG de respaldo si el PNG no existe
+  const fallbackUrl = (() => {
+    if (viewLabel.includes('LATERAL IZQ')) return '/female-body-left.svg';
+    if (viewLabel.includes('LATERAL DER')) return '/female-body-right.svg';
+    if (isBack) return '/female-body-back.svg';
+    return '/female-body-silhouette.svg';
+  })();
 
   const detectZona = (x: number, y: number): string => {
     if (viewLabel.includes('LATERAL')) {
@@ -1071,130 +1088,82 @@ function BodyViewSVG({ viewLabel, isBack = false, marks, mode, handleBodyClick, 
     handleBodyClick({ name: detectZona(svgP.x, svgP.y), x: Math.round(svgP.x), y: Math.round(svgP.y) });
   };
 
-  const svgW = fullSize ? 310 : 200;
-  const svgH = fullSize ? 578 : 373;
-  const uid = viewLabel.replace(/\s/g, '');
+  const w = fullSize ? 260 : 180;
+  const h = fullSize ? 540 : 374;
 
   return (
-    <div className="bg-slate-800/40 rounded-xl p-4 text-center">
+    <div className="bg-slate-900/60 rounded-xl p-4 text-center">
       <p className="text-white font-semibold mb-3 text-sm tracking-wide">
         {viewLabel}
         {mode === 'EDITAR' && <span className="text-yellow-400 text-xs ml-2">👆 clic para marcar</span>}
       </p>
-      <svg
-        ref={svgRef}
-        viewBox="0 0 300 580"
-        width={svgW}
-        height={svgH}
-        onClick={handleSVGClick}
-        className="mx-auto block"
-        style={{ cursor: mode === 'EDITAR' ? 'crosshair' : 'default' }}
+      {/* Contenedor relativo: imagen realista + SVG de marcas superpuesto */}
+      <div
+        ref={containerRef}
+        className="relative inline-block mx-auto"
+        style={{ width: w, height: h }}
       >
-        <defs>
-          <linearGradient id={`bg-${uid}`} x1="30%" y1="0%" x2="70%" y2="100%">
-            <stop offset="0%" stopColor="#6366f1" />
-            <stop offset="50%" stopColor="#4f46e5" />
-            <stop offset="100%" stopColor="#3730a3" />
-          </linearGradient>
-          <linearGradient id={`hl-${uid}`} x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="#818cf8" stopOpacity="0" />
-            <stop offset="40%" stopColor="#a5b4fc" stopOpacity="0.35" />
-            <stop offset="100%" stopColor="#818cf8" stopOpacity="0" />
-          </linearGradient>
-          <filter id={`sh-${uid}`} x="-20%" y="-10%" width="140%" height="120%">
-            <feDropShadow dx="0" dy="4" stdDeviation="6" floodColor="#1e1b4b" floodOpacity="0.7" />
-          </filter>
-          {mode === 'EDITAR' && (
-            <filter id={`glow-${uid}`}>
-              <feGaussianBlur stdDeviation="4" result="blur" />
-              <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
-            </filter>
-          )}
-        </defs>
-
-        {/* ── Cuerpo: relleno base ── */}
-        <g fill={`url(#bg-${uid})`} filter={`url(#sh-${uid})`}>
-          {/* Cabeza */}
-          <ellipse cx="150" cy="36" rx="34" ry="36" />
-          {/* Cuello */}
-          <path d="M 136 70 C 132 80 131 96 131 110 Q 150 117 169 110 C 169 96 168 80 164 70 Q 150 65 136 70 Z" />
-          {/* Torso */}
-          <path d="M 131 110 Q 95 108 62 136 C 50 146 48 164 50 184 C 52 202 56 218 58 232 C 60 245 60 257 64 270 C 67 280 70 290 68 304 C 66 318 62 330 64 344 C 66 357 76 366 90 370 Q 120 376 150 377 Q 180 376 210 370 C 224 366 234 357 236 344 C 238 330 234 318 232 304 C 230 290 233 280 236 270 C 240 257 240 245 242 232 C 244 218 248 202 250 184 C 252 164 250 146 238 136 Q 205 108 169 110 Q 150 117 131 110 Z" />
-          {/* Brazo izquierdo */}
-          <path d="M 62 136 C 50 142 40 156 36 174 L 32 208 C 30 222 32 238 36 252 L 42 276 C 44 286 48 294 56 298 L 68 300 C 74 299 76 292 76 284 L 74 260 C 72 244 70 228 70 212 L 68 174 C 66 154 64 142 62 136 Z" />
-          {/* Brazo derecho */}
-          <path d="M 238 136 C 250 142 260 156 264 174 L 268 208 C 270 222 268 238 264 252 L 258 276 C 256 286 252 294 244 298 L 232 300 C 226 299 224 292 224 284 L 226 260 C 228 244 230 228 230 212 L 232 174 C 234 154 236 142 238 136 Z" />
-          {/* Pierna izquierda */}
-          <path d="M 90 370 C 76 374 70 384 70 398 L 68 428 C 66 446 66 464 68 480 L 70 508 C 70 524 72 538 76 550 Q 78 560 88 566 L 112 568 Q 124 564 126 556 L 126 540 Q 126 526 126 510 L 126 480 C 126 464 128 448 128 432 Q 130 412 130 396 C 130 382 120 374 106 370 Q 98 368 90 370 Z" />
-          {/* Pierna derecha */}
-          <path d="M 210 370 C 224 374 230 384 230 398 L 232 428 C 234 446 234 464 232 480 L 230 508 C 230 524 228 538 224 550 Q 222 560 212 566 L 188 568 Q 176 564 174 556 L 174 540 Q 174 526 174 510 L 174 480 C 174 464 172 448 172 432 Q 170 412 170 396 C 170 382 180 374 194 370 Q 202 368 210 370 Z" />
-        </g>
-
-        {/* ── Highlight lateral ── */}
-        <g fill={`url(#hl-${uid})`} pointerEvents="none">
-          <ellipse cx="150" cy="36" rx="34" ry="36" />
-          <path d="M 131 110 Q 95 108 62 136 C 50 146 48 164 50 184 C 52 202 56 218 58 232 C 60 245 60 257 64 270 C 67 280 70 290 68 304 C 66 318 62 330 64 344 C 66 357 76 366 90 370 Q 120 376 150 377 Q 180 376 210 370 C 224 366 234 357 236 344 C 238 330 234 318 232 304 C 230 290 233 280 236 270 C 240 257 240 245 242 232 C 244 218 248 202 250 184 C 252 164 250 146 238 136 Q 205 108 169 110 Q 150 117 131 110 Z" />
-        </g>
-
-        {/* ── Detalles anatómicos ── */}
-        <g stroke="rgba(255,255,255,0.13)" strokeWidth="1" fill="none" pointerEvents="none">
-          {/* Clavículas */}
-          <path d="M 131 122 Q 100 126 72 136" />
-          <path d="M 169 122 Q 200 126 228 136" />
-          {/* Ombligo */}
-          <ellipse cx="150" cy="252" rx="5" ry="3" fill="rgba(0,0,0,0.25)" stroke="rgba(255,255,255,0.18)" />
-          {/* Línea media */}
-          <line x1="150" y1="122" x2="150" y2="370" strokeOpacity="0.08" />
-          {/* Pechos (solo vista frontal) */}
-          {!isBack && (
-            <>
-              <path d="M 95 178 Q 112 205 128 192" strokeWidth="1.2" />
-              <path d="M 205 178 Q 188 205 172 192" strokeWidth="1.2" />
-            </>
-          )}
-          {/* Línea lumbar (solo posterior) */}
-          {isBack && (
-            <path d="M 130 230 Q 150 252 170 230" strokeWidth="1.2" />
-          )}
-          {/* Rodillas */}
-          <ellipse cx="108" cy="468" rx="18" ry="12" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.12)" />
-          <ellipse cx="192" cy="468" rx="18" ry="12" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.12)" />
-        </g>
-
-        {/* ── Marcas ── */}
-        {marks.map((mark) => {
-          const color = MARK_COLORS[mark.tipo] ?? '#6366f1';
-          return (
-            <g key={mark.id}>
-              {/* Glow */}
-              <circle cx={mark.posicionX} cy={mark.posicionY} r={18} fill={color} opacity={0.25} />
-              {/* Círculo principal */}
-              <circle
-                cx={mark.posicionX}
-                cy={mark.posicionY}
-                r={13}
-                fill={color}
-                stroke="white"
-                strokeWidth="2"
-              />
-              {/* Número */}
-              <text
-                x={mark.posicionX}
-                y={mark.posicionY + 5}
-                textAnchor="middle"
-                fill="white"
-                fontSize="11"
-                fontWeight="bold"
-                pointerEvents="none"
-              >
-                {mark.intensidad}
-              </text>
-              {/* Tooltip (title) */}
-              <title>{mark.zona} — {getMarkConfig(mark.tipo).label} · Intensidad {mark.intensidad}/10</title>
-            </g>
-          );
-        })}
-      </svg>
+        {/* Imagen fotorealista de fondo, con fallback al SVG */}
+        <img
+          src={imageUrl}
+          alt={viewLabel}
+          className="absolute inset-0 w-full h-full object-contain pointer-events-none select-none"
+          style={{ filter: 'drop-shadow(0 4px 24px rgba(0,0,0,0.7))' }}
+          onError={(e) => {
+            const img = e.target as HTMLImageElement;
+            if (img.src !== window.location.origin + fallbackUrl) {
+              img.src = fallbackUrl;
+            }
+          }}
+        />
+        {/* SVG transparente encima para capturar clics y renderizar marcas */}
+        <svg
+          ref={svgRef}
+          viewBox="0 0 300 580"
+          width={w}
+          height={h}
+          onClick={handleSVGClick}
+          className="absolute inset-0"
+          style={{
+            cursor: mode === 'EDITAR' ? 'crosshair' : 'default',
+            background: 'transparent',
+          }}
+        >
+          {/* ── Marcas ── */}
+          {marks.map((mark) => {
+            const color = MARK_COLORS[mark.tipo] ?? '#6366f1';
+            return (
+              <g key={mark.id}>
+                {/* Halo */}
+                <circle cx={mark.posicionX} cy={mark.posicionY} r={20} fill={color} opacity={0.2} />
+                {/* Círculo principal */}
+                <circle
+                  cx={mark.posicionX}
+                  cy={mark.posicionY}
+                  r={13}
+                  fill={color}
+                  stroke="white"
+                  strokeWidth="2.5"
+                  style={{ filter: `drop-shadow(0 0 6px ${color})` }}
+                />
+                {/* Número intensidad */}
+                <text
+                  x={mark.posicionX}
+                  y={mark.posicionY + 5}
+                  textAnchor="middle"
+                  fill="white"
+                  fontSize="11"
+                  fontWeight="bold"
+                  pointerEvents="none"
+                >
+                  {mark.intensidad}
+                </text>
+                <title>{mark.zona} — {getMarkConfig(mark.tipo).label} · Intensidad {mark.intensidad}/10</title>
+              </g>
+            );
+          })}
+        </svg>
+      </div>
     </div>
   );
 }
