@@ -261,18 +261,45 @@ export default function CentralImpresionPage() {
     setLoadingH(false);
   };
 
-  // ── Imprimir ──
+  // ── Descargar PDF desde el backend (sin diálogo de impresión) ──
+  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+
   const handlePrint = async (historiaId: string, tipo: 'hc' | 'ordenes') => {
     const key = historiaId + tipo;
     setPrinting(key);
-    const r = await getHistoriaClinica(historiaId, token);
-    setPrinting(null);
-    if (r.error || !r.data) {
-      setErrorMsg('No se pudo cargar la historia clínica');
-      return;
+    setErrorMsg('');
+    try {
+      const endpoint =
+        tipo === 'hc'
+          ? `${API_BASE}/pdf/historia-clinica/${historiaId}`
+          : `${API_BASE}/pdf/ordenes/${historiaId}`;
+
+      const response = await fetch(endpoint, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body.error || `Error ${response.status}`);
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download =
+        tipo === 'hc'
+          ? `HistoriaClinica_${historiaId.slice(-6)}.pdf`
+          : `OrdenesMedicas_${historiaId.slice(-6)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Error al generar el PDF');
+    } finally {
+      setPrinting(null);
     }
-    const html = tipo === 'hc' ? buildHCHtml(r.data) : buildOrdenesHtml(r.data);
-    printInNewWindow(html);
   };
 
   return (
