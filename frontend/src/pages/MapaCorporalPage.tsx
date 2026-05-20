@@ -126,7 +126,7 @@ export default function MapaCorporalPage() {
     return mejoras.length > 0 ? mejoras : ['Sin cambios significativos'];
   };
 
-  const handleBodyClick = (zone: typeof bodyZones[0]) => {
+  const handleBodyClick = (zone: { name: string; x: number; y: number }) => {
     if (mode !== 'EDITAR') return;
 
     const newMark: Mark = {
@@ -141,8 +141,6 @@ export default function MapaCorporalPage() {
     };
 
     setMarks([...marks, newMark]);
-    
-    // Crear registro en Historia Clínica
     crearRegistroHistoria(newMark);
   };
 
@@ -599,25 +597,23 @@ export default function MapaCorporalPage() {
                 {/* Grid de Vistas 360 */}
                 {viewType === '2D' && view360 === 'TODAS' && (
                   <div className="grid grid-cols-2 gap-6">
-                    {/* Frontal */}
-                    <BodyView imageUrl="/female-body-silhouette.svg" viewLabel="FRONTAL" marks={marks} mode={mode} handleBodyClick={handleBodyClick} getMarkConfig={getMarkConfig} />
-                    {/* Posterior */}
-                    <BodyView imageUrl="/female-body-back.svg" viewLabel="POSTERIOR" marks={marks} mode={mode} handleBodyClick={handleBodyClick} getMarkConfig={getMarkConfig} />
+                    <BodyViewSVG viewLabel="FRONTAL" isBack={false} marks={marks} mode={mode} handleBodyClick={handleBodyClick} getMarkConfig={getMarkConfig} />
+                    <BodyViewSVG viewLabel="POSTERIOR" isBack={true} marks={marks} mode={mode} handleBodyClick={handleBodyClick} getMarkConfig={getMarkConfig} />
                   </div>
                 )}
 
                 {viewType === '2D' && view360 === 'FRONTAL' && (
-                  <BodyView imageUrl="/female-body-silhouette.svg" viewLabel="FRONTAL" marks={marks} mode={mode} handleBodyClick={handleBodyClick} getMarkConfig={getMarkConfig} fullSize={true} />
+                  <BodyViewSVG viewLabel="FRONTAL" isBack={false} marks={marks} mode={mode} handleBodyClick={handleBodyClick} getMarkConfig={getMarkConfig} fullSize={true} />
                 )}
 
                 {viewType === '2D' && view360 === 'POSTERIOR' && (
-                  <BodyView imageUrl="/female-body-back.svg" viewLabel="POSTERIOR" marks={marks} mode={mode} handleBodyClick={handleBodyClick} getMarkConfig={getMarkConfig} fullSize={true} />
+                  <BodyViewSVG viewLabel="POSTERIOR" isBack={true} marks={marks} mode={mode} handleBodyClick={handleBodyClick} getMarkConfig={getMarkConfig} fullSize={true} />
                 )}
 
                 {viewType === '2D' && view360 === 'LATERAL' && (
                   <div className="grid grid-cols-2 gap-6">
-                    <BodyView imageUrl="/female-body-left.svg" viewLabel="LATERAL IZQ" marks={marks} mode={mode} handleBodyClick={handleBodyClick} getMarkConfig={getMarkConfig} />
-                    <BodyView imageUrl="/female-body-right.svg" viewLabel="LATERAL DER" marks={marks} mode={mode} handleBodyClick={handleBodyClick} getMarkConfig={getMarkConfig} />
+                    <BodyViewSVG viewLabel="LATERAL IZQ" isBack={false} marks={marks} mode={mode} handleBodyClick={handleBodyClick} getMarkConfig={getMarkConfig} />
+                    <BodyViewSVG viewLabel="LATERAL DER" isBack={true} marks={marks} mode={mode} handleBodyClick={handleBodyClick} getMarkConfig={getMarkConfig} />
                   </div>
                 )}
               </motion.div>
@@ -1007,135 +1003,198 @@ export default function MapaCorporalPage() {
   );
 }
 
-// Componente para mostrar cada vista corporal
-interface BodyViewProps {
-  imageUrl: string;
+// ── Mapa de colores por tipo de marca ──
+const MARK_COLORS: Record<string, string> = {
+  IMPLANTE_MAMARIO: '#ec4899',
+  LIPOSUCCION: '#06b6d4',
+  LIFTING_FACIAL: '#f59e0b',
+  RINOPLASTIA: '#8b5cf6',
+  ABDOMINOPLASTIA: '#10b981',
+  CICATRIZ: '#eab308',
+  HEMATOMA: '#ef4444',
+  CELULITIS_EDEMA: '#f97316',
+  EDEMA: '#a855f7',
+  FIBROSIS: '#b45309',
+  DOLOR: '#dc2626',
+  AREA_TRATADA: '#3b82f6',
+};
+
+// ── Componente cuerpo SVG inline ──
+interface BodyViewSVGProps {
   viewLabel: string;
+  isBack?: boolean;
   marks: Mark[];
   mode: 'VISTA' | 'EDITAR' | 'COMPARAR';
-  handleBodyClick: (zone: any) => void;
+  handleBodyClick: (zone: { name: string; x: number; y: number }) => void;
   getMarkConfig: (tipo: Mark['tipo']) => any;
   fullSize?: boolean;
 }
 
-function BodyView({ imageUrl, viewLabel, marks, mode, handleBodyClick, getMarkConfig, fullSize }: BodyViewProps) {
-  // Detectar zona automáticamente basada en coordenadas
-  const detectZoneName = (x: number, y: number) => {
-    // Detectar zona basada en la posición aproximada
+function BodyViewSVG({ viewLabel, isBack = false, marks, mode, handleBodyClick, getMarkConfig, fullSize = false }: BodyViewSVGProps) {
+  const svgRef = useRef<SVGSVGElement>(null);
+
+  const detectZona = (x: number, y: number): string => {
     if (viewLabel.includes('LATERAL')) {
-      if (y < 20) return 'Cabeza';
-      if (y < 30) return 'Cuello';
-      if (y < 50) return 'Torso';
-      if (y < 70) return 'Abdomen';
-      if (y < 85) return 'Muslo';
+      if (y < 86) return 'Cabeza';
+      if (y < 120) return 'Cuello';
+      if (y < 230) return 'Torso';
+      if (y < 340) return 'Abdomen';
+      if (y < 470) return 'Muslo';
       return 'Pantorrilla';
     }
-
-    // Para vistas frontales/posteriores
-    if (y < 20) return 'Cabeza';
-    if (y < 28) return 'Cuello';
-    if (y < 45) {
-      return x < 50 ? 'Mama Izquierda' : 'Mama Derecha';
+    if (y < 86)  return 'Cabeza';
+    if (y < 120) return 'Cuello';
+    if (y < 180) return x < 110 ? 'Hombro Izquierdo' : x > 190 ? 'Hombro Derecho' : 'Clavícula';
+    if (y < 270) {
+      if (x < 75 || x > 225) return x < 150 ? 'Brazo Izquierdo' : 'Brazo Derecho';
+      if (!isBack) {
+        if (x < 140) return 'Mama Izquierda';
+        if (x > 160) return 'Mama Derecha';
+      }
+      return isBack ? 'Espalda Superior' : 'Pecho';
     }
-    if (y < 65) {
-      if (x < 30) return 'Brazo Izquierdo';
-      if (x > 70) return 'Brazo Derecho';
-      return 'Abdomen';
-    }
-    if (y < 85) {
-      return x < 50 ? 'Muslo Izquierdo' : 'Muslo Derecho';
-    }
-    return x < 50 ? 'Pantorrilla Izquierda' : 'Pantorrilla Derecha';
+    if (y < 342) return isBack ? 'Espalda Baja' : 'Abdomen';
+    if (y < 390) return 'Pelvis / Cadera';
+    if (y < 470) return x < 150 ? 'Muslo Izquierdo' : 'Muslo Derecho';
+    if (y < 545) return x < 150 ? 'Pierna Izquierda' : 'Pierna Derecha';
+    return x < 150 ? 'Pie Izquierdo' : 'Pie Derecho';
   };
 
-  const handleImageClick = (e: React.MouseEvent<HTMLDivElement>) => {
+  const handleSVGClick = (e: React.MouseEvent<SVGSVGElement>) => {
     if (mode !== 'EDITAR') return;
-
-    const container = e.currentTarget;
-    const rect = container.getBoundingClientRect();
-    
-    // Calcular coordenadas relativas al container
-    const offsetX = e.clientX - rect.left;
-    const offsetY = e.clientY - rect.top;
-    
-    // Convertir a porcentaje
-    const percentX = (offsetX / rect.width) * 100;
-    const percentY = (offsetY / rect.height) * 100;
-    
-    // Detectar zona automáticamente
-    const detectedZone = detectZoneName(percentX, percentY);
-    
-    // Crear objeto zona con coordenadas exactas
-    const clickedZone = {
-      id: `custom-${Date.now()}`,
-      name: detectedZone,
-      x: percentX,
-      y: percentY,
-    };
-    
-    handleBodyClick(clickedZone);
+    const svg = svgRef.current;
+    if (!svg) return;
+    const pt = svg.createSVGPoint();
+    pt.x = e.clientX;
+    pt.y = e.clientY;
+    const svgP = pt.matrixTransform(svg.getScreenCTM()!.inverse());
+    handleBodyClick({ name: detectZona(svgP.x, svgP.y), x: Math.round(svgP.x), y: Math.round(svgP.y) });
   };
+
+  const svgW = fullSize ? 310 : 200;
+  const svgH = fullSize ? 578 : 373;
+  const uid = viewLabel.replace(/\s/g, '');
 
   return (
-    <div className="bg-slate-700/50 rounded-lg p-4 text-center">
-      <p className="text-white font-semibold mb-4">
+    <div className="bg-slate-800/40 rounded-xl p-4 text-center">
+      <p className="text-white font-semibold mb-3 text-sm tracking-wide">
         {viewLabel}
-        {mode === 'EDITAR' && <span className="text-purple-400 text-sm ml-2">👆 Haz clic en cualquier zona</span>}
+        {mode === 'EDITAR' && <span className="text-yellow-400 text-xs ml-2">👆 clic para marcar</span>}
       </p>
-      <div 
-        className="relative mx-auto"
-        onClick={handleImageClick}
-        style={{ 
-          width: fullSize ? '400px' : '280px', 
-          height: fullSize ? '600px' : '400px',
-          cursor: mode === 'EDITAR' ? 'crosshair' : 'default',
-        }}
+      <svg
+        ref={svgRef}
+        viewBox="0 0 300 580"
+        width={svgW}
+        height={svgH}
+        onClick={handleSVGClick}
+        className="mx-auto block"
+        style={{ cursor: mode === 'EDITAR' ? 'crosshair' : 'default' }}
       >
-        {/* Imagen de Fondo */}
-        <img
-          src={imageUrl}
-          alt={viewLabel}
-          className="w-full h-full object-contain absolute pointer-events-none"
-          style={{
-            filter: mode === 'EDITAR' ? 'drop-shadow(0 0 20px rgba(168,85,247,0.3))' : 'drop-shadow(0 0 10px rgba(168,85,247,0.15))',
-            opacity: 0.85,
-          }}
-        />
+        <defs>
+          <linearGradient id={`bg-${uid}`} x1="30%" y1="0%" x2="70%" y2="100%">
+            <stop offset="0%" stopColor="#6366f1" />
+            <stop offset="50%" stopColor="#4f46e5" />
+            <stop offset="100%" stopColor="#3730a3" />
+          </linearGradient>
+          <linearGradient id={`hl-${uid}`} x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="#818cf8" stopOpacity="0" />
+            <stop offset="40%" stopColor="#a5b4fc" stopOpacity="0.35" />
+            <stop offset="100%" stopColor="#818cf8" stopOpacity="0" />
+          </linearGradient>
+          <filter id={`sh-${uid}`} x="-20%" y="-10%" width="140%" height="120%">
+            <feDropShadow dx="0" dy="4" stdDeviation="6" floodColor="#1e1b4b" floodOpacity="0.7" />
+          </filter>
+          {mode === 'EDITAR' && (
+            <filter id={`glow-${uid}`}>
+              <feGaussianBlur stdDeviation="4" result="blur" />
+              <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+            </filter>
+          )}
+        </defs>
 
-        {/* Marcas superpuestas */}
+        {/* ── Cuerpo: relleno base ── */}
+        <g fill={`url(#bg-${uid})`} filter={`url(#sh-${uid})`}>
+          {/* Cabeza */}
+          <ellipse cx="150" cy="36" rx="34" ry="36" />
+          {/* Cuello */}
+          <path d="M 136 70 C 132 80 131 96 131 110 Q 150 117 169 110 C 169 96 168 80 164 70 Q 150 65 136 70 Z" />
+          {/* Torso */}
+          <path d="M 131 110 Q 95 108 62 136 C 50 146 48 164 50 184 C 52 202 56 218 58 232 C 60 245 60 257 64 270 C 67 280 70 290 68 304 C 66 318 62 330 64 344 C 66 357 76 366 90 370 Q 120 376 150 377 Q 180 376 210 370 C 224 366 234 357 236 344 C 238 330 234 318 232 304 C 230 290 233 280 236 270 C 240 257 240 245 242 232 C 244 218 248 202 250 184 C 252 164 250 146 238 136 Q 205 108 169 110 Q 150 117 131 110 Z" />
+          {/* Brazo izquierdo */}
+          <path d="M 62 136 C 50 142 40 156 36 174 L 32 208 C 30 222 32 238 36 252 L 42 276 C 44 286 48 294 56 298 L 68 300 C 74 299 76 292 76 284 L 74 260 C 72 244 70 228 70 212 L 68 174 C 66 154 64 142 62 136 Z" />
+          {/* Brazo derecho */}
+          <path d="M 238 136 C 250 142 260 156 264 174 L 268 208 C 270 222 268 238 264 252 L 258 276 C 256 286 252 294 244 298 L 232 300 C 226 299 224 292 224 284 L 226 260 C 228 244 230 228 230 212 L 232 174 C 234 154 236 142 238 136 Z" />
+          {/* Pierna izquierda */}
+          <path d="M 90 370 C 76 374 70 384 70 398 L 68 428 C 66 446 66 464 68 480 L 70 508 C 70 524 72 538 76 550 Q 78 560 88 566 L 112 568 Q 124 564 126 556 L 126 540 Q 126 526 126 510 L 126 480 C 126 464 128 448 128 432 Q 130 412 130 396 C 130 382 120 374 106 370 Q 98 368 90 370 Z" />
+          {/* Pierna derecha */}
+          <path d="M 210 370 C 224 374 230 384 230 398 L 232 428 C 234 446 234 464 232 480 L 230 508 C 230 524 228 538 224 550 Q 222 560 212 566 L 188 568 Q 176 564 174 556 L 174 540 Q 174 526 174 510 L 174 480 C 174 464 172 448 172 432 Q 170 412 170 396 C 170 382 180 374 194 370 Q 202 368 210 370 Z" />
+        </g>
+
+        {/* ── Highlight lateral ── */}
+        <g fill={`url(#hl-${uid})`} pointerEvents="none">
+          <ellipse cx="150" cy="36" rx="34" ry="36" />
+          <path d="M 131 110 Q 95 108 62 136 C 50 146 48 164 50 184 C 52 202 56 218 58 232 C 60 245 60 257 64 270 C 67 280 70 290 68 304 C 66 318 62 330 64 344 C 66 357 76 366 90 370 Q 120 376 150 377 Q 180 376 210 370 C 224 366 234 357 236 344 C 238 330 234 318 232 304 C 230 290 233 280 236 270 C 240 257 240 245 242 232 C 244 218 248 202 250 184 C 252 164 250 146 238 136 Q 205 108 169 110 Q 150 117 131 110 Z" />
+        </g>
+
+        {/* ── Detalles anatómicos ── */}
+        <g stroke="rgba(255,255,255,0.13)" strokeWidth="1" fill="none" pointerEvents="none">
+          {/* Clavículas */}
+          <path d="M 131 122 Q 100 126 72 136" />
+          <path d="M 169 122 Q 200 126 228 136" />
+          {/* Ombligo */}
+          <ellipse cx="150" cy="252" rx="5" ry="3" fill="rgba(0,0,0,0.25)" stroke="rgba(255,255,255,0.18)" />
+          {/* Línea media */}
+          <line x1="150" y1="122" x2="150" y2="370" strokeOpacity="0.08" />
+          {/* Pechos (solo vista frontal) */}
+          {!isBack && (
+            <>
+              <path d="M 95 178 Q 112 205 128 192" strokeWidth="1.2" />
+              <path d="M 205 178 Q 188 205 172 192" strokeWidth="1.2" />
+            </>
+          )}
+          {/* Línea lumbar (solo posterior) */}
+          {isBack && (
+            <path d="M 130 230 Q 150 252 170 230" strokeWidth="1.2" />
+          )}
+          {/* Rodillas */}
+          <ellipse cx="108" cy="468" rx="18" ry="12" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.12)" />
+          <ellipse cx="192" cy="468" rx="18" ry="12" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.12)" />
+        </g>
+
+        {/* ── Marcas ── */}
         {marks.map((mark) => {
-          const config = getMarkConfig(mark.tipo);
+          const color = MARK_COLORS[mark.tipo] ?? '#6366f1';
           return (
-            <motion.div
-              key={mark.id}
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              exit={{ scale: 0 }}
-              whileHover={{ scale: 1.15 }}
-              style={{
-                position: 'absolute',
-                left: `${(mark.posicionX / 300) * 100}%`,
-                top: `${(mark.posicionY / 600) * 100}%`,
-                transform: 'translate(-50%, -50%)',
-              }}
-            >
-              <div
-                className={`rounded-full bg-gradient-to-r ${config.color} border-2 border-white shadow-lg flex items-center justify-center text-white font-bold text-sm cursor-pointer`}
-                style={{
-                  width: fullSize ? '40px' : '32px',
-                  height: fullSize ? '40px' : '32px',
-                  boxShadow: `0 0 15px rgba(${
-                    config.tipo === 'EDEMA' ? '168,85,247' : config.tipo === 'FIBROSIS' ? '217,119,6' : config.tipo === 'DOLOR' ? '220,38,38' : config.tipo === 'CICATRIZ' ? '234,88,12' : '37,99,235'
-                  }, 0.6)`,
-                }}
-                title={`${mark.zona} - Intensidad ${mark.intensidad}/10`}
+            <g key={mark.id}>
+              {/* Glow */}
+              <circle cx={mark.posicionX} cy={mark.posicionY} r={18} fill={color} opacity={0.25} />
+              {/* Círculo principal */}
+              <circle
+                cx={mark.posicionX}
+                cy={mark.posicionY}
+                r={13}
+                fill={color}
+                stroke="white"
+                strokeWidth="2"
+              />
+              {/* Número */}
+              <text
+                x={mark.posicionX}
+                y={mark.posicionY + 5}
+                textAnchor="middle"
+                fill="white"
+                fontSize="11"
+                fontWeight="bold"
+                pointerEvents="none"
               >
                 {mark.intensidad}
-              </div>
-            </motion.div>
+              </text>
+              {/* Tooltip (title) */}
+              <title>{mark.zona} — {getMarkConfig(mark.tipo).label} · Intensidad {mark.intensidad}/10</title>
+            </g>
           );
         })}
-      </div>
+      </svg>
     </div>
   );
 }
