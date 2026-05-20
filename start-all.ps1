@@ -1,32 +1,63 @@
-# EstetIA - Arrancar todos los servicios
+# EstetIA - Arrancar todos los servicios en terminal integrado
 # Uso: .\start-all.ps1
+
+$root = $PSScriptRoot
 
 Write-Host ""
 Write-Host "============================================" -ForegroundColor Cyan
 Write-Host "  EstetIA - Iniciando todos los servicios  " -ForegroundColor Cyan
 Write-Host "============================================" -ForegroundColor Cyan
+Write-Host "  Backend  -> http://localhost:3001"
+Write-Host "  Frontend -> http://localhost:5173"
+Write-Host "  Whisper  -> http://localhost:8000"
+Write-Host "  Presiona Ctrl+C para detener todo"
+Write-Host "============================================" -ForegroundColor Cyan
 Write-Host ""
 
-$root = $PSScriptRoot
+# Iniciar cada servicio como job en segundo plano
+$pathBackend  = "$root\backend"
+$pathFrontend = "$root\frontend"
+$pathWhisper  = "$root\whisper_service"
 
-# --- Backend ---
-Write-Host "[1/3] Backend (puerto 3001)..." -ForegroundColor Yellow
-Start-Process powershell -ArgumentList "-NoExit", "-Command", "Set-Location '$root\backend'; npm run dev" -WindowStyle Normal
+$job1 = Start-Job -Name "Backend" -ArgumentList $pathBackend -ScriptBlock {
+    param($p); Set-Location $p; npm run dev 2>&1
+}
+$job2 = Start-Job -Name "Frontend" -ArgumentList $pathFrontend -ScriptBlock {
+    param($p); Set-Location $p; npm run dev 2>&1
+}
+$pythonExe = "C:\Users\SOPORTE\AppData\Local\Programs\Python\Python313\python.exe"
+$job3 = Start-Job -Name "Whisper" -ArgumentList $pathWhisper, $pythonExe -ScriptBlock {
+    param($p, $py); Set-Location $p; & $py main.py 2>&1
+}
+$jobs = @($job1, $job2, $job3)
 
-# --- Frontend ---
-Write-Host "[2/3] Frontend (puerto 5173)..." -ForegroundColor Yellow
-Start-Process powershell -ArgumentList "-NoExit", "-Command", "Set-Location '$root\frontend'; npm run dev" -WindowStyle Normal
+$colors = @{
+    "Backend"  = "Cyan"
+    "Frontend" = "Yellow"
+    "Whisper"  = "Green"
+}
 
-# --- Whisper ---
-Write-Host "[3/3] Whisper Service (puerto 8000)..." -ForegroundColor Yellow
-Start-Process powershell -ArgumentList "-NoExit", "-Command", "Set-Location '$root\whisper_service'; .\start.ps1" -WindowStyle Normal
-
+Write-Host "[OK] Los 3 servicios arrancaron en segundo plano" -ForegroundColor Green
 Write-Host ""
-Write-Host "============================================" -ForegroundColor Green
-Write-Host "  Servicios iniciados en ventanas nuevas   " -ForegroundColor Green
-Write-Host ""
-Write-Host "  Backend  -> http://localhost:3001        " -ForegroundColor White
-Write-Host "  Frontend -> http://localhost:5173        " -ForegroundColor White
-Write-Host "  Whisper  -> http://localhost:8000        " -ForegroundColor White
-Write-Host "============================================" -ForegroundColor Green
-Write-Host ""
+
+# Mostrar logs en tiempo real con prefijo de color
+try {
+    while ($true) {
+        foreach ($job in $jobs) {
+            $lines = Receive-Job -Job $job
+            foreach ($line in $lines) {
+                if ($line) {
+                    $color = $colors[$job.Name]
+                    Write-Host "[$($job.Name.ToUpper())] $line" -ForegroundColor $color
+                }
+            }
+        }
+        Start-Sleep -Milliseconds 300
+    }
+} finally {
+    Write-Host ""
+    Write-Host "Deteniendo servicios..." -ForegroundColor Red
+    $jobs | Stop-Job
+    $jobs | Remove-Job -Force
+    Write-Host "Servicios detenidos." -ForegroundColor Red
+}

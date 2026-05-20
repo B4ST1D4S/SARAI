@@ -9,6 +9,7 @@ import {
   createBloqueo,
   deleteBloqueo,
   getSlotsDisponibles,
+  getSlotsConEstado,
   getDisponibilidadesConCitas,
   getMedicosPorTipoConsulta,
   getDiasDisponibles,
@@ -143,7 +144,7 @@ export async function getSlots(req: Request, res: Response): Promise<void> {
       return;
     }
     const duracionMinutos = duracion ? parseInt(duracion, 10) : undefined;
-    const slots = await getSlotsDisponibles(medicoId, fecha, duracionMinutos);
+    const slots = await getSlotsConEstado(medicoId, fecha, duracionMinutos);
     res.json({ success: true, slots });
   } catch (error: any) {
     res.status(500).json({ error: error.message });

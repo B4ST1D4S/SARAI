@@ -68,7 +68,7 @@ export default function AgendarCitaWizard({
   const [tipos, setTipos] = useState<TipoConsulta[]>([]);
   const [medicos, setMedicos] = useState<Medico[]>([]);
   const [diasDisp, setDiasDisp] = useState<number[]>([]);
-  const [slots, setSlots] = useState<string[]>([]);
+  const [slots, setSlots] = useState<{ hora: string; estado: 'libre' | 'ocupado' | 'bloqueado' }[]>([]);
   const [loadTipos, setLoadTipos] = useState(false);
   const [loadMedicos, setLoadMedicos] = useState(false);
   const [loadDias, setLoadDias] = useState(false);
@@ -132,12 +132,25 @@ export default function AgendarCitaWizard({
       { headers: { Authorization: `Bearer ${getToken()}` } })
       .then(r => r.json())
       .then(d => {
-        const s: string[] = d.slots || [];
-        if (s.length === 0) { const g: string[] = []; for (let h=9;h<17;h++) g.push(`${String(h).padStart(2,"0")}:00`); setSlots(g); }
-        else setSlots(s);
+        const raw = d.slots ?? [];
+        // Soporte formato nuevo { hora, estado } y antiguo string[]
+        const normalized = raw.map((s: any) =>
+          typeof s === 'string' ? { hora: s, estado: 'libre' as const } : s
+        );
+        if (normalized.length === 0) {
+          const fallback = [];
+          for (let h = 9; h < 17; h++) fallback.push({ hora: `${String(h).padStart(2,"0")}:00`, estado: 'libre' as const });
+          setSlots(fallback);
+        } else {
+          setSlots(normalized);
+        }
         scrollToBottom();
       })
-      .catch(() => { const g: string[] = []; for (let h=9;h<17;h++) g.push(`${String(h).padStart(2,"0")}:00`); setSlots(g); })
+      .catch(() => {
+        const fallback = [];
+        for (let h = 9; h < 17; h++) fallback.push({ hora: `${String(h).padStart(2,"0")}:00`, estado: 'libre' as const });
+        setSlots(fallback);
+      })
       .finally(() => setLoadSlots(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [diaSel]);
@@ -151,7 +164,7 @@ export default function AgendarCitaWizard({
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${getToken()}` },
         body: JSON.stringify({ pacienteId, medicoId: medicoSel.id, tipoCita: tipoSel.nombre, entidadSalud: entidad || undefined,
-          fechaHora: new Date(`${fecha}T${horaSel}:00`).toISOString(), duracionMinutos: tipoSel.duracionMinutos,
+          fechaHora: `${fecha}T${horaSel}:00.000Z`, duracionMinutos: tipoSel.duracionMinutos,
           motivo: `Cita de ${tipoSel.nombre}`, notas }),
       });
       const data = await res.json();
@@ -288,37 +301,60 @@ export default function AgendarCitaWizard({
                   <SeccionHeader num={3} titulo="Fecha" completado={!!diaSel}
                     resumen={diaSel ? fechaLarga(calAnio, calMes, diaSel) : undefined} />
                   {!diaSel && (
-                    <div className="px-5 py-4">
-                      <div className="flex items-center justify-between mb-3">
-                        <button onClick={prevMes} className="p-1.5 hover:bg-slate-700/50 rounded-lg transition-colors"><ChevronLeft size={16} className="text-gray-400" /></button>
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold text-white text-sm">{MESES[calMes-1]} {calAnio}</span>
-                          {loadDias && <RefreshCw size={12} className="animate-spin text-yellow-400" />}
+                    <div className="px-4 py-3">
+                      {/* Nav mes */}
+                      <div className="flex items-center justify-between mb-2">
+                        <button onClick={prevMes} className="w-6 h-6 flex items-center justify-center hover:bg-slate-700/60 rounded-md transition-colors">
+                          <ChevronLeft size={14} className="text-slate-400" />
+                        </button>
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-semibold text-white text-xs">{MESES[calMes-1]} {calAnio}</span>
+                          {loadDias && <RefreshCw size={10} className="animate-spin text-yellow-400" />}
                         </div>
-                        <button onClick={nextMes} className="p-1.5 hover:bg-slate-700/50 rounded-lg transition-colors"><ChevronRight size={16} className="text-gray-400" /></button>
+                        <button onClick={nextMes} className="w-6 h-6 flex items-center justify-center hover:bg-slate-700/60 rounded-md transition-colors">
+                          <ChevronRight size={14} className="text-slate-400" />
+                        </button>
                       </div>
-                      <div className="grid grid-cols-7 mb-1">{DIAS.map(d => <div key={d} className="text-center text-[10px] text-slate-500 font-medium py-1">{d}</div>)}</div>
+                      {/* Cabecera días */}
+                      <div className="grid grid-cols-7 mb-1">
+                        {DIAS.map(d => <div key={d} className="text-center text-[9px] text-slate-600 font-semibold py-0.5 uppercase">{d}</div>)}
+                      </div>
+                      {/* Celdas */}
                       <div className="grid grid-cols-7 gap-0.5">
                         {celdas.map((dia, i) => {
-                          if (!dia) return <div key={`e-${i}`} />;
+                          if (!dia) return <div key={`e-${i}`} className="aspect-square" />;
                           const esHoy = dia===hoyDia && calMes===hoyMes && calAnio===hoyAnio;
                           const pasado = esPasado(dia);
                           const disponible = diasDisp.includes(dia);
                           return (
-                            <button key={dia} type="button" disabled={pasado || (!disponible && !loadDias)} onClick={() => setDiaSel(dia)}
-                              className={`relative aspect-square rounded-lg text-xs font-medium transition-all
-                                ${disponible && !pasado ? "bg-yellow-500/10 text-yellow-300 hover:bg-yellow-500/25 border border-yellow-500/25"
-                                  : pasado ? "text-slate-700 cursor-default" : "text-slate-600 cursor-default"}
-                                ${esHoy ? "ring-1 ring-yellow-500/60" : ""}`}>
+                            <button key={dia} type="button"
+                              disabled={pasado || (!disponible && !loadDias)}
+                              onClick={() => setDiaSel(dia)}
+                              className={`relative aspect-square rounded-md text-[11px] font-medium transition-all flex items-center justify-center
+                                ${disponible && !pasado
+                                  ? "bg-yellow-500/12 text-yellow-300 hover:bg-yellow-500/28 border border-yellow-500/30 hover:scale-105"
+                                  : pasado
+                                    ? "text-slate-700 cursor-default"
+                                    : "text-slate-600 cursor-default"}
+                                ${esHoy ? "ring-1 ring-yellow-500/70" : ""}`}
+                            >
                               {dia}
-                              {disponible && !pasado && <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-yellow-400" />}
+                              {disponible && !pasado && (
+                                <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-yellow-400/80" />
+                              )}
                             </button>
                           );
                         })}
                       </div>
-                      <div className="flex items-center gap-4 mt-3 pt-3 border-t border-slate-700/30 text-[10px] text-slate-500">
-                        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-yellow-500/10 border border-yellow-500/25 inline-block" />Disponible</span>
-                        {diasDisp.length===0 && !loadDias && <span className="text-slate-600 ml-auto">Sin disponibilidad este mes →</span>}
+                      {/* Leyenda */}
+                      <div className="flex items-center gap-3 mt-2 pt-2 border-t border-slate-700/30 text-[9px] text-slate-600">
+                        <span className="flex items-center gap-1">
+                          <span className="w-2 h-2 rounded-sm bg-yellow-500/12 border border-yellow-500/30 inline-block" />
+                          Con disponibilidad
+                        </span>
+                        {diasDisp.length===0 && !loadDias && (
+                          <span className="ml-auto text-slate-600">Sin disponibilidad este mes</span>
+                        )}
                       </div>
                     </div>
                   )}
@@ -346,14 +382,51 @@ export default function AgendarCitaWizard({
                           <div className="w-4 h-4 border-2 border-yellow-400 border-t-transparent rounded-full animate-spin" />Consultando...
                         </div>
                       ) : (
-                        <div className="grid grid-cols-5 sm:grid-cols-7 gap-1.5">
-                          {slots.map(s => (
-                            <button key={s} type="button" onClick={() => { setHoraSel(s); scrollToBottom(); }}
-                              className="py-2 rounded-lg text-xs font-semibold border transition-all bg-slate-700/40 border-slate-600/40 text-white hover:border-yellow-500/50 hover:bg-yellow-500/10">
-                              {s}
-                            </button>
-                          ))}
-                        </div>
+                        <>
+                          <div className="grid grid-cols-5 sm:grid-cols-7 gap-1.5">
+                            {slots.map(s => {
+                              const libre = s.estado === 'libre';
+                              const ocupado = s.estado === 'ocupado';
+                              const bloqueado = s.estado === 'bloqueado';
+                              return (
+                                <button
+                                  key={s.hora}
+                                  type="button"
+                                  disabled={!libre}
+                                  title={ocupado ? 'Turno ocupado' : bloqueado ? 'Turno bloqueado' : 'Disponible'}
+                                  onClick={() => { if (libre) { setHoraSel(s.hora); scrollToBottom(); } }}
+                                  className={`relative py-2 rounded-lg text-xs font-semibold border transition-all
+                                    ${libre
+                                      ? 'bg-slate-700/40 border-slate-600/40 text-white hover:border-yellow-500/60 hover:bg-yellow-500/10 hover:text-yellow-200 cursor-pointer'
+                                      : ocupado
+                                        ? 'bg-red-900/20 border-red-700/40 text-red-400/70 cursor-not-allowed line-through'
+                                        : 'bg-slate-800/60 border-slate-700/30 text-slate-600 cursor-not-allowed opacity-50'
+                                    }`}
+                                >
+                                  {s.hora}
+                                  {ocupado && (
+                                    <span className="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-red-500" />
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </div>
+                          {/* Leyenda */}
+                          <div className="flex items-center gap-4 mt-3 pt-3 border-t border-slate-700/30 text-[10px] text-slate-500 flex-wrap">
+                            <span className="flex items-center gap-1.5">
+                              <span className="w-3 h-3 rounded bg-slate-700/40 border border-slate-600/40 inline-block" />
+                              Libre
+                            </span>
+                            <span className="flex items-center gap-1.5">
+                              <span className="w-3 h-3 rounded bg-red-900/20 border border-red-700/40 inline-block" />
+                              Ocupado
+                            </span>
+                            <span className="flex items-center gap-1.5">
+                              <span className="w-3 h-3 rounded bg-slate-800/60 border border-slate-700/30 opacity-50 inline-block" />
+                              Bloqueado
+                            </span>
+                          </div>
+                        </>
                       )}
                     </div>
                   )}

@@ -190,8 +190,6 @@ export default function AgendarCita({
       const medicoId = user.id || user.userId;
       if (!medicoId) throw new Error('No se pudo identificar al médico. Recarga la página.');
 
-      const fechaHora = new Date(`${formData.fecha}T${formData.hora}:00`);
-
       const response = await fetch('/api/citas', {
         method: 'POST',
         headers: {
@@ -203,7 +201,7 @@ export default function AgendarCita({
           medicoId,
           tipoCita: formData.tipoConsulta,
           entidadSalud: formData.entidadSalud || undefined,
-          fechaHora: fechaHora.toISOString(),
+          fechaHora: `${formData.fecha}T${formData.hora}:00.000Z`,
           duracionMinutos: duracionTipoActual() || 60,
           motivo: `Cita de ${formData.tipoConsulta}`,
           notas: formData.notas,

@@ -6,7 +6,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Users, UserCheck, Clock, RefreshCw, Bell, CheckCircle, AlertCircle, Search, X } from 'lucide-react';
-import { getCitasMedico } from '../services/api';
+
 
 interface Cita {
   id: string;
@@ -31,14 +31,21 @@ export default function AdmisionPage() {
   const [filtroProfesional, setFiltroProfesional] = useState('');
 
   const getToken = () => localStorage.getItem('accessToken') || '';
-  const hoy = new Date().toISOString().split('T')[0];
 
   const cargar = async () => {
     setLoading(true);
     const token = getToken();
-    const res = await getCitasMedico(token);
-    if (!res.error && res.data) {
-      const todas = ((res.data as any).citas || []).map((c: any, i: number) => {
+    // Rango LOCAL del día (igual que AgendaPage) para no perder citas por zona horaria
+    const ahora = new Date();
+    const inicioLocal = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 0, 0, 0, 0);
+    const finLocal    = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 23, 59, 59, 999);
+    const res = await fetch(
+      `/api/citas/medico/agenda?fechaInicio=${inicioLocal.toISOString()}&fechaFin=${finLocal.toISOString()}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    if (res.ok) {
+      const data = await res.json();
+      const todas = ((data as any).citas || []).map((c: any, i: number) => {
         const fecha = new Date(c.fechaHora);
         return {
           id: c.id,
@@ -54,11 +61,11 @@ export default function AdmisionPage() {
           turno: i + 1,
         } as Cita;
       });
-      // Mostrar solo de hoy + estados relevantes
-      const hoyFiltrado = todas.filter((c: Cita) =>
-        c.fecha === hoy && ['CONFIRMADA', 'EN_SALA', 'PENDIENTE'].includes(c.estado)
-      ).sort((a: Cita, b: Cita) => a.hora.localeCompare(b.hora));
-      setCitas(hoyFiltrado);
+      // Filtrar solo estados relevantes (fecha ya viene filtrada por el backend)
+      const filtradas = todas
+        .filter((c: Cita) => ['CONFIRMADA', 'EN_SALA', 'PENDIENTE'].includes(c.estado))
+        .sort((a: Cita, b: Cita) => a.hora.localeCompare(b.hora));
+      setCitas(filtradas);
     }
     setLoading(false);
   };

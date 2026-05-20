@@ -15,6 +15,7 @@ export default function AgendaPage() {
   const [mostrarAgendarCita, setMostrarAgendarCita] = useState(false);
   const [pacienteSeleccionado, setPacienteSeleccionado] = useState<any>(null);
   const [pacienteParaEditar, setPacienteParaEditar] = useState<any>(null);
+  const [documentoInicial, setDocumentoInicial] = useState<{ tipoDocumento: string; numeroDocumento: string } | null>(null);
   const [errorPaciente, setErrorPaciente] = useState<string>('');
   const [citas, setCitas] = useState<any[]>([]);
   const [loadingCitas, setLoadingCitas] = useState(false);
@@ -187,9 +188,10 @@ export default function AgendaPage() {
     setMostrarFormularioPaciente(true);
   };
 
-  // Paciente no encontrado → mostrar formulario VACIÓ para crear
-  const handleNuevoPaciente = () => {
+  // Paciente no encontrado → mostrar formulario con documento pre-llenado
+  const handleNuevoPaciente = (datos?: { tipoDocumento: string; numeroDocumento: string }) => {
     setPacienteParaEditar(null);
+    setDocumentoInicial(datos || null);
     setMostrarBuscador(false);
     setMostrarFormularioPaciente(true);
   };
@@ -201,9 +203,9 @@ export default function AgendaPage() {
   const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
     'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 
-  const citasConfirmadas = citas.filter(c => c.estado === 'CONFIRMADA').length;
-  const citasPendientes = citas.filter(c => c.estado === 'PENDIENTE').length;
-  const citasAtendidas = citas.filter(c => c.estado === 'COMPLETADA').length;
+  const citasConfirmadas = citas.filter(c => ['CONFIRMADA', 'EN_SALA'].includes(c.estado)).length;
+  const citasPendientes  = citas.filter(c => c.estado === 'PENDIENTE').length;
+  const citasAtendidas   = citas.filter(c => c.estado === 'COMPLETADA').length;
 
   const getEstadoConfig = (estado: string) => {
     switch (estado) {
@@ -278,7 +280,7 @@ export default function AgendaPage() {
             <div className="relative">
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-emerald-400/80 text-[9px] sm:text-sm font-semibold uppercase tracking-wider">Confirm.</p>
+                  <p className="text-emerald-400/80 text-[9px] sm:text-sm font-semibold uppercase tracking-wider">Confirm./Sala</p>
                   <p className="text-2xl sm:text-4xl font-bold text-white mt-1">{citasConfirmadas}</p>
                 </div>
                 <div className="bg-gradient-to-br from-emerald-500/20 to-teal-600/20 p-1.5 sm:p-3 rounded-xl">
@@ -536,10 +538,10 @@ export default function AgendaPage() {
               </div>
             )}
             <FormularioPaciente
-              onClose={() => { setMostrarFormularioPaciente(false); setErrorPaciente(''); setPacienteParaEditar(null); setMostrarBuscador(true); }}
+              onClose={() => { setMostrarFormularioPaciente(false); setErrorPaciente(''); setPacienteParaEditar(null); setDocumentoInicial(null); setMostrarBuscador(true); }}
               onSubmit={handleCrearPaciente}
               titulo={pacienteParaEditar ? 'Revisar Datos del Paciente' : 'Crear Nuevo Paciente - Agenda'}
-              pacienteInicial={pacienteParaEditar ? mapPacienteApiAForm(pacienteParaEditar) : undefined}
+              pacienteInicial={pacienteParaEditar ? mapPacienteApiAForm(pacienteParaEditar) : (documentoInicial ?? undefined)}
               modoEdicion={!!pacienteParaEditar}
             />
           </>

@@ -299,35 +299,32 @@ export async function getDiasDisponibles(
 // ──────────────────────────────────────────────────────────────────────────
 // Dado medicoId + fecha (YYYY-MM-DD) + duracionMinutos opcional (de TipoConsulta), retorna horas libres
 
-export async function getSlotsDisponibles(medicoId: string, fecha: string, duracionOverride?: number): Promise<string[]> {
-  const date = new Date(fecha + 'T00:00:00Z');
-  const diaSemana = date.getUTCDay(); // 0=Dom…6=Sáb
+export type EstadoSlot = 'libre' | 'ocupado' | 'bloqueado';
+export interface SlotConEstado { hora: string; estado: EstadoSlot }
 
-  // 1. Obtener configuración del médico para ese día
+export async function getSlotsConEstado(medicoId: string, fecha: string, duracionOverride?: number): Promise<SlotConEstado[]> {
+  const date = new Date(fecha + 'T00:00:00Z');
+  const diaSemana = date.getUTCDay();
+
   const disponibilidades = await prisma.disponibilidadMedico.findMany({
     where: { medicoId, diaSemana, activo: true },
   });
-
   if (disponibilidades.length === 0) return [];
 
-  // 2. Verificar que no haya bloqueo ese día
-  const bloqueado = await prisma.bloqueDisponibilidad.findFirst({
+  // ¿Día completamente bloqueado?
+  const bloqueoDia = await prisma.bloqueDisponibilidad.findFirst({
     where: {
       medicoId,
       fechaInicio: { lte: new Date(fecha + 'T23:59:59Z') },
       fechaFin: { gte: new Date(fecha + 'T00:00:00Z') },
     },
   });
-  if (bloqueado) return [];
 
-  // 3. Obtener citas ya programadas ese día
+  // Citas ya agendadas ese día
   const citasDelDia = await prisma.cita.findMany({
     where: {
       medicoId,
-      fechaHora: {
-        gte: new Date(fecha + 'T00:00:00Z'),
-        lte: new Date(fecha + 'T23:59:59Z'),
-      },
+      fechaHora: { gte: new Date(fecha + 'T00:00:00Z'), lte: new Date(fecha + 'T23:59:59Z') },
       estado: { notIn: ['CANCELADA'] },
     },
     select: { fechaHora: true, duracionMinutos: true },
@@ -340,24 +337,29 @@ export async function getSlotsDisponibles(medicoId: string, fecha: string, durac
     })
   );
 
-  // 4. Generar slots según configuración (duracion: TipoConsulta tiene prioridad sobre franja)
-  const slots: string[] = [];
+  const result: SlotConEstado[] = [];
   for (const disp of disponibilidades) {
     const [inicioH, inicioM] = disp.horaInicio.split(':').map(Number);
     const [finH, finM] = disp.horaFin.split(':').map(Number);
     const duracion = duracionOverride ?? disp.duracionSlot;
+    let cur = inicioH * 60 + inicioM;
+    const fin = finH * 60 + finM;
 
-    let totalMinutos = inicioH * 60 + inicioM;
-    const finMinutos = finH * 60 + finM;
-
-    while (totalMinutos + duracion <= finMinutos) {
-      const hh = String(Math.floor(totalMinutos / 60)).padStart(2, '0');
-      const mm = String(totalMinutos % 60).padStart(2, '0');
-      const slot = `${hh}:${mm}`;
-      if (!ocupadas.has(slot)) slots.push(slot);
-      totalMinutos += duracion;
+    while (cur + duracion <= fin) {
+      const hh = String(Math.floor(cur / 60)).padStart(2, '0');
+      const mm = String(cur % 60).padStart(2, '0');
+      const hora = `${hh}:${mm}`;
+      let estado: EstadoSlot = 'libre';
+      if (bloqueoDia) estado = 'bloqueado';
+      else if (ocupadas.has(hora)) estado = 'ocupado';
+      result.push({ hora, estado });
+      cur += duracion;
     }
   }
+  return result;
+}
 
-  return slots;
+export async function getSlotsDisponibles(medicoId: string, fecha: string, duracionOverride?: number): Promise<string[]> {
+  const slots = await getSlotsConEstado(medicoId, fecha, duracionOverride);
+  return slots.filter(s => s.estado === 'libre').map(s => s.hora);
 }
