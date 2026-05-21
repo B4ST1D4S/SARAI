@@ -144,7 +144,7 @@ const ORIGEN_MAP: Record<string, string> = {
 // ═══════════════════════════════════════════════════════════════
 // Encabezado empresa
 // ═══════════════════════════════════════════════════════════════
-function buildEmpresaHeader(medico: any, titulo: string, historia: any): string {
+function buildEmpresaHeader(medico: any, titulo: string, historia: any, clinica?: Record<string, string>): string {
   const nombreMedico = medico
     ? `Dr(a). ${medico.nombre ?? ''} ${medico.apellido ?? ''}`.trim()
     : '';
@@ -153,14 +153,33 @@ function buildEmpresaHeader(medico: any, titulo: string, historia: any): string 
   const regProf      = medico?.registroProfesional ? `R.P.: ${medico.registroProfesional}` : '';
   const hcNum        = historia?.id ? historia.id.slice(-8).toUpperCase() : '';
 
+  const nombreClinica = clinica?.nombre_clinica?.trim() || 'Sistema de Gestión Médica';
+  const nit           = clinica?.nit?.trim()            || '';
+  const direccion     = clinica?.direccion?.trim()      || '';
+  const ciudad        = clinica?.ciudad?.trim()         || '';
+  const telefono      = clinica?.telefono?.trim()       || '';
+  const logoUrl       = clinica?.logo_url?.trim()       || '';
+
+  const infoLines = [
+    nit       ? `NIT: ${nit}`       : '',
+    direccion ? direccion            : '',
+    ciudad    ? ciudad               : '',
+    telefono  ? `Tel: ${telefono}`  : '',
+  ].filter(Boolean);
+
+  const logoHtml = logoUrl
+    ? `<img src="${logoUrl}" style="max-width:80px; max-height:52px; object-fit:contain;" alt="Logo"/>`
+    : `<div class="logo-box">LOGO<br>CLÍNICA</div>`;
+
   return `
   <table class="top-header">
     <tr>
       <td class="logo-cell">
-        <div class="logo-box">LOGO<br>CLÍNICA</div>
+        ${logoHtml}
       </td>
       <td class="empresa-cell">
-        <div class="empresa-nombre">Sistema de Gestión Médica</div>
+        <div class="empresa-nombre">${nombreClinica}</div>
+        ${infoLines.map(l => `<div class="empresa-light">${l}</div>`).join('')}
         ${nombreMedico ? `<div class="empresa-sub">${nombreMedico}${especialidad ? ' &mdash; ' + especialidad : ''}</div>` : ''}
         ${(regMedico || regProf) ? `<div class="empresa-light">${[regMedico, regProf].filter(Boolean).join(' &nbsp;&middot;&nbsp; ')}</div>` : ''}
         <div class="empresa-light">Impreso: ${new Date().toLocaleString('es-CO', { dateStyle:'short', timeStyle:'short' })}</div>
@@ -205,7 +224,7 @@ function buildFirma(medico: any): string {
 // ═══════════════════════════════════════════════════════════════
 // HISTORIA CLÍNICA
 // ═══════════════════════════════════════════════════════════════
-export function buildHCHtml(historia: any): string {
+export function buildHCHtml(historia: any, clinica?: Record<string, string>): string {
   const raw  = historia.datosExtendidos ?? historia.contenido ?? {};
   const ext  = typeof raw === 'string' ? JSON.parse(raw) : raw;
   const sv   = ext.signosVitales          ?? {};
@@ -227,7 +246,7 @@ export function buildHCHtml(historia: any): string {
 </head>
 <body>
 
-  ${buildEmpresaHeader(med, 'HISTORIA CLÍNICA', historia)}
+  ${buildEmpresaHeader(med, 'HISTORIA CLÍNICA', historia, clinica)}
 
   <!-- ── Datos del paciente ── -->
   <table class="hc-table">
@@ -489,7 +508,7 @@ export function buildHCHtml(historia: any): string {
 // ═══════════════════════════════════════════════════════════════
 // ÓRDENES MÉDICAS
 // ═══════════════════════════════════════════════════════════════
-export function buildOrdenesHtml(historia: any): string {
+export function buildOrdenesHtml(historia: any, clinica?: Record<string, string>): string {
   const raw    = historia.datosExtendidos ?? historia.contenido ?? {};
   const ext    = typeof raw === 'string' ? JSON.parse(raw) : raw;
   const ordenes = ext.ordenesMedicas ?? {};
@@ -514,7 +533,7 @@ export function buildOrdenesHtml(historia: any): string {
 </head>
 <body>
 
-  ${buildEmpresaHeader(med, 'ÓRDENES MÉDICAS', historia)}
+  ${buildEmpresaHeader(med, 'ÓRDENES MÉDICAS', historia, clinica)}
 
   <!-- Datos paciente resumen -->
   <table class="hc-table">
