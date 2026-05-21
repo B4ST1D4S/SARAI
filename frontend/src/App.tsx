@@ -1,6 +1,7 @@
 ﻿import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import AuthPage from './pages/AuthPage';
+import NeuralCanvas from './components/NeuralCanvas';
 import DashboardPage from './pages/DashboardPage';
 import PacientesPage from './pages/PacientesPage';
 import HistoriaClinicaPage from './pages/HistoriaClinicaPage';
@@ -285,6 +286,8 @@ function App() {
 
   return (
     <div className="min-h-screen bg-[#080a0f] flex">
+      {/* Red neuronal de fondo — visible en todos los módulos */}
+      <NeuralCanvas opacity={0.13} nodeCount={100} />
       <Sidebar
         currentPage={currentPage}
         setCurrentPage={setCurrentPage}

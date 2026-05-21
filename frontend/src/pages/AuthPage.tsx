@@ -1,76 +1,7 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { login } from '../services/api';
-
-/* ??? Red neuronal animada ???????????????????????????????????? */
-function NeuralCanvas() {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    let raf: number;
-
-    const resize = () => {
-      canvas.width  = window.innerWidth;
-      canvas.height = window.innerHeight;
-    };
-    resize();
-    window.addEventListener('resize', resize);
-
-    const N = 90;
-    const MAX = 160;
-
-    interface P { x:number; y:number; vx:number; vy:number; r:number; }
-    const pts: P[] = Array.from({ length: N }, () => ({
-      x:  Math.random() * canvas.width,
-      y:  Math.random() * canvas.height,
-      vx: (Math.random() - 0.5) * 0.45,
-      vy: (Math.random() - 0.5) * 0.45,
-      r:  Math.random() * 1.8 + 0.8,
-    }));
-
-    const draw = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      for (const p of pts) {
-        p.x += p.vx; p.y += p.vy;
-        if (p.x < 0 || p.x > canvas.width)  p.vx *= -1;
-        if (p.y < 0 || p.y > canvas.height) p.vy *= -1;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(0,200,230,0.75)';
-        ctx.fill();
-      }
-
-      for (let i = 0; i < pts.length; i++) {
-        for (let j = i + 1; j < pts.length; j++) {
-          const dx = pts[i].x - pts[j].x;
-          const dy = pts[i].y - pts[j].y;
-          const d  = Math.sqrt(dx * dx + dy * dy);
-          if (d < MAX) {
-            const alpha = 0.18 * (1 - d / MAX);
-            ctx.beginPath();
-            ctx.moveTo(pts[i].x, pts[i].y);
-            ctx.lineTo(pts[j].x, pts[j].y);
-            ctx.strokeStyle = `rgba(0,180,216,${alpha})`;
-            ctx.lineWidth = 0.6;
-            ctx.stroke();
-          }
-        }
-      }
-      raf = requestAnimationFrame(draw);
-    };
-
-    draw();
-    return () => { cancelAnimationFrame(raf); window.removeEventListener('resize', resize); };
-  }, []);
-
-  return <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />;
-}
+import NeuralCanvas from '../components/NeuralCanvas';
 
 /* ??? Cruz médica SVG con glow ???????????????????????????????? */
 function MedicalCross() {
@@ -196,25 +127,6 @@ export default function AuthPage() {
       <div className="absolute right-[4%] top-1/2 -translate-y-1/2 w-[320px] h-[320px] opacity-40 pointer-events-none hidden lg:block">
         <MedicalCross />
       </div>
-
-      {/* ?? Íconos médicos flotantes ?? */}
-      {[
-        { icon:'??', top:'12%',  right:'22%', size:'text-2xl', delay:0    },
-        { icon:'??', top:'60%',  right:'18%', size:'text-xl',  delay:0.4  },
-        { icon:'??', top:'78%',  right:'28%', size:'text-xl',  delay:0.8  },
-        { icon:'??', top:'20%',  left:'6%',   size:'text-xl',  delay:0.6  },
-        { icon:'??', top:'70%',  left:'8%',   size:'text-xl',  delay:1.0  },
-      ].map((item, i) => (
-        <motion.div key={i}
-          className={`absolute ${item.size} pointer-events-none hidden lg:block`}
-          style={{ top: item.top, right: (item as any).right, left: (item as any).left }}
-          initial={{ opacity: 0, scale: 0.5 }}
-          animate={{ opacity: 0.25, scale: 1 }}
-          transition={{ delay: item.delay, duration: 0.8 }}
-        >
-          {item.icon}
-        </motion.div>
-      ))}
 
       {/* ?? Tarjeta de login ?? */}
       <motion.div
