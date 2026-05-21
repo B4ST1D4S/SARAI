@@ -12,9 +12,9 @@ const BASE_CSS = `
   /* ── Encabezado empresa ─────────────────────── */
   .top-header { display: table; width: 100%; border-collapse: collapse; margin-bottom: 4px; }
   .top-header-row { display: table-row; }
-  .logo-cell   { display: table-cell; width: 120px; vertical-align: middle; padding-right: 8px; }
+  .logo-cell   { display: table-cell; width: 180px; vertical-align: middle; padding-right: 10px; }
   .logo-box    {
-    width: 110px; height: 70px; border: 2px solid #2563AB; border-radius: 3px;
+    width: 160px; height: 100px; border: 2px solid #2563AB; border-radius: 3px;
     text-align: center; line-height: 1.3; font-weight: bold; font-size: 9px;
     color: #2563AB; display: flex; align-items: center; justify-content: center; padding: 4px;
   }
@@ -168,7 +168,7 @@ function buildEmpresaHeader(medico: any, titulo: string, historia: any, clinica?
   ].filter(Boolean);
 
   const logoHtml = logoUrl
-    ? `<img src="${logoUrl}" style="max-width:110px; max-height:72px; object-fit:contain; display:block;" alt="Logo"/>`
+    ? `<img src="${logoUrl}" style="max-width:160px; max-height:100px; width:auto; height:auto; object-fit:contain; display:block;" alt="Logo"/>`
     : `<div class="logo-box">LOGO<br>CLÍNICA</div>`;
 
   return `
