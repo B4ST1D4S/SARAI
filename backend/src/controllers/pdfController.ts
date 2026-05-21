@@ -30,6 +30,15 @@ async function htmlToPdf(html: string): Promise<Buffer> {
   }
 }
 
+async function getClinicaParams(): Promise<Record<string, string>> {
+  const rows = await prisma.parametroSistema.findMany({
+    where: { grupo: 'clinica', estado: true },
+  });
+  const map: Record<string, string> = {};
+  rows.forEach(r => { map[r.clave] = r.valor ?? ''; });
+  return map;
+}
+
 async function getHistoriaConDatos(id: string) {
   return prisma.historiaClinica.findUnique({
     where: { id },
@@ -70,7 +79,8 @@ export async function descargarHCPdf(req: Request, res: Response): Promise<void>
     const historia = await getHistoriaConDatos(id);
     if (!historia) { res.status(404).json({ error: 'Historia clínica no encontrada' }); return; }
 
-    const html   = buildHCHtml(historia);
+    const clinica = await getClinicaParams();
+    const html   = buildHCHtml(historia, clinica);
     const buffer = await htmlToPdf(html);
 
     const nombre = (historia.paciente?.nombreCompleto ?? 'HC').replace(/\s+/g, '_');
@@ -92,7 +102,8 @@ export async function descargarOrdenesPdf(req: Request, res: Response): Promise<
     const historia = await getHistoriaConDatos(id);
     if (!historia) { res.status(404).json({ error: 'Historia clínica no encontrada' }); return; }
 
-    const html   = buildOrdenesHtml(historia);
+    const clinica = await getClinicaParams();
+    const html   = buildOrdenesHtml(historia, clinica);
     const buffer = await htmlToPdf(html);
 
     const nombre = (historia.paciente?.nombreCompleto ?? 'OM').replace(/\s+/g, '_');
