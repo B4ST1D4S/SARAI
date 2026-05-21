@@ -1887,7 +1887,7 @@ function TabParamKV({ grupo, descripcion }: { grupo: string; descripcion: string
         : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             {items.map((p: any) => (
-              <div key={p.clave}>
+              <div key={p.clave} className={p.clave === 'logo_url' ? 'sm:col-span-2' : ''}>
                 <label className="block text-xs text-gray-400 mb-1.5">{p.etiqueta}</label>
                 {p.tipo === 'boolean'
                   ? (
@@ -1896,6 +1896,46 @@ function TabParamKV({ grupo, descripcion }: { grupo: string; descripcion: string
                       onChange={v => setValores(prev => ({ ...prev, [p.clave]: v ? 'true' : 'false' }))}
                       label={valores[p.clave] === 'true' ? 'Activado' : 'Desactivado'}
                     />
+                  ) : p.clave === 'logo_url'
+                  ? (
+                    <div className="flex items-start gap-4">
+                      <label className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white text-xs font-semibold rounded-lg cursor-pointer transition border border-slate-600 whitespace-nowrap">
+                        <Upload size={13} />
+                        Cargar imagen
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={e => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            const reader = new FileReader();
+                            reader.onload = ev => {
+                              setValores(prev => ({ ...prev, logo_url: ev.target?.result as string ?? '' }));
+                            };
+                            reader.readAsDataURL(file);
+                          }}
+                        />
+                      </label>
+                      {valores['logo_url']
+                        ? (
+                          <div className="flex items-center gap-3">
+                            <img
+                              src={valores['logo_url']}
+                              alt="Logo clínica"
+                              className="max-h-14 max-w-[160px] object-contain rounded border border-slate-600 bg-white/5 p-1"
+                            />
+                            <button
+                              onClick={() => setValores(prev => ({ ...prev, logo_url: '' }))}
+                              className="text-xs text-red-400 hover:text-red-300 transition"
+                            >
+                              Quitar
+                            </button>
+                          </div>
+                        )
+                        : <span className="text-xs text-gray-500 self-center">Sin logo configurado</span>
+                      }
+                    </div>
                   ) : (
                     <input
                       type={p.tipo === 'url' ? 'text' : p.tipo}
