@@ -261,9 +261,9 @@ model FotoClinica {
 }
 
 model MapaCorporal {
-  id                 String         @id @default(cuid())
+  id                 String        @id @default(cuid())
   pacienteId         String
-  procedimientoId    String?
+  procedimientoId    String
   fechaEvaluacion    DateTime
   zonasMarcadas      Json
   edemaZonas         Json
@@ -272,10 +272,10 @@ model MapaCorporal {
   colorIndicator     String?
   anotacionesClinics String?
   evaluadoPor        String
-  createdAt          DateTime       @default(now())
-  updatedAt          DateTime       @updatedAt
-  paciente           Paciente       @relation(fields: [pacienteId], references: [id])
-  procedimiento      Procedimiento? @relation(fields: [procedimientoId], references: [id])
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  paciente           Paciente      @relation(fields: [pacienteId], references: [id])
+  procedimiento      Procedimiento @relation(fields: [procedimientoId], references: [id])
 
   @@index([pacienteId])
   @@index([procedimientoId])

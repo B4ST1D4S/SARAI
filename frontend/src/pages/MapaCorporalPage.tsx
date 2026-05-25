@@ -787,30 +787,67 @@ export default function MapaCorporalPage() {
             </div>
           </motion.div>
 
-          {/* COLUMNA 2: Vistas 360° (Frontal + Posterior) */}
-          <motion.div className="bg-slate-900/60 border border-slate-700/30 rounded-lg p-2 flex flex-col gap-1 overflow-hidden">
-            <label className="text-xs font-bold text-cyan-400 px-2">VISTAS 360°</label>
-            <div className="flex-1 grid grid-cols-2 gap-1 overflow-hidden">
-              <div className="bg-slate-800/80 rounded-lg overflow-hidden">
-                <BodyViewSVG viewLabel="FRONTAL" isBack={false} marks={marks} mode={mode} handleBodyClick={handleBodyClick} getMarkConfig={getMarkConfig} />
-              </div>
-              <div className="bg-slate-800/80 rounded-lg overflow-hidden">
-                <BodyViewSVG viewLabel="POSTERIOR" isBack={true} marks={marks} mode={mode} handleBodyClick={handleBodyClick} getMarkConfig={getMarkConfig} />
-              </div>
+          {/* COLUMNAS 2+3: Vistas corporales con filtro por pestaña */}
+          <motion.div className="col-span-2 bg-slate-900/60 border border-slate-700/30 rounded-lg p-2 flex flex-col gap-2 overflow-hidden">
+            {/* Tabs de vista */}
+            <div className="flex items-center gap-1.5 flex-wrap px-1">
+              <span className="text-xs text-gray-400 mr-1">👆 Haz clic en zonas</span>
+              {(['TODAS','FRONTAL','LATERAL'] as const).map(v => (
+                <button
+                  key={v}
+                  onClick={() => setView360(v as any)}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                    view360 === v
+                      ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/30'
+                      : 'bg-slate-700/80 text-gray-300 hover:bg-slate-600 border border-slate-600/50'
+                  }`}
+                >
+                  {v === 'TODAS' ? '⊞ Todas' : v === 'FRONTAL' ? '⊞ Frontal' : '⊞ Lateral'}
+                </button>
+              ))}
             </div>
-          </motion.div>
 
-          {/* COLUMNA 3: Vistas Laterales */}
-          <motion.div className="bg-slate-900/60 border border-slate-700/30 rounded-lg p-2 flex flex-col gap-1 overflow-hidden">
-            <label className="text-xs font-bold text-cyan-400 px-2">VISTAS LATERALES</label>
-            <div className="flex-1 grid grid-cols-2 gap-1 overflow-hidden">
-              <div className="bg-slate-800/80 rounded-lg overflow-hidden">
-                <BodyViewSVG viewLabel="LATERAL IZQ" isBack={false} marks={marks} mode={mode} handleBodyClick={handleBodyClick} getMarkConfig={getMarkConfig} />
+            {/* TODAS: 4 columnas en fila */}
+            {view360 === 'TODAS' && (
+              <div className="flex-1 grid grid-cols-4 gap-2 overflow-hidden min-h-0">
+                <div className="bg-slate-800/80 rounded-lg overflow-hidden flex flex-col">
+                  <BodyViewSVG viewLabel="FRONTAL" isBack={false} marks={marks} mode={mode} handleBodyClick={handleBodyClick} getMarkConfig={getMarkConfig} />
+                </div>
+                <div className="bg-slate-800/80 rounded-lg overflow-hidden flex flex-col">
+                  <BodyViewSVG viewLabel="POSTERIOR" isBack={true} marks={marks} mode={mode} handleBodyClick={handleBodyClick} getMarkConfig={getMarkConfig} />
+                </div>
+                <div className="bg-slate-800/80 rounded-lg overflow-hidden flex flex-col">
+                  <BodyViewSVG viewLabel="LATERAL IZQ" isBack={false} marks={marks} mode={mode} handleBodyClick={handleBodyClick} getMarkConfig={getMarkConfig} />
+                </div>
+                <div className="bg-slate-800/80 rounded-lg overflow-hidden flex flex-col">
+                  <BodyViewSVG viewLabel="LATERAL DER" isBack={true} marks={marks} mode={mode} handleBodyClick={handleBodyClick} getMarkConfig={getMarkConfig} />
+                </div>
               </div>
-              <div className="bg-slate-800/80 rounded-lg overflow-hidden">
-                <BodyViewSVG viewLabel="LATERAL DER" isBack={true} marks={marks} mode={mode} handleBodyClick={handleBodyClick} getMarkConfig={getMarkConfig} />
+            )}
+
+            {/* FRONTAL: Frontal + Posterior juntos */}
+            {(view360 === 'FRONTAL' || view360 === 'POSTERIOR') && (
+              <div className="flex-1 grid grid-cols-2 gap-2 overflow-hidden min-h-0">
+                <div className="bg-slate-800/80 rounded-lg overflow-hidden flex flex-col">
+                  <BodyViewSVG viewLabel="FRONTAL" isBack={false} marks={marks} mode={mode} handleBodyClick={handleBodyClick} getMarkConfig={getMarkConfig} fullSize />
+                </div>
+                <div className="bg-slate-800/80 rounded-lg overflow-hidden flex flex-col">
+                  <BodyViewSVG viewLabel="POSTERIOR" isBack={true} marks={marks} mode={mode} handleBodyClick={handleBodyClick} getMarkConfig={getMarkConfig} fullSize />
+                </div>
               </div>
-            </div>
+            )}
+
+            {/* LATERAL: IZQ + DER lado a lado grandes */}
+            {view360 === 'LATERAL' && (
+              <div className="flex-1 grid grid-cols-2 gap-2 overflow-hidden min-h-0">
+                <div className="bg-slate-800/80 rounded-lg overflow-hidden flex flex-col">
+                  <BodyViewSVG viewLabel="LATERAL IZQ" isBack={false} marks={marks} mode={mode} handleBodyClick={handleBodyClick} getMarkConfig={getMarkConfig} fullSize />
+                </div>
+                <div className="bg-slate-800/80 rounded-lg overflow-hidden flex flex-col">
+                  <BodyViewSVG viewLabel="LATERAL DER" isBack={true} marks={marks} mode={mode} handleBodyClick={handleBodyClick} getMarkConfig={getMarkConfig} fullSize />
+                </div>
+              </div>
+            )}
           </motion.div>
         </div>
         )} {/* fin ternario pacienteId / loading / mapa */}
@@ -1045,36 +1082,32 @@ function BodyViewSVG({ viewLabel, isBack = false, marks, mode, handleBodyClick, 
     );
   };
 
-  const w = fullSize ? 260 : 180;
-  const h = fullSize ? 540 : 374;
-
   return (
-    <div className="bg-slate-900/60 rounded-xl p-4 text-center">
-      <p className="text-white font-semibold mb-3 text-sm tracking-wide">
+    <div className="h-full w-full flex flex-col min-h-0">
+      {/* Título compacto */}
+      <p className="shrink-0 text-white font-semibold text-xs tracking-wide text-center py-1 px-2">
         {viewLabel}
-        {mode === 'EDITAR' && <span className="text-yellow-400 text-xs ml-2">👆 clic para marcar</span>}
+        {mode === 'EDITAR' && <span className="text-yellow-400 ml-1">👆 clic</span>}
       </p>
-      {/* Contenedor relativo: imagen realista + SVG de marcas superpuesto */}
+      {/* Contenedor relativo que llena todo el espacio restante */}
       <div
         ref={containerRef}
-        className="relative inline-block mx-auto"
-        style={{ width: w, height: h }}
+        className="relative flex-1 min-h-0 w-full"
       >
-        {/* Imagen fotorealista de fondo, con fallback al SVG */}
+        {/* Imagen fotorealista de fondo */}
         <img
           src={imageUrl}
           alt={viewLabel}
-          className="absolute inset-0 w-full h-full object-fill pointer-events-none select-none"
-          style={{ filter: 'drop-shadow(0 4px 24px rgba(0,0,0,0.7))' }}
+          className="absolute inset-0 w-full h-full object-contain pointer-events-none select-none"
+          style={{ filter: 'drop-shadow(0 4px 20px rgba(0,0,0,0.7))' }}
         />
         {/* SVG transparente encima para capturar clics y renderizar marcas */}
         <svg
           ref={svgRef}
           viewBox="0 0 300 580"
-          width={w}
-          height={h}
+          preserveAspectRatio="xMidYMid meet"
           onClick={handleSVGClick}
-          className="absolute inset-0"
+          className="absolute inset-0 w-full h-full"
           style={{
             cursor: mode === 'EDITAR' ? 'crosshair' : 'default',
             background: 'transparent',
