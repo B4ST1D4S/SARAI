@@ -335,3 +335,76 @@ export async function getEspecialidades(token: string) {
   });
 }
 
+// ============================================
+// MAPA CORPORAL ENDPOINTS
+// ============================================
+
+export interface MapaMark {
+  id: string;
+  tipo: string;
+  posicionX: number;
+  posicionY: number;
+  intensidad: number;
+  zona: string;
+  fecha: string;
+  vista: 'FRONTAL' | 'POSTERIOR' | 'LATERAL_IZQ' | 'LATERAL_DER';
+  nota?: string;
+}
+
+export interface SaveMapaCorporalRequest {
+  pacienteId: string;
+  procedimientoId: string;
+  zonasMarcadas: MapaMark[];
+  edemaZonas?: Record<string, any>[];
+  fibrosisZonas?: Record<string, any>[];
+  dolorZonas?: Record<string, any>[];
+  anotacionesClinics?: string;
+}
+
+export async function saveMapaCorporal(data: SaveMapaCorporalRequest, token: string) {
+  return apiCall('/mapa-corporal', {
+    method: 'POST',
+    body: data,
+    token,
+  });
+}
+
+export async function getMapaCorporalByProcedimiento(
+  procedimientoId: string,
+  pacienteId: string,
+  token: string
+) {
+  return apiCall(
+    `/mapa-corporal/procedimiento/${procedimientoId}/${pacienteId}`,
+    {
+      method: 'GET',
+      token,
+    }
+  );
+}
+
+export async function getMapaCorporalPorPaciente(pacienteId: string, token: string) {
+  return apiCall(`/mapa-corporal/paciente/${pacienteId}`, {
+    method: 'GET',
+    token,
+  });
+}
+
+export async function updateMapaCorporal(
+  id: string,
+  data: Partial<SaveMapaCorporalRequest>,
+  token: string
+) {
+  return apiCall(`/mapa-corporal/${id}`, {
+    method: 'PUT',
+    body: data,
+    token,
+  });
+}
+
+export async function deleteMapaCorporal(id: string, token: string) {
+  return apiCall(`/mapa-corporal/${id}`, {
+    method: 'DELETE',
+    token,
+  });
+}

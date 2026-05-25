@@ -1,8 +1,12 @@
-import { useState, useRef } from 'react';
+﻿import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Trash2, RotateCw, Download, TrendingDown, ZoomIn, Calendar, Share2, Eye, Beaker, Box } from 'lucide-react';
+import { Trash2, RotateCw, Download, TrendingDown, Calendar, Plus, Save, ChevronDown, ChevronUp, AlertTriangle, ClipboardList, FileText, Activity, Eye, Box, Share2 } from 'lucide-react';
 import { Body3D } from '../components/Body3D';
-import { createHistoriaClinica } from '../services/api';
+import { saveMapaCorporal, getMapaCorporalPorPaciente, searchPacientes } from '../services/api';
+import bodyFrontImg from './images/body-front-3d.png';
+import bodyBackImg from './images/body-back-3d.png';
+import bodyLeftImg from './images/body-left-3d.png';
+import bodyRightImg from './images/body-right-3d.png';
 
 interface Mark {
   id: string;
@@ -10,17 +14,48 @@ interface Mark {
   posicionX: number;
   posicionY: number;
   intensidad: number;
-  fecha: string;
   zona: string;
+  fecha?: string;
+  vista: 'FRONTAL' | 'POSTERIOR' | 'LATERAL_IZQ' | 'LATERAL_DER'; // Vista donde se registró la marca
   nota?: string;
 }
 
+interface Evolucion {
+  id: string;
+  numeroEvolucion: number;
+  fechaEvolucion: string;
+  planQuirurgico: string;
+  planPrequirurgico: {
+    examenesPrequirurgicos: boolean;
+    valoracionEnfermeria: boolean;
+    valoracionPreanestesica: boolean;
+    otros: string;
+  };
+  observacionesFrontal: string;
+  observacionesPosterior: string;
+  recomendaciones: string;
+  riesgosComplicaciones: string[];
+  finalidadAtencion: string;
+  marcas: Mark[];
+  creadoEn: string;
+}
+
 export default function MapaCorporalPage() {
-  const [marks, setMarks] = useState<Mark[]>([
-    { id: '1', tipo: 'IMPLANTE_MAMARIO', posicionX: 105, posicionY: 130, intensidad: 6, fecha: '2026-03-25', zona: 'Mama Izquierda', nota: '320cc - Post-op día 2' },
-    { id: '2', tipo: 'IMPLANTE_MAMARIO', posicionX: 195, posicionY: 130, intensidad: 6, fecha: '2026-04-01', zona: 'Mama Derecha', nota: '320cc - Evolución favorable' },
-    { id: '3', tipo: 'LIPOSUCCION', posicionX: 150, posicionY: 275, intensidad: 5, fecha: '2026-04-10', zona: 'Abdomen', nota: 'Liposucción 400ml' },
-  ]);
+  const [marks, setMarks] = useState<Mark[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [pacienteId, setPacienteId] = useState<string>('');
+  const [procedimientoId, setProcedimientoId] = useState<string>('');
+  const [procedimientoNombre, setProcedimientoNombre] = useState<string>('');
+  const [mapaCorporalId, setMapaCorporalId] = useState<string | null>(null);
+  
+  // Modal para procedimiento duplicado
+  const [showDuplicateModal, setShowDuplicateModal] = useState(false);
+  const [pendingMark, setPendingMark] = useState<Mark | null>(null);
+  const [duplicateType, setDuplicateType] = useState<string>('');
+  const [oldMarkId, setOldMarkId] = useState<string | null>(null);
+  const [replacementTipo, setReplacementTipo] = useState<Mark['tipo'] | null>(null);
+  const [duplicateAction, setDuplicateAction] = useState<'delete' | 'replace' | null>(null);
 
   const [selectedTipo, setSelectedTipo] = useState<Mark['tipo']>('IMPLANTE_MAMARIO');
   const [intensidadActual, setIntensidadActual] = useState(5);
@@ -32,15 +67,64 @@ export default function MapaCorporalPage() {
   const [view360, setView360] = useState<'TODAS' | 'FRONTAL' | 'POSTERIOR' | 'LATERAL'>('TODAS');
   const [viewType, setViewType] = useState<'2D' | '3D'>('2D');
   const canvasRef = useRef<SVGSVGElement>(null);
+  // ── Refs para save-on-unmount (evitar stale closures) ──
+  const marksRef = useRef<Mark[]>([]);
+  const evolucionDataRef = useRef({ evolucion: '', recomendaciones: '' });
+  const saveEvolucionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pacienteIdRef = useRef('');
+  const procedimientoIdRef = useRef('');
+  // Guard: evita que React StrictMode (doble-mount) borre datos al hacer cleanup antes de cargar
+  const hasLoadedRef = useRef(false);
+
+  // ── Evolución Cirugía Plástica ──
+  const [evoluciones, setEvoluciones] = useState<Evolucion[]>([]);
+  const [showEvolucionForm, setShowEvolucionForm] = useState(false);
+  const [evolucionForm, setEvolucionForm] = useState({
+    fechaEvolucion: new Date().toISOString().split('T')[0],
+    planQuirurgico: '',
+    planPrequirurgico: {
+      examenesPrequirurgicos: false,
+      valoracionEnfermeria: false,
+      valoracionPreanestesica: false,
+      otros: '',
+    },
+    observacionesFrontal: '',
+    observacionesPosterior: '',
+    recomendaciones: '',
+    riesgosComplicaciones: [] as string[],
+    finalidadAtencion: '',
+  });
+  const [newRiesgo, setNewRiesgo] = useState('');
+
+  const [pacienteSearch, setPacienteSearch] = useState('');
+  const [pacienteNombreDisplay, setPacienteNombreDisplay] = useState('');
+  const [buscandoPaciente, setBuscandoPaciente] = useState(false);
+  const [pacientesBuscados, setPacientesBuscados] = useState<any[]>([]);
 
   const marcasTipos = [
-    { tipo: 'IMPLANTE_MAMARIO', color: 'from-pink-600 to-pink-500', label: 'Aumento Mamario', icon: '💗', descripcion: 'Implante mamario', rango: 'POST-OP 0-90 días' },
-    { tipo: 'LIPOSUCCION', color: 'from-cyan-600 to-cyan-500', label: 'Liposucción', icon: '🔵', descripcion: 'Contorneado corporal', rango: 'POST-OP 0-60 días' },
-    { tipo: 'LIFTING_FACIAL', color: 'from-amber-600 to-amber-500', label: 'Lifting Facial', icon: '⭐', descripcion: 'Rejuvenecimiento facial', rango: 'POST-OP 0-90 días' },
-    { tipo: 'ABDOMINOPLASTIA', color: 'from-emerald-600 to-emerald-500', label: 'Abdominoplastia', icon: '💚', descripcion: 'Estiramiento abdominal', rango: 'POST-OP 0-120 días' },
-    { tipo: 'CICATRIZ', color: 'from-yellow-600 to-yellow-500', label: 'Cicatriz', icon: '✂️', descripcion: 'Evolución de cicatriz', rango: 'POST-OP 24+ horas' },
-    { tipo: 'HEMATOMA', color: 'from-red-700 to-red-600', label: 'Hematoma', icon: '🔴', descripcion: 'Moretones post-op', rango: 'POST-OP 0-21 días' },
-    { tipo: 'CELULITIS_EDEMA', color: 'from-red-600 to-red-500', label: 'Edema/Inflamación', icon: '⚠️', descripcion: 'Inflamación post-op', rango: 'POST-OP 0-30 días' },
+    { tipo: 'IMPLANTE_MAMARIO', color: 'from-pink-600 to-pink-500', solidColor: '#ec4899', label: 'Aumento Mamario', icon: '💗', descripcion: 'Implante mamario', rango: 'POST-OP 0-90 días' },
+    { tipo: 'LIPOSUCCION', color: 'from-cyan-600 to-cyan-500', solidColor: '#06b6d4', label: 'Liposucción', icon: '🔵', descripcion: 'Contorneado corporal', rango: 'POST-OP 0-60 días' },
+    { tipo: 'LIFTING_FACIAL', color: 'from-amber-600 to-amber-500', solidColor: '#f59e0b', label: 'Lifting Facial', icon: '⭐', descripcion: 'Rejuvenecimiento facial', rango: 'POST-OP 0-90 días' },
+    { tipo: 'ABDOMINOPLASTIA', color: 'from-emerald-600 to-emerald-500', solidColor: '#10b981', label: 'Abdominoplastia', icon: '💚', descripcion: 'Estiramiento abdominal', rango: 'POST-OP 0-120 días' },
+    { tipo: 'CICATRIZ', color: 'from-yellow-600 to-yellow-500', solidColor: '#eab308', label: 'Cicatriz', icon: '✂️', descripcion: 'Evolución de cicatriz', rango: 'POST-OP 24+ horas' },
+    { tipo: 'HEMATOMA', color: 'from-red-700 to-red-600', solidColor: '#dc2626', label: 'Hematoma', icon: '🔴', descripcion: 'Moretones post-op', rango: 'POST-OP 0-21 días' },
+    { tipo: 'CELULITIS_EDEMA', color: 'from-red-600 to-red-500', solidColor: '#ef4444', label: 'Edema/Inflamación', icon: '⚠️', descripcion: 'Inflamación post-op', rango: 'POST-OP 0-30 días' },
+  ];
+
+  // ── Recomendaciones quirúrgicas predefinidas (parametrizables) ──
+  const RECOMENDACIONES_PREDEFINIDAS = [
+    'Reposo relativo por 48 horas',
+    'Evitar exposición solar por 30 días',
+    'Usar faja de compresión 24/7 por 4 semanas',
+    'No actividad física de alto impacto por 3 semanas',
+    'Cita de control en 7 días',
+    'Cambio de apósitos cada 48 horas',
+    'Hidratación abundante (2L agua/día)',
+    'Tomar medicación según horario prescrito',
+    'No fumar ni alcohol por 4 semanas',
+    'Masaje drenaje linfático desde día 5 post-op',
+    'Vigilar: fiebre >38°C, sangrado activo o dolor intenso',
+    'Dieta blanda las primeras 24h post-anestesia',
   ];
 
   const bodyZones = [
@@ -67,9 +151,189 @@ export default function MapaCorporalPage() {
     { id: 'pantorrilla-der', name: 'Pantorrilla Der', x: 60, y: 155, r: 2.5 },
   ];
 
+  // ═══════════════════════════════════════
+  // CARGAR DATOS DEL BACKEND AL MONTAR
+  // ═══════════════════════════════════════
+  useEffect(() => {
+    // No hay pacienteId en localStorage — la selección es explícita en esta página
+    hasLoadedRef.current = true; // Marcar como listo (no hay nada que cargar al montar)
+  }, []);
+
+  // ── Buscar paciente ──
+  const buscarPaciente = async () => {
+    const q = pacienteSearch.trim();
+    if (!q) return;
+    const token = localStorage.getItem('accessToken');
+    if (!token) return;
+    setBuscandoPaciente(true);
+    try {
+      const response = await searchPacientes(q, token);
+      if (response.data) {
+        const list = Array.isArray(response.data) ? response.data : [response.data];
+        setPacientesBuscados(list);
+      } else {
+        setPacientesBuscados([]);
+      }
+    } catch {
+      setPacientesBuscados([]);
+    } finally {
+      setBuscandoPaciente(false);
+    }
+  };
+
+  // ── Seleccionar paciente y cargar su mapa ──
+  const seleccionarPaciente = async (paciente: any) => {
+    setPacienteId(paciente.id);
+    setPacienteNombreDisplay(paciente.nombreCompleto);
+    setPacientesBuscados([]);
+    setPacienteSearch('');
+    const token = localStorage.getItem('accessToken');
+    if (!token) return;
+    setLoading(true);
+    try {
+      const response = await getMapaCorporalPorPaciente(paciente.id, token);
+      if (response.data && response.data.data && response.data.data.length > 0) {
+        const mapaReciente = response.data.data[0];
+        setMarks(mapaReciente.zonasMarcadas as Mark[]);
+        setMapaCorporalId(mapaReciente.id);
+        if (mapaReciente.anotacionesClinics) {
+          try {
+            const extra = JSON.parse(mapaReciente.anotacionesClinics);
+            setEvolucionForm(prev => ({
+              ...prev,
+              observacionesFrontal: extra.evolucion || '',
+              recomendaciones: extra.recomendaciones || '',
+            }));
+          } catch {}
+        }
+      } else {
+        setMarks([]);
+        setMapaCorporalId(null);
+      }
+    } catch (error) {
+      console.error('Error cargando mapa del paciente:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ═══════════════════════════════════════
+  // SINCRONIZAR REFS CON STATE
+  // ═══════════════════════════════════════
+  useEffect(() => { marksRef.current = marks; }, [marks]);
+  useEffect(() => { pacienteIdRef.current = pacienteId; }, [pacienteId]);
+  useEffect(() => { procedimientoIdRef.current = procedimientoId; }, [procedimientoId]);
+  useEffect(() => {
+    evolucionDataRef.current = {
+      evolucion: evolucionForm.observacionesFrontal,
+      recomendaciones: evolucionForm.recomendaciones,
+    };
+  }, [evolucionForm.observacionesFrontal, evolucionForm.recomendaciones]);
+
+  // ═══════════════════════════════════════
+  // GUARDAR AL SALIR DEL MÓDULO (beforeunload + unmount)
+  // ═══════════════════════════════════════
+  useEffect(() => {
+    const saveOnExit = () => {
+      // No guardar si los datos nunca se cargaron (evita borrar datos con React StrictMode)
+      if (!hasLoadedRef.current) return;
+      const token = localStorage.getItem('accessToken');
+      const pid = pacienteIdRef.current;
+      if (!token || !pid) return;
+      const { evolucion, recomendaciones } = evolucionDataRef.current;
+      const BASE_URL = (import.meta.env.VITE_API_URL as string) || 'http://localhost:3001/api';
+      fetch(`${BASE_URL}/mapa-corporal`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({
+          pacienteId: pid,
+          procedimientoId: procedimientoIdRef.current || undefined,
+          zonasMarcadas: marksRef.current,
+          edemaZonas: [],
+          fibrosisZonas: [],
+          dolorZonas: [],
+          anotacionesClinics: JSON.stringify({ evolucion, recomendaciones }),
+        }),
+        keepalive: true,
+      }).catch(() => {});
+    };
+    window.addEventListener('beforeunload', saveOnExit);
+    return () => {
+      window.removeEventListener('beforeunload', saveOnExit);
+      saveOnExit(); // Guardar también al navegar entre rutas (React unmount)
+    };
+  }, []);
+
+  // ═══════════════════════════════════════
+  // AUTO-GUARDAR CUANDO HAY CAMBIOS
+  // ═══════════════════════════════════════
+  const autoSaveMapaCorporal = async (marksToSave: Mark[]) => {
+    try {
+      const token = localStorage.getItem('accessToken');
+      
+      // Si falta pacienteId, no guardar
+      if (!token || !pacienteId) {
+        return;
+      }
+
+      setSaving(true);
+
+      const response = await saveMapaCorporal(
+        {
+          pacienteId,
+          procedimientoId: procedimientoId || undefined,
+          zonasMarcadas: marksToSave,
+          edemaZonas: [],
+          fibrosisZonas: [],
+          dolorZonas: [],
+          anotacionesClinics: JSON.stringify({
+            evolucion: evolucionDataRef.current.evolucion,
+            recomendaciones: evolucionDataRef.current.recomendaciones,
+          }),
+        },
+        token
+      );
+
+      if (response.data) {
+        // El backend devuelve { success, message, data: mapaCorporal }, apiCall lo envuelve en { data: {...} }
+        const savedId = (response.data as any)?.data?.id || (response.data as any)?.id;
+        if (savedId) setMapaCorporalId(savedId);
+        console.log('✅ Mapa corporal guardado automáticamente');
+      } else {
+        console.error('❌ Error al guardar:', response.error);
+      }
+    } catch (error: any) {
+      console.error('Error en auto-guardado:', error);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // ── Auto-guardar evolución/recomendaciones con debounce de 1.5s ──
+  const autoSaveEvolucion = (evolucion: string, recomendaciones: string) => {
+    evolucionDataRef.current = { evolucion, recomendaciones };
+    if (saveEvolucionTimerRef.current) clearTimeout(saveEvolucionTimerRef.current);
+    saveEvolucionTimerRef.current = setTimeout(() => {
+      autoSaveMapaCorporal(marksRef.current);
+    }, 1500);
+  };
+
+  // ═══════════════════════════════════════
+  // VALIDAR PROCEDIMIENTO DUPLICADO
+  // ═══════════════════════════════════════
+  // Detectar duplicado: MISMO tipo + MISMA zona + posición muy cercana (< 35px)
+  const findDuplicateMark = (tipo: string, zona: string, x: number, y: number): Mark | undefined => {
+    const PROXIMITY = 35;
+    return marks.find(m =>
+      m.tipo === tipo &&
+      m.zona === zona &&
+      Math.sqrt(Math.pow(m.posicionX - x, 2) + Math.pow(m.posicionY - y, 2)) < PROXIMITY
+    );
+  };
+
   // Análisis de evolución
   const analyzeEvolution = () => {
-    const marcasOrdenadas = [...marks].sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime());
+    const marcasOrdenadas = [...marks].sort((a, b) => new Date(a.fecha ?? '').getTime() - new Date(b.fecha ?? '').getTime());
     const mejoras: string[] = [];
     
     for (let i = 0; i < marcasOrdenadas.length - 1; i++) {
@@ -85,7 +349,7 @@ export default function MapaCorporalPage() {
     return mejoras.length > 0 ? mejoras : ['Sin cambios significativos'];
   };
 
-  const handleBodyClick = (zone: typeof bodyZones[0]) => {
+  const handleBodyClick = (zone: { name: string; x: number; y: number }, vistaActual: 'FRONTAL' | 'POSTERIOR' | 'LATERAL_IZQ' | 'LATERAL_DER' = 'FRONTAL') => {
     if (mode !== 'EDITAR') return;
 
     const newMark: Mark = {
@@ -96,13 +360,29 @@ export default function MapaCorporalPage() {
       intensidad: intensidadActual,
       fecha: new Date().toISOString().split('T')[0],
       zona: zone.name,
+      vista: vistaActual,
       nota: '',
     };
 
-    setMarks([...marks, newMark]);
+    // Validar si el procedimiento ya existe EN LA MISMA ZONA y posición cercana
+    const duplicado = findDuplicateMark(selectedTipo, zone.name, zone.x, zone.y);
+    if (duplicado) {
+      const procName = marcasTipos.find(m => m.tipo === selectedTipo)?.label || selectedTipo;
+      setDuplicateType(procName);
+      setPendingMark(newMark);
+      setOldMarkId(duplicado.id);
+      setReplacementTipo(null);
+      setDuplicateAction(null);
+      setShowDuplicateModal(true);
+      return;
+    }
+
+    // Si no hay duplicado, agregar marca normalmente
+    const updatedMarks = [...marks, newMark];
+    setMarks(updatedMarks);
     
-    // Crear registro en Historia Clínica
-    crearRegistroHistoria(newMark);
+    // AUTO-GUARDAR automáticamente
+    autoSaveMapaCorporal(updatedMarks);
   };
 
   // Wrapper para 3D body zone clicks
@@ -117,16 +397,35 @@ export default function MapaCorporalPage() {
       intensidad: intensidadActual,
       fecha: new Date().toISOString().split('T')[0],
       zona: zona,
+      vista: 'FRONTAL',
       nota: '',
     };
 
-    setMarks([...marks, newMark]);
+    // Validar si el procedimiento ya existe EN LA MISMA ZONA y posición cercana
+    const duplicado = findDuplicateMark(selectedTipo, zona, x, y);
+    if (duplicado) {
+      const procName = marcasTipos.find(m => m.tipo === selectedTipo)?.label || selectedTipo;
+      setDuplicateType(procName);
+      setPendingMark(newMark);
+      setOldMarkId(duplicado.id);
+      setReplacementTipo(null);
+      setDuplicateAction(null);
+      setShowDuplicateModal(true);
+      return;
+    }
+
+    // Si no hay duplicado, agregar marca normalmente
+    const updatedMarks = [...marks, newMark];
+    setMarks(updatedMarks);
     
-    // Crear registro en Historia Clínica
-    crearRegistroHistoria(newMark);
+    // AUTO-GUARDAR automáticamente
+    autoSaveMapaCorporal(updatedMarks);
   };
 
-  // Función para crear registro en Historia Clínica
+  /* 
+  // ❌ FUNCIÓN DESHABILITADA - Ya no se crea Historia Clínica automáticamente
+  // Ahora los registros se persisten en MapaCorporal al guardar
+  // y se pueden generar reportes desde allí si es necesario
   const crearRegistroHistoria = async (mark: Mark) => {
     try {
       const token = localStorage.getItem('accessToken') || '';
@@ -154,17 +453,44 @@ export default function MapaCorporalPage() {
       console.error('Error al crear registro en Historia Clínica:', error);
     }
   };
+  */
 
   const removeMark = (id: string) => {
-    setMarks(marks.filter((m) => m.id !== id));
+    const updatedMarks = marks.filter((m) => m.id !== id);
+    setMarks(updatedMarks);
+    // Auto-guardar al eliminar
+    autoSaveMapaCorporal(updatedMarks);
+  };
+
+  const handleDuplicateAction = (action: 'delete' | 'replace') => {
+    if (!oldMarkId || !pendingMark) return;
+
+    let updatedMarks = marks.filter(m => m.id !== oldMarkId);
+
+    if (action === 'replace' && replacementTipo) {
+      const newMark: Mark = {
+        ...pendingMark,
+        tipo: replacementTipo,
+      };
+      updatedMarks = [...updatedMarks, newMark];
+    }
+
+    setMarks(updatedMarks);
+    autoSaveMapaCorporal(updatedMarks);
+    setShowDuplicateModal(false);
+    setPendingMark(null);
+    setOldMarkId(null);
+    setReplacementTipo(null);
+    setDuplicateAction(null);
   };
 
   const getMarkConfig = (tipo: Mark['tipo']) => {
     return marcasTipos.find((m) => m.tipo === tipo) || marcasTipos[0];
   };
 
-  const getDaysFromFirst = (fecha: string) => {
-    const first = new Date(marks[0]?.fecha || new Date());
+  const getDaysFromFirst = (fecha: string | undefined) => {
+    if (!fecha) return 0;
+    const first = new Date(marks[0]?.fecha ?? new Date());
     const current = new Date(fecha);
     return Math.ceil((current.getTime() - first.getTime()) / (1000 * 60 * 60 * 24));
   };
@@ -180,543 +506,649 @@ export default function MapaCorporalPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-3 sm:p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Header Premium */}
+    <div className="h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-2 overflow-hidden">
+      <div className="h-full flex flex-col gap-2">
+        {/* ═══════════════════════════════════════════════════════════════ */}
+        {/* HEADER COMPACTO - Control rápido */}
+        {/* ═══════════════════════════════════════════════════════════════ */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-5 sm:mb-8"
+          className="bg-gradient-to-r from-slate-800 to-slate-900 border border-yellow-600/30 rounded-lg p-3"
         >
-          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 mb-3 sm:mb-6">
-            <div>
-              <h1 className="text-xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-yellow-400 to-yellow-600 bg-clip-text text-transparent mb-1 sm:mb-2">
+          <div className="flex items-center justify-between gap-2">
+            {/* Logo + Titulo */}
+            <div className="flex-shrink-0">
+              <h1 className="text-lg font-bold bg-gradient-to-r from-yellow-400 to-yellow-600 bg-clip-text text-transparent">
                 Mapa Corporal 360°
               </h1>
-              <p className="text-gray-400 text-xs sm:text-sm">Documentación digital profesional</p>
             </div>
-            <div className="flex gap-2 flex-wrap">
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => setShowTimeline(!showTimeline)}
-                className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-semibold transition flex items-center gap-2 text-sm"
-              >
-                <Calendar size={16} /> Timeline
-              </motion.button>
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => setMode(mode === 'COMPARAR' ? 'VISTA' : 'COMPARAR')}
-                className={`px-4 py-2 rounded-lg font-semibold transition flex items-center gap-2 text-sm ${
-                  mode === 'COMPARAR'
-                    ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                    : 'bg-slate-700 hover:bg-slate-600 text-white'
-                }`}
-              >
-                <Eye size={16} /> Comparar
-              </motion.button>
+
+            {/* Buscador / Paciente seleccionado */}
+            <div className="flex-1 max-w-xs relative">
+              {pacienteId ? (
+                <div className="flex items-center gap-2">
+                  <span className="text-emerald-400 text-xs font-bold truncate">👤 {pacienteNombreDisplay}</span>
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => {
+                      setPacienteId('');
+                      setPacienteNombreDisplay('');
+                      setMarks([]);
+                      setMapaCorporalId(null);
+                      setEvolucionForm(f => ({ ...f, observacionesFrontal: '', recomendaciones: '' }));
+                    }}
+                    className="text-gray-500 hover:text-red-400 text-xs px-1"
+                    title="Cambiar paciente"
+                  >✕</motion.button>
+                </div>
+              ) : (
+                <div>
+                  <div className="flex gap-1">
+                    <input
+                      type="text"
+                      value={pacienteSearch}
+                      onChange={e => setPacienteSearch(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && buscarPaciente()}
+                      placeholder="Buscar paciente (nombre o cédula)…"
+                      className="flex-1 bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-yellow-500 min-w-0"
+                    />
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={buscarPaciente}
+                      disabled={buscandoPaciente}
+                      className="bg-yellow-600 hover:bg-yellow-700 text-white px-2 py-1 rounded text-xs font-bold flex-shrink-0 disabled:opacity-50"
+                    >
+                      {buscandoPaciente ? '…' : '🔍'}
+                    </motion.button>
+                  </div>
+                  {/* Resultados */}
+                  {pacientesBuscados.length > 0 && (
+                    <div className="absolute top-full mt-1 left-0 right-0 bg-slate-800 border border-yellow-600/40 rounded shadow-xl z-50 max-h-40 overflow-y-auto">
+                      {pacientesBuscados.map((p: any) => (
+                        <button
+                          key={p.id}
+                          onClick={() => seleccionarPaciente(p)}
+                          className="w-full text-left px-3 py-2 hover:bg-slate-700 text-xs text-white border-b border-slate-700/50 last:border-0"
+                        >
+                          <span className="font-bold">{p.nombreCompleto}</span>
+                          <span className="text-gray-400 ml-2">{p.tipoDocumento} {p.numeroDocumento}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {!buscandoPaciente && pacienteSearch && pacientesBuscados.length === 0 && (
+                    <p className="absolute top-full mt-1 left-0 text-xs text-gray-500 bg-slate-800 border border-slate-700 rounded px-2 py-1 z-50">
+                      Sin resultados — presiona 🔍
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Modo actual + Stats */}
+            <div className="flex items-center gap-3 text-xs">
+              {marks.length > 0 && (
+                <>
+                  <span className="text-gray-400">Marcas: <span className="text-white font-bold">{marks.length}</span></span>
+                  <span className="text-gray-400">Intensidad promedio: <span className="text-white font-bold">{(marks.reduce((a, b) => a + b.intensidad, 0) / marks.length).toFixed(1)}</span></span>
+                </>
+              )}
+            </div>
+
+            {/* Botones Control Rápido */}
+            <div className="flex gap-1.5">
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => setMode(mode === 'EDITAR' ? 'VISTA' : 'EDITAR')}
-                className={`px-4 py-2 rounded-lg font-semibold transition flex items-center gap-2 text-sm ${
+                className={`px-3 py-1.5 rounded text-xs font-bold transition ${
                   mode === 'EDITAR'
-                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                    ? 'bg-emerald-600 text-white'
                     : 'bg-yellow-600 hover:bg-yellow-700 text-white'
                 }`}
               >
-                {mode === 'EDITAR' ? '✎ Editar' : '✎ Editar'}
+                {mode === 'EDITAR' ? '✓ Editar' : '✎ Editar'}
               </motion.button>
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => setViewType(viewType === '2D' ? '3D' : '2D')}
-                className={`px-4 py-2 rounded-lg font-semibold transition flex items-center gap-2 text-sm ${
-                  viewType === '3D'
-                    ? 'bg-cyan-600 hover:bg-cyan-700 text-white'
-                    : 'bg-slate-700 hover:bg-slate-600 text-white'
-                }`}
-              >
-                <Box size={16} /> {viewType === '2D' ? '3D' : '2D'}
-              </motion.button>
+
+              {mode === 'EDITAR' && (
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => {
+                    setMarks([]);
+                    autoSaveMapaCorporal([]);
+                  }}
+                  className="px-3 py-1.5 rounded text-xs font-bold bg-red-600 hover:bg-red-700 text-white transition"
+                >
+                  🗑️ Limpiar
+                </motion.button>
+              )}
+
+              {saving ? (
+                <span className="px-2 py-1 rounded-full bg-blue-900/30 border border-blue-600/50 text-blue-300 text-xs animate-pulse">
+                  💾 Guardando...
+                </span>
+              ) : mapaCorporalId ? (
+                <span className="px-2 py-1 rounded-full bg-green-900/30 border border-green-600/50 text-green-300 text-xs">
+                  ✅ Guardado
+                </span>
+              ) : null}
             </div>
           </div>
-
-          {/* Quick Stats */}
-          {marks.length > 0 && (
-            <div className="grid grid-cols-4 gap-3">
-              <div className="bg-slate-800/80 border border-yellow-600/30 rounded-lg p-3">
-                <p className="text-gray-400 text-sm">Total Marcas</p>
-                <p className="text-2xl font-bold text-white">{marks.length}</p>
-              </div>
-              <div className="bg-slate-800/80 border border-yellow-600/30 rounded-lg p-3">
-                <p className="text-gray-400 text-sm">Zonas Afectadas</p>
-                <p className="text-2xl font-bold text-white">{new Set(marks.map(m => m.zona)).size}</p>
-              </div>
-              <div className="bg-slate-800/80 border border-yellow-600/30 rounded-lg p-3">
-                <p className="text-gray-400 text-sm">Intensidad Promedio</p>
-                <p className="text-2xl font-bold text-white">{(marks.reduce((a, b) => a + b.intensidad, 0) / marks.length).toFixed(1)}</p>
-              </div>
-              <div className="bg-slate-800/80 border border-yellow-600/30 rounded-lg p-3">
-                <p className="text-gray-400 text-sm">Días de Seguimiento</p>
-                <p className="text-2xl font-bold text-white">{getDaysFromFirst(marks[marks.length - 1]?.fecha)}</p>
-              </div>
-            </div>
-          )}
         </motion.div>
 
-        <motion.div
-          variants={containerVariants}
-          initial="hidden"
-          animate="visible"
-          className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-6"
-        >
-          {/* Sidebar Izquierdo - Controles y Análisis */}
-          <motion.div variants={itemVariants} className="space-y-6 col-span-1">
-            {/* Selector de Tipo */}
-            {mode === 'EDITAR' && (
-              <motion.div className="bg-slate-800/80 backdrop-blur border border-yellow-600/30 rounded-xl p-5 space-y-3">
-                <h3 className="text-white font-bold text-lg">Tipo de Marca</h3>
-                <div className="space-y-2">
-                  {marcasTipos.map((item) => (
-                    <motion.button
-                      key={item.tipo}
-                      onClick={() => setSelectedTipo(item.tipo as Mark['tipo'])}
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      className={`w-full p-3 rounded-lg border-2 text-left transition text-xs ${
-                        selectedTipo === item.tipo
-                          ? `bg-gradient-to-r ${item.color} border-white text-white shadow-lg`
-                          : 'bg-slate-700 border-slate-600 hover:border-yellow-600/50 text-gray-300'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span>{item.icon}</span>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold">{item.label}</p>
-                          <p className="text-xs opacity-75">{item.rango}</p>
-                        </div>
-                      </div>
-                    </motion.button>
-                  ))}
-                </div>
-              </motion.div>
-            )}
+        {/* ═══════════════════════════════════════════════════════════════ */}
+        {/* CONTENIDO PRINCIPAL - Grid 2 columnas */}
+        {/* ═══════════════════════════════════════════════════════════════ */}
+        {!pacienteId ? (
+          /* ── Sin paciente: pantalla de bienvenida ── */
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center space-y-4">
+              <div className="text-6xl">🩺</div>
+              <h2 className="text-xl font-bold text-white">Mapa Corporal 360°</h2>
+              <p className="text-gray-400 text-sm max-w-xs">
+                Busca y selecciona un paciente en la barra superior para visualizar o registrar su mapa corporal.
+              </p>
+              <p className="text-yellow-500 text-xs animate-pulse">↑ Usa el buscador de arriba</p>
+            </div>
+          </div>
+        ) : loading ? (
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center space-y-3">
+              <div className="text-4xl animate-spin">⏳</div>
+              <p className="text-gray-400 text-sm">Cargando mapa de {pacienteNombreDisplay}…</p>
+            </div>
+          </div>
+        ) : (
+        <div className="flex-1 grid grid-cols-3 gap-2 overflow-hidden">
+          {/* COLUMNA 1: Selector de Procedimiento + Intensidad */}
+          <motion.div className="bg-slate-900/60 border border-slate-700/30 rounded-lg p-3 flex flex-col gap-2 overflow-y-auto">
+            {/* Tipo de Marca - Tarjetas de acceso rápido */}
+            <div>
+              <label className="text-xs font-bold text-yellow-400 block mb-1.5">PROCEDIMIENTO</label>
+              <div className="grid grid-cols-2 gap-1">
+                {marcasTipos.map((tipo) => (
+                  <motion.button
+                    key={tipo.tipo}
+                    whileTap={{ scale: 0.96 }}
+                    onClick={() => mode === 'EDITAR' && setSelectedTipo(tipo.tipo as Mark['tipo'])}
+                    className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-left transition-all text-xs ${
+                      selectedTipo === tipo.tipo
+                        ? `bg-gradient-to-r ${tipo.color} text-white shadow-md ring-1 ring-white/20`
+                        : 'bg-slate-800/80 hover:bg-slate-700 text-gray-300 border border-slate-600/50'
+                    } ${mode !== 'EDITAR' ? 'opacity-60 cursor-default' : 'cursor-pointer'}`}
+                  >
+                    <span className="text-base leading-none">{tipo.icon}</span>
+                    <span className="font-medium leading-tight truncate">{tipo.label}</span>
+                  </motion.button>
+                ))}
+              </div>
+            </div>
 
-            {/* Control de Intensidad */}
+            {/* Intensidad */}
             {mode === 'EDITAR' && (
-              <motion.div className="bg-slate-800/80 backdrop-blur border border-yellow-600/30 rounded-xl p-5">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-white font-bold">Intensidad</h3>
-                  <span className="text-2xl font-bold bg-gradient-to-r from-yellow-400 to-yellow-600 bg-clip-text text-transparent">
-                    {intensidadActual}/10
-                  </span>
-                </div>
+              <div>
+                <label className="text-xs font-bold text-cyan-400 block mb-1">INTENSIDAD: {intensidadActual}/10</label>
                 <input
                   type="range"
                   min="1"
                   max="10"
                   value={intensidadActual}
                   onChange={(e) => setIntensidadActual(parseInt(e.target.value))}
-                  className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-yellow-600"
+                  className="w-full"
                 />
-                <div className="grid grid-cols-2 gap-2 mt-3 text-xs text-gray-400">
-                  <div>🟢 Leve (1-3)</div>
-                  <div>🟡 Moderado (4-6)</div>
-                  <div>🟠 Severo (7-8)</div>
-                  <div>🔴 Crítico (9-10)</div>
-                </div>
-              </motion.div>
+              </div>
             )}
 
-            {/* Análisis de Evolución */}
-            {marks.length > 1 && (
-              <motion.div className="bg-gradient-to-b from-green-900/40 to-emerald-900/20 border border-emerald-600/30 rounded-xl p-5">
-                <h3 className="text-white font-bold flex items-center gap-2 mb-3">
-                  <TrendingDown size={18} className="text-emerald-400" />
-                  Evolución
-                </h3>
-                <div className="space-y-2">
-                  {analyzeEvolution().map((mejora, i) => (
-                    <motion.div
-                      key={i}
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      className="text-sm text-emerald-300 bg-slate-800/50 p-2 rounded border border-emerald-600/20"
-                    >
-                      ✓ {mejora}
-                    </motion.div>
-                  ))}
-                </div>
-              </motion.div>
-            )}
-
-            {/* Acciones */}
-            <div className="flex flex-col gap-2">
-              {marks.length > 0 && (
-                <>
-                  <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition flex items-center justify-center gap-2 text-sm"
-                  >
-                    <Download size={16} /> Exportar PDF
-                  </motion.button>
-                  <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold transition flex items-center justify-center gap-2 text-sm"
-                  >
-                    <Share2 size={16} /> Compartir
-                  </motion.button>
-                </>
-              )}
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => setMarks([])}
-                className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-semibold transition flex items-center justify-center gap-2 text-sm"
-              >
-                <RotateCw size={16} /> Limpiar
-              </motion.button>
-            </div>
-
-            {/* Marcas Activas */}
-            <motion.div className="bg-slate-800/80 backdrop-blur border border-yellow-600/30 rounded-xl p-5">
-              <h3 className="text-white font-bold text-lg mb-4">
-                Registro ({marks.length})
-              </h3>
-              <div className="space-y-2 max-h-64 overflow-y-auto">
+            {/* Registros Activos */}
+            <div>
+              <label className="text-xs font-bold text-purple-400 block mb-1">REGISTROS ({marks.length})</label>
+              <div className="space-y-1 overflow-y-auto max-h-28">
                 {marks.length === 0 ? (
-                  <p className="text-gray-400 text-sm text-center py-6">
-                    {mode === 'EDITAR' ? 'Selecciona zonas del cuerpo' : 'Sin registros'}
-                  </p>
+                  <p className="text-gray-500 text-xs text-center py-3">Sin registros</p>
                 ) : (
-                  marks
-                    .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())
-                    .map((mark) => (
-                      <motion.div
+                  marks.map((mark) => {
+                    const config = getMarkConfig(mark.tipo);
+                    return (
+                      <div
                         key={mark.id}
-                        whileHover={{ scale: 1.02 }}
-                        onClick={() => setSelectedMark(mark.id)}
-                        className={`bg-gradient-to-r ${getMarkConfig(mark.tipo).color} p-3 rounded-lg border cursor-pointer transition ${
-                          selectedMark === mark.id ? 'border-white' : 'border-white/20'
-                        }`}
+                        className="bg-slate-800 border-l-2 rounded px-2 py-1 text-xs flex justify-between items-center hover:bg-slate-700"
+                        style={{ borderLeftColor: config.solidColor || '#d4af37' }}
                       >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex-1 min-w-0">
-                            <p className="font-semibold text-white text-sm">{mark.zona}</p>
-                            <p className="text-xs opacity-90">{getMarkConfig(mark.tipo).label}</p>
-                            <p className="text-xs opacity-75">Día {getDaysFromFirst(mark.fecha)} • {mark.fecha}</p>
-                          </div>
-                          <div className="text-right">
-                            <p className="font-bold text-white">{mark.intensidad}</p>
-                            <p className="text-xs opacity-75">/10</p>
-                          </div>
+                        <div>
+                          <p className="font-bold text-white">{config.label}</p>
+                          <p className="text-gray-400 text-xs">{mark.zona} • Int: {mark.intensidad}</p>
                         </div>
                         {mode === 'EDITAR' && (
                           <motion.button
                             whileHover={{ scale: 1.1 }}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              removeMark(mark.id);
-                            }}
-                            className="mt-2 text-white hover:text-yellow-300 transition"
+                            whileTap={{ scale: 0.9 }}
+                            onClick={() => removeMark(mark.id)}
+                            className="p-1 hover:bg-red-600/30 rounded text-red-400"
                           >
-                            <Trash2 size={14} />
+                            ✕
                           </motion.button>
                         )}
-                      </motion.div>
-                    ))
+                      </div>
+                    );
+                  })
                 )}
               </div>
-            </motion.div>
-          </motion.div>
+            </div>
 
-          {/* Centro - Mapa Corporal (Cols 2-5) */}
-          <motion.div variants={itemVariants} className="col-span-4">
-            <div className="space-y-6">
-              {/* Modo Comparación */}
-              {mode === 'COMPARAR' && (
-                <motion.div className="bg-slate-800/80 border border-blue-600/30 rounded-xl p-5">
-                  <h3 className="text-white font-bold mb-3">Comparar Fechas</h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-sm text-gray-400">Desde</label>
-                      <select
-                        value={comparisonDates[0]}
-                        onChange={(e) => setComparisonDates([e.target.value, comparisonDates[1]])}
-                        className="w-full mt-1 bg-slate-700 text-white rounded p-2 text-sm border border-slate-600"
-                      >
-                        {marks.map((m) => (
-                          <option key={m.id} value={m.fecha}>
-                            {m.fecha}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-sm text-gray-400">Hasta</label>
-                      <select
-                        value={comparisonDates[1]}
-                        onChange={(e) => setComparisonDates([comparisonDates[0], e.target.value])}
-                        className="w-full mt-1 bg-slate-700 text-white rounded p-2 text-sm border border-slate-600"
-                      >
-                        {marks.map((m) => (
-                          <option key={m.id} value={m.fecha}>
-                            {m.fecha}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
+            {/* Evolución */}
+            <div className="border-t border-slate-700/50 pt-2">
+              <label className="text-xs font-bold text-emerald-400 block mb-1">📋 EVOLUCIÓN</label>
+              <textarea
+                value={evolucionForm.observacionesFrontal}
+                onChange={(e) => {
+                  setEvolucionForm(prev => ({ ...prev, observacionesFrontal: e.target.value }));
+                  autoSaveEvolucion(e.target.value, evolucionForm.recomendaciones);
+                }}
+                rows={3}
+                placeholder="Registrar evolución del tratamiento..."
+                className="w-full bg-slate-700/80 border border-slate-600 focus:border-emerald-500 text-white rounded px-2 py-1.5 text-xs outline-none resize-none placeholder-gray-500 transition"
+              />
+            </div>
 
-              {/* Timeline */}
-              {showTimeline && marks.length > 0 && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="bg-slate-800/80 border border-slate-700/30 rounded-xl p-5"
-                >
-                  <h3 className="text-white font-bold mb-4">Línea de Tiempo</h3>
-                  <div className="relative">
-                    {[...marks]
-                      .sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime())
-                      .map((mark, i, arr) => (
-                        <div key={mark.id} className="flex gap-4 pb-4">
-                          <div className="flex flex-col items-center">
-                            <div className={`w-4 h-4 rounded-full bg-gradient-to-r ${getMarkConfig(mark.tipo).color} border-2 border-white`} />
-                            {i < arr.length - 1 && <div className="w-1 h-8 bg-slate-700 mt-1" />}
-                          </div>
-                          <div className="pt-1">
-                            <p className="text-white font-semibold text-sm">{mark.zona}</p>
-                            <p className="text-gray-400 text-xs">{mark.fecha} • Día {getDaysFromFirst(mark.fecha)}</p>
-                            <p className="text-yellow-400 text-xs mt-1">
-                              {getMarkConfig(mark.tipo).label} - Intensidad {mark.intensidad}/10
-                            </p>
-                          </div>
-                        </div>
-                      ))}
-                  </div>
-                </motion.div>
-              )}
-
-              {/* Mapa Corporal Principal */}
-              <motion.div className="bg-slate-800/80 backdrop-blur border border-yellow-600/30 rounded-xl p-8">
-                <div className="mb-6">
-                  <h3 className="text-white font-bold text-xl mb-4">
-                    {viewType === '3D' 
-                      ? '🎯 Modelo 3D Interactivo' 
-                      : mode === 'EDITAR' ? '👆 Haz clic en zonas' : mode === 'COMPARAR' ? '🔍 Comparación Visual' : '👀 Vistas 360°'}
-                  </h3>
-                  
-                  {/* Mostrar vista 3D */}
-                  {viewType === '3D' && (
-                    <div className="w-full rounded-lg overflow-hidden mb-6 bg-slate-900">
-                      <Body3D 
-                        marks={marks}
-                        mode={mode}
-                        selectedTipo={selectedTipo}
-                        intensidad={intensidadActual}
-                        onBodyZoneClick={handleBody3DZoneClick}
-                      />
-                    </div>
-                  )}
-
-                  {/* Selector de vistas 360 (solo en modo 2D) */}
-                  {viewType === '2D' && (
-                    <div className="flex gap-2 flex-wrap justify-center mb-6">
-                      {[
-                        { view: 'TODAS', label: '🔄 Todas', icon: '360°' },
-                        { view: 'FRONTAL', label: '👀 Frontal' },
-                        { view: 'POSTERIOR', label: '🔙 Posterior' },
-                        { view: 'LATERAL', label: '↔️ Lateral' },
-                      ].map((btn) => (
-                        <motion.button
-                          key={btn.view}
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
-                          onClick={() => setView360(btn.view as any)}
-                          className={`px-4 py-2 rounded-lg font-semibold transition ${
-                            view360 === btn.view
-                              ? 'bg-yellow-600 text-white'
-                              : 'bg-slate-700 hover:bg-slate-600 text-gray-300'
-                          }`}
-                        >
-                          {btn.label}
-                        </motion.button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Grid de Vistas 360 */}
-                {viewType === '2D' && view360 === 'TODAS' && (
-                  <div className="grid grid-cols-2 gap-6">
-                    {/* Frontal */}
-                    <BodyView imageUrl="/female-body-silhouette.svg" viewLabel="FRONTAL" marks={marks} mode={mode} handleBodyClick={handleBodyClick} getMarkConfig={getMarkConfig} />
-                    {/* Posterior */}
-                    <BodyView imageUrl="/female-body-back.svg" viewLabel="POSTERIOR" marks={marks} mode={mode} handleBodyClick={handleBodyClick} getMarkConfig={getMarkConfig} />
-                  </div>
-                )}
-
-                {viewType === '2D' && view360 === 'FRONTAL' && (
-                  <BodyView imageUrl="/female-body-silhouette.svg" viewLabel="FRONTAL" marks={marks} mode={mode} handleBodyClick={handleBodyClick} getMarkConfig={getMarkConfig} fullSize={true} />
-                )}
-
-                {viewType === '2D' && view360 === 'POSTERIOR' && (
-                  <BodyView imageUrl="/female-body-back.svg" viewLabel="POSTERIOR" marks={marks} mode={mode} handleBodyClick={handleBodyClick} getMarkConfig={getMarkConfig} fullSize={true} />
-                )}
-
-                {viewType === '2D' && view360 === 'LATERAL' && (
-                  <div className="grid grid-cols-2 gap-6">
-                    <BodyView imageUrl="/female-body-left.svg" viewLabel="LATERAL IZQ" marks={marks} mode={mode} handleBodyClick={handleBodyClick} getMarkConfig={getMarkConfig} />
-                    <BodyView imageUrl="/female-body-right.svg" viewLabel="LATERAL DER" marks={marks} mode={mode} handleBodyClick={handleBodyClick} getMarkConfig={getMarkConfig} />
-                  </div>
-                )}
-              </motion.div>
-
-              {/* Componente reutilizable para cada vista */}
+            {/* Recomendaciones */}
+            <div>
+              <label className="text-xs font-bold text-blue-400 block mb-1.5">💡 RECOMENDACIONES QUIRÚRGICAS</label>
+              {/* Chips predefinidos — clic para agregar */}
+              <div className="flex flex-wrap gap-1 mb-1.5">
+                {RECOMENDACIONES_PREDEFINIDAS.map((rec, i) => (
+                  <button
+                    key={i}
+                    onClick={() => {
+                      const current = evolucionForm.recomendaciones;
+                      const newVal = current ? current + '\n• ' + rec : '• ' + rec;
+                      setEvolucionForm(prev => ({ ...prev, recomendaciones: newVal }));
+                      autoSaveEvolucion(evolucionForm.observacionesFrontal, newVal);
+                    }}
+                    className="px-1.5 py-0.5 bg-blue-900/40 hover:bg-blue-700/60 border border-blue-600/40 text-blue-300 text-[10px] rounded-full transition cursor-pointer leading-tight"
+                  >
+                    + {rec}
+                  </button>
+                ))}
+              </div>
+              <textarea
+                value={evolucionForm.recomendaciones}
+                onChange={(e) => {
+                  setEvolucionForm(prev => ({ ...prev, recomendaciones: e.target.value }));
+                  autoSaveEvolucion(evolucionForm.observacionesFrontal, e.target.value);
+                }}
+                rows={3}
+                placeholder="Recomendaciones para el paciente..."
+                className="w-full bg-slate-700/80 border border-slate-600 focus:border-blue-500 text-white rounded px-2 py-1.5 text-xs outline-none resize-none placeholder-gray-500 transition"
+              />
             </div>
           </motion.div>
-        </motion.div>
+
+          {/* COLUMNAS 2+3: Vistas corporales con filtro por pestaña */}
+          <motion.div className="col-span-2 bg-slate-900/60 border border-slate-700/30 rounded-lg p-2 flex flex-col gap-2 overflow-hidden">
+            {/* Tabs de vista */}
+            <div className="flex items-center gap-1.5 flex-wrap px-1">
+              <span className="text-xs text-gray-400 mr-1">👆 Haz clic en zonas</span>
+              {(['TODAS','FRONTAL','LATERAL'] as const).map(v => (
+                <button
+                  key={v}
+                  onClick={() => setView360(v as any)}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                    view360 === v
+                      ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/30'
+                      : 'bg-slate-700/80 text-gray-300 hover:bg-slate-600 border border-slate-600/50'
+                  }`}
+                >
+                  {v === 'TODAS' ? '⊞ Todas' : v === 'FRONTAL' ? '⊞ Frontal' : '⊞ Lateral'}
+                </button>
+              ))}
+            </div>
+
+            {/* TODAS: 4 columnas en fila */}
+            {view360 === 'TODAS' && (
+              <div className="flex-1 grid grid-cols-4 gap-2 overflow-hidden min-h-0">
+                <div className="bg-slate-800/80 rounded-lg overflow-hidden flex flex-col">
+                  <BodyViewSVG viewLabel="FRONTAL" isBack={false} marks={marks} mode={mode} handleBodyClick={handleBodyClick} getMarkConfig={getMarkConfig} />
+                </div>
+                <div className="bg-slate-800/80 rounded-lg overflow-hidden flex flex-col">
+                  <BodyViewSVG viewLabel="POSTERIOR" isBack={true} marks={marks} mode={mode} handleBodyClick={handleBodyClick} getMarkConfig={getMarkConfig} />
+                </div>
+                <div className="bg-slate-800/80 rounded-lg overflow-hidden flex flex-col">
+                  <BodyViewSVG viewLabel="LATERAL IZQ" isBack={false} marks={marks} mode={mode} handleBodyClick={handleBodyClick} getMarkConfig={getMarkConfig} />
+                </div>
+                <div className="bg-slate-800/80 rounded-lg overflow-hidden flex flex-col">
+                  <BodyViewSVG viewLabel="LATERAL DER" isBack={true} marks={marks} mode={mode} handleBodyClick={handleBodyClick} getMarkConfig={getMarkConfig} />
+                </div>
+              </div>
+            )}
+
+            {/* FRONTAL: Frontal + Posterior juntos */}
+            {(view360 === 'FRONTAL' || view360 === 'POSTERIOR') && (
+              <div className="flex-1 grid grid-cols-2 gap-2 overflow-hidden min-h-0">
+                <div className="bg-slate-800/80 rounded-lg overflow-hidden flex flex-col">
+                  <BodyViewSVG viewLabel="FRONTAL" isBack={false} marks={marks} mode={mode} handleBodyClick={handleBodyClick} getMarkConfig={getMarkConfig} fullSize />
+                </div>
+                <div className="bg-slate-800/80 rounded-lg overflow-hidden flex flex-col">
+                  <BodyViewSVG viewLabel="POSTERIOR" isBack={true} marks={marks} mode={mode} handleBodyClick={handleBodyClick} getMarkConfig={getMarkConfig} fullSize />
+                </div>
+              </div>
+            )}
+
+            {/* LATERAL: IZQ + DER lado a lado grandes */}
+            {view360 === 'LATERAL' && (
+              <div className="flex-1 grid grid-cols-2 gap-2 overflow-hidden min-h-0">
+                <div className="bg-slate-800/80 rounded-lg overflow-hidden flex flex-col">
+                  <BodyViewSVG viewLabel="LATERAL IZQ" isBack={false} marks={marks} mode={mode} handleBodyClick={handleBodyClick} getMarkConfig={getMarkConfig} fullSize />
+                </div>
+                <div className="bg-slate-800/80 rounded-lg overflow-hidden flex flex-col">
+                  <BodyViewSVG viewLabel="LATERAL DER" isBack={true} marks={marks} mode={mode} handleBodyClick={handleBodyClick} getMarkConfig={getMarkConfig} fullSize />
+                </div>
+              </div>
+            )}
+          </motion.div>
+        </div>
+        )} {/* fin ternario pacienteId / loading / mapa */}
       </div>
+        {/* ═══════════════════════════════════════════════════════════════ */}
+        {/* MODAL: Procedimiento Duplicado */}
+        {/* ═══════════════════════════════════════════════════════════════ */}
+        <AnimatePresence>
+          {showDuplicateModal && pendingMark && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+              onClick={() => {
+                setShowDuplicateModal(false);
+                setPendingMark(null);
+              }}
+            >
+              <motion.div
+                initial={{ scale: 0.95, y: 20 }}
+                animate={{ scale: 1, y: 0 }}
+                exit={{ scale: 0.95, y: 20 }}
+                className="bg-slate-900 border-2 border-yellow-600/50 rounded-2xl shadow-2xl max-w-sm w-full p-6"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Header */}
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-12 h-12 rounded-full bg-yellow-900/50 border-2 border-yellow-600/50 flex items-center justify-center">
+                    <AlertTriangle size={24} className="text-yellow-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-white font-bold text-lg">Procedimiento Duplicado</h3>
+                    <p className="text-gray-400 text-xs">En la misma zona</p>
+                  </div>
+                </div>
+
+                {/* Mensaje */}
+                <div className="bg-yellow-900/20 border border-yellow-700/30 rounded-lg p-4 mb-4">
+                  <p className="text-yellow-300 text-sm">
+                    Ya existe un registro de <span className="font-bold">{duplicateType}</span> en <span className="font-bold">{pendingMark.zona}</span>.
+                  </p>
+                  <p className="text-gray-400 text-xs mt-2">
+                    ¿Qué deseas hacer?
+                  </p>
+                </div>
+
+                {/* Opciones */}
+                <div className="space-y-3">
+                  {/* Opción 1: Cancelar */}
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => {
+                      setShowDuplicateModal(false);
+                      setPendingMark(null);
+                    }}
+                    className="w-full px-4 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-semibold transition text-center"
+                  >
+                    ❌ Cancelar
+                  </motion.button>
+
+                  {/* Opción 2: Eliminar anterior */}
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => handleDuplicateAction('delete')}
+                    className="w-full px-4 py-3 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white rounded-lg font-semibold transition text-center"
+                  >
+                    🗑️ Eliminar el anterior
+                  </motion.button>
+
+                  {/* Opción 3: Reemplazar por otro procedimiento */}
+                  <div className="space-y-2">
+                    <label className="text-xs text-gray-300 block">🔄 Reemplazar por otro procedimiento:</label>
+                    <select
+                      value={replacementTipo || ''}
+                      onChange={(e) => setReplacementTipo(e.target.value as Mark['tipo'])}
+                      className="w-full bg-slate-700 border border-slate-600 focus:border-amber-500 text-white rounded-lg px-3 py-2 text-sm outline-none transition"
+                    >
+                      <option value="">-- Seleccionar procedimiento --</option>
+                      {marcasTipos.map((tipo) => (
+                        <option key={tipo.tipo} value={tipo.tipo}>
+                          {tipo.label}
+                        </option>
+                      ))}
+                    </select>
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => handleDuplicateAction('replace')}
+                      disabled={!replacementTipo}
+                      className="w-full px-4 py-3 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white rounded-lg font-semibold transition text-center disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      ✅ Reemplazar procedimiento
+                    </motion.button>
+                  </div>
+                </div>
+
+                {/* Info adicional */}
+                <div className="mt-4 pt-4 border-t border-slate-700/50">
+                  <p className="text-gray-500 text-xs text-center">
+                    Los cambios se guardarán automáticamente
+                  </p>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
     </div>
   );
 }
 
-// Componente para mostrar cada vista corporal
-interface BodyViewProps {
-  imageUrl: string;
+// ── Mapa de colores por tipo de marca ──
+const MARK_COLORS: Record<string, string> = {
+  IMPLANTE_MAMARIO: '#ec4899',
+  LIPOSUCCION: '#06b6d4',
+  LIFTING_FACIAL: '#f59e0b',
+  RINOPLASTIA: '#8b5cf6',
+  ABDOMINOPLASTIA: '#10b981',
+  CICATRIZ: '#eab308',
+  HEMATOMA: '#ef4444',
+  CELULITIS_EDEMA: '#f97316',
+  EDEMA: '#a855f7',
+  FIBROSIS: '#b45309',
+  DOLOR: '#dc2626',
+  AREA_TRATADA: '#3b82f6',
+};
+
+// ── Componente cuerpo SVG inline ──
+interface BodyViewSVGProps {
   viewLabel: string;
+  isBack?: boolean;
   marks: Mark[];
   mode: 'VISTA' | 'EDITAR' | 'COMPARAR';
-  handleBodyClick: (zone: any) => void;
+  handleBodyClick: (zone: { name: string; x: number; y: number }, vista: 'FRONTAL' | 'POSTERIOR' | 'LATERAL_IZQ' | 'LATERAL_DER') => void;
   getMarkConfig: (tipo: Mark['tipo']) => any;
   fullSize?: boolean;
 }
 
-function BodyView({ imageUrl, viewLabel, marks, mode, handleBodyClick, getMarkConfig, fullSize }: BodyViewProps) {
-  // Detectar zona automáticamente basada en coordenadas
-  const detectZoneName = (x: number, y: number) => {
-    // Detectar zona basada en la posición aproximada
+function BodyViewSVG({ viewLabel, isBack = false, marks, mode, handleBodyClick, getMarkConfig, fullSize = false }: BodyViewSVGProps) {
+  const svgRef = useRef<SVGSVGElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Determinar la vista actual (FRONTAL, POSTERIOR, LATERAL_IZQ, LATERAL_DER)
+  const getVistaActual = (): 'FRONTAL' | 'POSTERIOR' | 'LATERAL_IZQ' | 'LATERAL_DER' => {
+    if (viewLabel.includes('LATERAL IZQ')) return 'LATERAL_IZQ';
+    if (viewLabel.includes('LATERAL DER')) return 'LATERAL_DER';
+    if (isBack) return 'POSTERIOR';
+    return 'FRONTAL';
+  };
+
+  const vistaActual = getVistaActual();
+
+  // Imagen según vista — importadas desde src/pages/images/
+  const imageUrl = (() => {
+    if (viewLabel.includes('LATERAL IZQ')) return bodyLeftImg;
+    if (viewLabel.includes('LATERAL DER')) return bodyRightImg;
+    if (isBack) return bodyBackImg;
+    return bodyFrontImg;
+  })();
+
+  // Filtrar marcas que pertenecen a esta vista
+  const marksDelVistaActual = marks.filter(m => m.vista === vistaActual);
+
+  // Transformar coordenadas para vistas laterales (invertir X para vista derecha)
+  const getCoordTransformada = (mark: Mark): { x: number; y: number } => {
+    if (vistaActual === 'LATERAL_DER') {
+      // Para vista lateral derecha, invertir coordenadas X (espejo)
+      return { x: 300 - mark.posicionX, y: mark.posicionY };
+    }
+    return { x: mark.posicionX, y: mark.posicionY };
+  };
+
+  const detectZona = (x: number, y: number): string => {
+    // Con object-fill la imagen llena el viewBox completo (0-300 × 0-580)
+    // Umbrales calibrados sobre el cuerpo real en los PNG
+
+    // === VISTA LATERAL ===
     if (viewLabel.includes('LATERAL')) {
-      if (y < 20) return 'Cabeza';
-      if (y < 30) return 'Cuello';
-      if (y < 50) return 'Torso';
-      if (y < 70) return 'Abdomen';
-      if (y < 85) return 'Muslo';
+      if (y < 75)  return 'Cabeza';
+      if (y < 112) return 'Cuello';
+      if (y < 260) return 'Torso';
+      if (y < 348) return 'Abdomen';
+      if (y < 455) return 'Muslo';
       return 'Pantorrilla';
     }
 
-    // Para vistas frontales/posteriores
-    if (y < 20) return 'Cabeza';
-    if (y < 28) return 'Cuello';
-    if (y < 45) {
-      return x < 50 ? 'Mama Izquierda' : 'Mama Derecha';
+    // === VISTA FRONTAL / POSTERIOR ===
+    // Cabeza (~0-13 % de altura = 0-75)
+    if (y < 75)  return 'Cabeza';
+    // Cuello (~13-20 % = 75-115)
+    if (y < 115) return 'Cuello';
+    // Hombros / clavícula (~20-25 % = 115-145)
+    if (y < 145) return x < 82 ? 'Hombro Izquierdo' : x > 218 ? 'Hombro Derecho' : 'Clavícula';
+    // Torso superior + brazos (~25-55 % = 145-320)
+    if (y < 320) {
+      // Brazos a los lados del torso
+      if (x < 65 || x > 235) return x < 150 ? 'Brazo Izquierdo' : 'Brazo Derecho';
+      // Zona pecho (solo vista frontal)
+      if (!isBack && y < 240) {
+        if (x < 143) return 'Mama Izquierda';
+        if (x > 157) return 'Mama Derecha';
+        return 'Pecho';
+      }
+      return isBack ? 'Espalda Superior' : 'Abdomen Superior';
     }
-    if (y < 65) {
-      if (x < 30) return 'Brazo Izquierdo';
-      if (x > 70) return 'Brazo Derecho';
-      return 'Abdomen';
-    }
-    if (y < 85) {
-      return x < 50 ? 'Muslo Izquierdo' : 'Muslo Derecho';
-    }
-    return x < 50 ? 'Pantorrilla Izquierda' : 'Pantorrilla Derecha';
+    // Abdomen bajo / espalda baja (~55-60 % = 320-348)
+    if (y < 348) return isBack ? 'Espalda Baja' : 'Abdomen';
+    // Pelvis / cadera (~60-70 % = 348-406)
+    if (y < 406) return 'Pelvis / Cadera';
+    // Muslos (~70-78 % = 406-452)
+    if (y < 452) return x < 150 ? 'Muslo Izquierdo' : 'Muslo Derecho';
+    // Piernas (~78-92 % = 452-534)
+    if (y < 534) return x < 150 ? 'Pierna Izquierda' : 'Pierna Derecha';
+    // Pies (~92-100 % = 534-580)
+    return x < 150 ? 'Pie Izquierdo' : 'Pie Derecho';
   };
 
-  const handleImageClick = (e: React.MouseEvent<HTMLDivElement>) => {
+  const handleSVGClick = (e: React.MouseEvent<SVGSVGElement>) => {
     if (mode !== 'EDITAR') return;
-
-    const container = e.currentTarget;
-    const rect = container.getBoundingClientRect();
-    
-    // Calcular coordenadas relativas al container
-    const offsetX = e.clientX - rect.left;
-    const offsetY = e.clientY - rect.top;
-    
-    // Convertir a porcentaje
-    const percentX = (offsetX / rect.width) * 100;
-    const percentY = (offsetY / rect.height) * 100;
-    
-    // Detectar zona automáticamente
-    const detectedZone = detectZoneName(percentX, percentY);
-    
-    // Crear objeto zona con coordenadas exactas
-    const clickedZone = {
-      id: `custom-${Date.now()}`,
-      name: detectedZone,
-      x: percentX,
-      y: percentY,
-    };
-    
-    handleBodyClick(clickedZone);
+    const svg = svgRef.current;
+    if (!svg) return;
+    const pt = svg.createSVGPoint();
+    pt.x = e.clientX;
+    pt.y = e.clientY;
+    const svgP = pt.matrixTransform(svg.getScreenCTM()!.inverse());
+    // Pasar la vista actual a handleBodyClick
+    handleBodyClick(
+      { name: detectZona(svgP.x, svgP.y), x: Math.round(svgP.x), y: Math.round(svgP.y) },
+      vistaActual
+    );
   };
 
   return (
-    <div className="bg-slate-700/50 rounded-lg p-4 text-center">
-      <p className="text-white font-semibold mb-4">
+    <div className="h-full w-full flex flex-col min-h-0">
+      {/* Título compacto */}
+      <p className="shrink-0 text-white font-semibold text-xs tracking-wide text-center py-1 px-2">
         {viewLabel}
-        {mode === 'EDITAR' && <span className="text-purple-400 text-sm ml-2">👆 Haz clic en cualquier zona</span>}
+        {mode === 'EDITAR' && <span className="text-yellow-400 ml-1">👆 clic</span>}
       </p>
-      <div 
-        className="relative mx-auto"
-        onClick={handleImageClick}
-        style={{ 
-          width: fullSize ? '400px' : '280px', 
-          height: fullSize ? '600px' : '400px',
-          cursor: mode === 'EDITAR' ? 'crosshair' : 'default',
-        }}
+      {/* Contenedor relativo que llena todo el espacio restante */}
+      <div
+        ref={containerRef}
+        className="relative flex-1 min-h-0 w-full"
       >
-        {/* Imagen de Fondo */}
+        {/* Imagen fotorealista de fondo */}
         <img
           src={imageUrl}
           alt={viewLabel}
-          className="w-full h-full object-contain absolute pointer-events-none"
-          style={{
-            filter: mode === 'EDITAR' ? 'drop-shadow(0 0 20px rgba(168,85,247,0.3))' : 'drop-shadow(0 0 10px rgba(168,85,247,0.15))',
-            opacity: 0.85,
-          }}
+          className="absolute inset-0 w-full h-full object-contain pointer-events-none select-none"
+          style={{ filter: 'drop-shadow(0 4px 20px rgba(0,0,0,0.7))' }}
         />
-
-        {/* Marcas superpuestas */}
-        {marks.map((mark) => {
-          const config = getMarkConfig(mark.tipo);
-          return (
-            <motion.div
-              key={mark.id}
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              exit={{ scale: 0 }}
-              whileHover={{ scale: 1.15 }}
-              style={{
-                position: 'absolute',
-                left: `${(mark.posicionX / 300) * 100}%`,
-                top: `${(mark.posicionY / 600) * 100}%`,
-                transform: 'translate(-50%, -50%)',
-              }}
-            >
-              <div
-                className={`rounded-full bg-gradient-to-r ${config.color} border-2 border-white shadow-lg flex items-center justify-center text-white font-bold text-sm cursor-pointer`}
-                style={{
-                  width: fullSize ? '40px' : '32px',
-                  height: fullSize ? '40px' : '32px',
-                  boxShadow: `0 0 15px rgba(${
-                    config.tipo === 'EDEMA' ? '168,85,247' : config.tipo === 'FIBROSIS' ? '217,119,6' : config.tipo === 'DOLOR' ? '220,38,38' : config.tipo === 'CICATRIZ' ? '234,88,12' : '37,99,235'
-                  }, 0.6)`,
-                }}
-                title={`${mark.zona} - Intensidad ${mark.intensidad}/10`}
-              >
-                {mark.intensidad}
-              </div>
-            </motion.div>
-          );
-        })}
+        {/* SVG transparente encima para capturar clics y renderizar marcas */}
+        <svg
+          ref={svgRef}
+          viewBox="0 0 300 580"
+          preserveAspectRatio="xMidYMid meet"
+          onClick={handleSVGClick}
+          className="absolute inset-0 w-full h-full"
+          style={{
+            cursor: mode === 'EDITAR' ? 'crosshair' : 'default',
+            background: 'transparent',
+            pointerEvents: mode === 'EDITAR' ? 'all' : 'none',
+          }}
+        >
+          {/* ── Marcas (solo de esta vista) ── */}
+          {marksDelVistaActual.map((mark) => {
+            const color = MARK_COLORS[mark.tipo] ?? '#6366f1';
+            const { x, y } = getCoordTransformada(mark);
+            return (
+              <g key={mark.id}>
+                {/* Halo */}
+                <circle cx={x} cy={y} r={20} fill={color} opacity={0.2} />
+                {/* Círculo principal */}
+                <circle
+                  cx={x}
+                  cy={y}
+                  r={13}
+                  fill={color}
+                  stroke="white"
+                  strokeWidth="2.5"
+                  style={{ filter: `drop-shadow(0 0 6px ${color})` }}
+                />
+                {/* Número intensidad */}
+                <text
+                  x={x}
+                  y={y + 5}
+                  textAnchor="middle"
+                  fill="white"
+                  fontSize="11"
+                  fontWeight="bold"
+                  pointerEvents="none"
+                >
+                  {mark.intensidad}
+                </text>
+                <title>{mark.zona} — {getMarkConfig(mark.tipo).label} · Intensidad {mark.intensidad}/10</title>
+              </g>
+            );
+          })}
+        </svg>
       </div>
     </div>
   );
