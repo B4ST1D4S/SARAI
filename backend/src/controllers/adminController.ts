@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
+import { randomUUID } from 'crypto';
 
 const prisma = new PrismaClient();
 
@@ -1148,13 +1149,15 @@ export async function updateParametroSistema(req: Request, res: Response) {
   try {
     const { grupo, clave } = req.params;
     const { valor } = req.body;
+    const now = new Date();
     const item = await prisma.parametroSistema.upsert({
       where: { grupo_clave: { grupo, clave } },
-      update: { valor },
-      create: { grupo, clave, valor, etiqueta: clave, tipo: 'text', orden: 99 },
+      update: { valor, updatedAt: now },
+      create: { id: randomUUID(), grupo, clave, valor, etiqueta: clave, tipo: 'text', orden: 99, updatedAt: now },
     });
     res.json(item);
-  } catch {
+  } catch (e) {
+    console.error('updateParametroSistema error:', e);
     res.status(500).json({ error: 'Error al actualizar parámetro' });
   }
 }
