@@ -24,6 +24,7 @@ export async function create(req: Request, res: Response): Promise<void> {
       pacienteId,
       medicoId,
       tipoCita,
+      entidadSalud,
       fechaHora,
       duracionMinutos,
       motivo,
@@ -39,6 +40,7 @@ export async function create(req: Request, res: Response): Promise<void> {
       pacienteId,
       medicoId,
       tipoCita,
+      entidadSalud,
       fechaHora,
       duracionMinutos,
       motivo,
@@ -64,8 +66,8 @@ export async function getMedico(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    const { estado } = req.query;
-    const citas = await getCitasByMedico(req.user.userId, estado as string);
+    const { estado, fechaInicio, fechaFin } = req.query;
+    const citas = await getCitasByMedico(req.user.userId, estado as string, fechaInicio as string, fechaFin as string);
 
     res.json({
       success: true,

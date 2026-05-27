@@ -14,6 +14,8 @@ import disponibilidadRoutes from './routes/disponibilidad.js';
 import usuariosRoutes from './routes/usuarios.js';
 import especialidadesRoutes from './routes/especialidades.js';
 import adminRoutes from './routes/admin.js';
+import pdfRoutes from './routes/pdf.js';
+import mapaCorporalRoutes from './routes/mapaCorporal.js';
 
 dotenv.config();
 
@@ -62,6 +64,8 @@ app.use('/api/disponibilidad', disponibilidadRoutes);
 app.use('/api/usuarios', usuariosRoutes);
 app.use('/api/especialidades', especialidadesRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/pdf',   pdfRoutes);
+app.use('/api/mapa-corporal', mapaCorporalRoutes);
 
 // ============================================
 // MANEJO DE ERRORES

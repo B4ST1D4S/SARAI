@@ -760,6 +760,26 @@ async function main() {
   });
 
   console.log('✅ Configuración del sistema creada');
+
+  // ── Tipos de Consulta básicos para estética clínica ──────────────────────
+  const tiposConsultaBase = [
+    { id: 'TC-001', nombre: 'Consulta Inicial', clasificacion: 'CONSULTA', duracionMinutos: 30 },
+    { id: 'TC-002', nombre: 'Preoperatorio', clasificacion: 'PREOPERATORIO', duracionMinutos: 45 },
+    { id: 'TC-003', nombre: 'Postoperatorio', clasificacion: 'CONTROL', duracionMinutos: 30 },
+    { id: 'TC-004', nombre: 'Control', clasificacion: 'CONTROL', duracionMinutos: 20 },
+    { id: 'TC-005', nombre: 'Procedimiento Estético', clasificacion: 'PROCEDIMIENTO', duracionMinutos: 90 },
+    { id: 'TC-006', nombre: 'Valoración Nutricional', clasificacion: 'CONSULTA', duracionMinutos: 40 },
+  ];
+
+  for (const tc of tiposConsultaBase) {
+    await prisma.tipoConsulta.upsert({
+      where: { id: tc.id },
+      update: { nombre: tc.nombre, clasificacion: tc.clasificacion, duracionMinutos: tc.duracionMinutos, updatedAt: new Date() },
+      create: { ...tc, updatedAt: new Date() },
+    });
+  }
+  console.log(`✅ ${tiposConsultaBase.length} Tipos de Consulta creados/actualizados`);
+
   console.log('🌱 Seed completado exitosamente!');
 }
 
