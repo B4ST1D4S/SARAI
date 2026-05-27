@@ -376,10 +376,7 @@ export async function getMapaCorporalByProcedimiento(
 ) {
   return apiCall(
     `/mapa-corporal/procedimiento/${procedimientoId}/${pacienteId}`,
-    {
-      method: 'GET',
-      token,
-    }
+    { method: 'GET', token }
   );
 }
 
@@ -408,3 +405,4 @@ export async function deleteMapaCorporal(id: string, token: string) {
     token,
   });
 }
+

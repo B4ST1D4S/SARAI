@@ -101,6 +101,10 @@ export default function MapaCorporalPage() {
   const [buscandoPaciente, setBuscandoPaciente] = useState(false);
   const [pacientesBuscados, setPacientesBuscados] = useState<any[]>([]);
 
+  // ── Historial de guardados ──
+  const [showHistorial, setShowHistorial] = useState(false);
+  const [historialMapas, setHistorialMapas] = useState<any[]>([]);
+
   const marcasTipos = [
     { tipo: 'IMPLANTE_MAMARIO', color: 'from-pink-600 to-pink-500', solidColor: '#ec4899', label: 'Aumento Mamario', icon: '💗', descripcion: 'Implante mamario', rango: 'POST-OP 0-90 días' },
     { tipo: 'LIPOSUCCION', color: 'from-cyan-600 to-cyan-500', solidColor: '#06b6d4', label: 'Liposucción', icon: '🔵', descripcion: 'Contorneado corporal', rango: 'POST-OP 0-60 días' },
@@ -193,6 +197,8 @@ export default function MapaCorporalPage() {
     try {
       const response = await getMapaCorporalPorPaciente(paciente.id, token);
       if (response.data && response.data.data && response.data.data.length > 0) {
+        // Guardar historial completo
+        setHistorialMapas(response.data.data);
         const mapaReciente = response.data.data[0];
         setMarks(mapaReciente.zonasMarcadas as Mark[]);
         setMapaCorporalId(mapaReciente.id);
@@ -207,6 +213,7 @@ export default function MapaCorporalPage() {
           } catch {}
         }
       } else {
+        setHistorialMapas([]);
         setMarks([]);
         setMapaCorporalId(null);
       }
@@ -215,6 +222,23 @@ export default function MapaCorporalPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // ── Cargar un guardado anterior del historial ──
+  const cargarDesdeHistorial = (mapa: any) => {
+    setMarks(mapa.zonasMarcadas as Mark[]);
+    setMapaCorporalId(mapa.id);
+    if (mapa.anotacionesClinics) {
+      try {
+        const extra = JSON.parse(mapa.anotacionesClinics);
+        setEvolucionForm(prev => ({
+          ...prev,
+          observacionesFrontal: extra.evolucion || '',
+          recomendaciones: extra.recomendaciones || '',
+        }));
+      } catch {}
+    }
+    setShowHistorial(false);
   };
 
   // ═══════════════════════════════════════
@@ -297,7 +321,18 @@ export default function MapaCorporalPage() {
       if (response.data) {
         // El backend devuelve { success, message, data: mapaCorporal }, apiCall lo envuelve en { data: {...} }
         const savedId = (response.data as any)?.data?.id || (response.data as any)?.id;
-        if (savedId) setMapaCorporalId(savedId);
+        if (savedId) {
+          setMapaCorporalId(savedId);
+          // Actualizar historial: reemplazar si ya existe, o agregar al principio
+          setHistorialMapas(prev => {
+            const savedMapa = (response.data as any)?.data || response.data;
+            const exists = prev.find(m => m.id === savedId);
+            if (exists) {
+              return prev.map(m => m.id === savedId ? { ...m, ...savedMapa } : m);
+            }
+            return [savedMapa, ...prev];
+          });
+        }
         console.log('✅ Mapa corporal guardado automáticamente');
       } else {
         console.error('❌ Error al guardar:', response.error);
@@ -321,12 +356,19 @@ export default function MapaCorporalPage() {
   // ═══════════════════════════════════════
   // VALIDAR PROCEDIMIENTO DUPLICADO
   // ═══════════════════════════════════════
-  // Detectar duplicado: MISMO tipo + MISMA zona + posición muy cercana (< 35px)
-  const findDuplicateMark = (tipo: string, zona: string, x: number, y: number): Mark | undefined => {
+  // Detectar duplicado: MISMO tipo + MISMA zona + MISMA vista + posición muy cercana (< 35px)
+  const findDuplicateMark = (
+    tipo: string,
+    zona: string,
+    x: number,
+    y: number,
+    vista: Mark['vista']
+  ): Mark | undefined => {
     const PROXIMITY = 35;
     return marks.find(m =>
       m.tipo === tipo &&
       m.zona === zona &&
+      m.vista === vista &&
       Math.sqrt(Math.pow(m.posicionX - x, 2) + Math.pow(m.posicionY - y, 2)) < PROXIMITY
     );
   };
@@ -364,8 +406,8 @@ export default function MapaCorporalPage() {
       nota: '',
     };
 
-    // Validar si el procedimiento ya existe EN LA MISMA ZONA y posición cercana
-    const duplicado = findDuplicateMark(selectedTipo, zone.name, zone.x, zone.y);
+    // Validar duplicado: MISMO tipo + zona + vista + posición cercana
+    const duplicado = findDuplicateMark(selectedTipo, zone.name, zone.x, zone.y, vistaActual);
     if (duplicado) {
       const procName = marcasTipos.find(m => m.tipo === selectedTipo)?.label || selectedTipo;
       setDuplicateType(procName);
@@ -386,7 +428,7 @@ export default function MapaCorporalPage() {
   };
 
   // Wrapper para 3D body zone clicks
-  const handleBody3DZoneClick = (x: number, y: number, zona: string) => {
+  const handleBody3DZoneClick = (x: number, y: number, zona: string, vista: Mark['vista'] = 'FRONTAL') => {
     if (mode !== 'EDITAR') return;
 
     const newMark: Mark = {
@@ -397,12 +439,12 @@ export default function MapaCorporalPage() {
       intensidad: intensidadActual,
       fecha: new Date().toISOString().split('T')[0],
       zona: zona,
-      vista: 'FRONTAL',
+      vista,
       nota: '',
     };
 
-    // Validar si el procedimiento ya existe EN LA MISMA ZONA y posición cercana
-    const duplicado = findDuplicateMark(selectedTipo, zona, x, y);
+    // Validar duplicado: MISMO tipo + zona + vista + posición cercana
+    const duplicado = findDuplicateMark(selectedTipo, zona, x, y, vista);
     if (duplicado) {
       const procName = marcasTipos.find(m => m.tipo === selectedTipo)?.label || selectedTipo;
       setDuplicateType(procName);
@@ -599,7 +641,74 @@ export default function MapaCorporalPage() {
             </div>
 
             {/* Botones Control Rápido */}
-            <div className="flex gap-1.5">
+            <div className="flex gap-1.5 relative">
+              {/* Botón historial de guardados */}
+              {pacienteId && historialMapas.length > 0 && (
+                <div className="relative">
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => setShowHistorial(prev => !prev)}
+                    className={`px-3 py-1.5 rounded text-xs font-bold transition flex items-center gap-1 ${
+                      showHistorial
+                        ? 'bg-purple-600 text-white'
+                        : 'bg-slate-700 hover:bg-slate-600 text-gray-200 border border-slate-600'
+                    }`}
+                    title="Ver historial de guardados"
+                  >
+                    🗂️ <span>{historialMapas.length}</span>
+                  </motion.button>
+                  {/* Panel desplegable historial */}
+                  <AnimatePresence>
+                    {showHistorial && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -8, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: -8, scale: 0.95 }}
+                        transition={{ duration: 0.15 }}
+                        className="absolute right-0 top-full mt-1 w-72 bg-slate-800 border border-purple-600/40 rounded-lg shadow-2xl z-50 overflow-hidden"
+                        onClick={e => e.stopPropagation()}
+                      >
+                        <div className="px-3 py-2 bg-slate-900 border-b border-slate-700 flex items-center justify-between">
+                          <span className="text-xs font-bold text-purple-300">📋 Historial de guardados</span>
+                          <button onClick={() => setShowHistorial(false)} className="text-gray-400 hover:text-white text-xs">✕</button>
+                        </div>
+                        <div className="max-h-64 overflow-y-auto">
+                          {historialMapas.map((mapa: any, idx: number) => (
+                            <button
+                              key={mapa.id}
+                              onClick={() => cargarDesdeHistorial(mapa)}
+                              className={`w-full text-left px-3 py-2.5 hover:bg-slate-700 border-b border-slate-700/50 last:border-0 transition ${
+                                mapa.id === mapaCorporalId ? 'bg-purple-900/30 border-l-2 border-l-purple-500' : ''
+                              }`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs font-bold text-white">
+                                  {idx === 0 ? '⭐ Más reciente' : `Guardado #${historialMapas.length - idx}`}
+                                </span>
+                                {mapa.id === mapaCorporalId && (
+                                  <span className="text-xs text-purple-400">← actual</span>
+                                )}
+                              </div>
+                              <div className="text-xs text-gray-400 mt-0.5">
+                                {new Date(mapa.updatedAt).toLocaleString('es-CO', {
+                                  day: '2-digit', month: 'short', year: 'numeric',
+                                  hour: '2-digit', minute: '2-digit',
+                                })}
+                              </div>
+                              <div className="text-xs text-cyan-400 mt-0.5">
+                                {Array.isArray(mapa.zonasMarcadas) ? mapa.zonasMarcadas.length : 0} marcas
+                                {mapa.procedimiento && ` · ${mapa.procedimiento.nombreProcedimiento}`}
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              )}
+
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
@@ -1013,12 +1122,8 @@ function BodyViewSVG({ viewLabel, isBack = false, marks, mode, handleBodyClick, 
   // Filtrar marcas que pertenecen a esta vista
   const marksDelVistaActual = marks.filter(m => m.vista === vistaActual);
 
-  // Transformar coordenadas para vistas laterales (invertir X para vista derecha)
+  // Coordenadas directas: la marca se renderiza en el mismo punto donde el usuario hizo clic
   const getCoordTransformada = (mark: Mark): { x: number; y: number } => {
-    if (vistaActual === 'LATERAL_DER') {
-      // Para vista lateral derecha, invertir coordenadas X (espejo)
-      return { x: 300 - mark.posicionX, y: mark.posicionY };
-    }
     return { x: mark.posicionX, y: mark.posicionY };
   };
 
