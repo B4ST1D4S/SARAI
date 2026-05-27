@@ -21,6 +21,7 @@ import UsuariosPage from './pages/UsuariosPage';
 import AdminPage from './pages/AdminPage';
 import CentralImpresionPage from './pages/CentralImpresionPage';
 import SaraiAssistant from './components/SaraiAssistant';
+import NeuralCanvas from './components/NeuralCanvas';
 import saraiLogo from './assets/logo1.png';
 
 const NAV_SECTIONS = [
@@ -285,6 +286,7 @@ function App() {
 
   return (
     <div className="min-h-screen bg-[#080a0f] flex">
+      <NeuralCanvas opacity={0.13} nodeCount={100} />
       <Sidebar
         currentPage={currentPage}
         setCurrentPage={setCurrentPage}

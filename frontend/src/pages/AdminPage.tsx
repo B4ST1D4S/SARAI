@@ -13,9 +13,10 @@ import {
   DollarSign, ToggleLeft, ToggleRight, Search, CheckCircle,
   AlertTriangle, ChevronDown, FolderOpen, LayoutGrid, BookOpen, GitBranch,
   ClipboardList, Eye, EyeOff, Star, RotateCcw,
-  FileText, List, SlidersHorizontal, Stethoscope, Calendar, MessageSquare,
+  FileText, List, SlidersHorizontal, Stethoscope, Calendar, MessageSquare, Palette,
 } from 'lucide-react';
 import * as svc from '../services/adminService';
+import { useTheme, ThemeId } from '../hooks/useTheme';
 
 // ─── CSV helpers ──────────────────────────────────────────────
 function csvToObjects(text: string): any[] {
@@ -470,8 +471,10 @@ function TabTiposConsulta() {
   // ─── Servicios asociados al tipo en edición ───
   const [svcs,       setSvcs]       = useState<any[]>([]);
   const [svcsLoading,setSvcsLoading]= useState(false);
-  const [allServs,   setAllServs]   = useState<any[]>([]);
-  const [svcSearch,  setSvcSearch]  = useState('');
+  const [svcResults,   setSvcResults]   = useState<any[]>([]);
+  const [svcSearching, setSvcSearching] = useState(false);
+  const [svcSearch,    setSvcSearch]    = useState('');
+  const [tableSearch,  setTableSearch]  = useState('');
   const [addSvcId,   setAddSvcId]   = useState('');
   const [addPrincipal, setAddPrincipal] = useState(false);
   const [addingServ, setAddingServ] = useState(false);
@@ -506,10 +509,9 @@ function TabTiposConsulta() {
   const openEdit   = (r: any) => {
     const { especialidad, departamento, hcModulo, serviciosConfig, preparaciones, ...rest } = r;
     setForm({ ...rest, especialidadId: r.especialidadId || '', departamentoId: r.departamentoId || '', hcModuloId: r.hcModuloId || '' });
-    setErr(''); setWiz(0); setSvcs([]); setAddSvcId(''); setSvcSearch(''); setSvcErr('');
+    setErr(''); setWiz(0); setSvcs([]); setAddSvcId(''); setSvcSearch(''); setSvcErr(''); setSvcResults([]);
     setModal('edit');
     loadSvcs(r.id);
-    svc.getServicios().then((s: any) => setAllServs(s || [])).catch(() => {});
   };
 
   const save = async () => {
@@ -535,7 +537,7 @@ function TabTiposConsulta() {
     setAddingServ(true); setSvcErr('');
     try {
       await svc.addServicioAConsulta(form.id, { servicioId: addSvcId, esPrincipal: addPrincipal, generaAutomatico: true, requiereOrden: false });
-      setAddSvcId(''); setAddPrincipal(false);
+      setAddSvcId(''); setAddPrincipal(false); setSvcSearch('');
       await loadSvcs(form.id);
     } catch(e: any) { setSvcErr(e?.message || 'Error al agregar'); }
     finally { setAddingServ(false); }
@@ -551,16 +553,35 @@ function TabTiposConsulta() {
   const f = (k: string) => (v: any) => setForm((p: any) => ({...p, [k]: v}));
   const TABS = ['General', 'Clínica', 'Servicios'];
 
-  const filteredServs = allServs.filter((s: any) =>
-    !svcs.find((x: any) => x.servicioId === s.id) &&
-    (s.nombre?.toLowerCase().includes(svcSearch.toLowerCase()) || s.codigoCups?.toLowerCase().includes(svcSearch.toLowerCase()))
-  );
+  useEffect(() => {
+    if (!svcSearch || svcSearch.length < 2 || addSvcId) { setSvcResults([]); setSvcSearching(false); return; }
+    setSvcSearching(true);
+    const timer = setTimeout(async () => {
+      try {
+        const data = await svc.getServicios(`search=${encodeURIComponent(svcSearch)}`);
+        const already = new Set(svcs.map((x: any) => x.servicioId));
+        setSvcResults((data as any[]).filter((s: any) => !already.has(s.id)));
+      } catch { setSvcResults([]); }
+      finally { setSvcSearching(false); }
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [svcSearch, svcs, addSvcId]);
 
   return (
     <>
       <SecHeader title="Tipos de Consulta" onNew={openCreate} onBulk={() => setModal('bulk')} />
       {loadErr && <ErrBanner msg={loadErr} onRetry={load} />}
-      <Table items={items} loading={loading}
+      <div className="relative mb-4 max-w-sm">
+        <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+        <input value={tableSearch} onChange={e => setTableSearch(e.target.value)}
+          placeholder="Buscar por nombre, especialidad o clasificación…"
+          className="w-full pl-9 pr-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-xs text-white focus:border-yellow-500 focus:outline-none" />
+      </div>
+      <Table items={tableSearch ? items.filter(i =>
+        i.nombre?.toLowerCase().includes(tableSearch.toLowerCase()) ||
+        i.especialidad?.nombre?.toLowerCase().includes(tableSearch.toLowerCase()) ||
+        i.clasificacion?.toLowerCase().includes(tableSearch.toLowerCase())
+      ) : items} loading={loading}
         cols={[
           { key:'nombre', label:'Nombre' },
           { key:'clasificacion', label:'Clasificación', render: r => <span className="px-2 py-0.5 rounded-full text-[10px] bg-blue-500/20 text-blue-300">{r.clasificacion}</span> },
@@ -651,18 +672,29 @@ function TabTiposConsulta() {
                       <p className="text-xs text-gray-400 font-semibold uppercase tracking-wider">Agregar servicio CUPS</p>
                       <input
                         className="w-full bg-slate-800 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-yellow-500/50"
-                        placeholder="Buscar por código o nombre…"
+                        placeholder="Buscar por código CUPS o descripción…"
                         value={svcSearch}
-                        onChange={e => setSvcSearch(e.target.value)}
+                        onChange={e => { setSvcSearch(e.target.value); setAddSvcId(''); }}
                       />
-                      {svcSearch && filteredServs.length > 0 && (
+                      {!svcSearch && !addSvcId && (
+                        <p className="text-[10px] text-gray-600">Escribe 2+ caracteres para buscar servicios CUPS</p>
+                      )}
+                      {svcSearch && svcSearch.length >= 2 && !addSvcId && (
                         <div className="max-h-40 overflow-y-auto space-y-1 bg-slate-900/60 rounded-xl border border-white/5 p-1">
-                          {filteredServs.slice(0, 20).map((s: any) => (
-                            <button key={s.id} onClick={() => { setAddSvcId(s.id); setSvcSearch(`[${s.codigoCups}] ${s.nombre}`); }}
-                              className={`w-full text-left px-3 py-2 rounded-lg text-xs transition ${addSvcId === s.id ? 'bg-yellow-600/20 text-yellow-200' : 'hover:bg-white/5 text-gray-300'}`}>
-                              <span className="font-mono text-yellow-400 mr-2">{s.codigoCups}</span>{s.nombre}
-                            </button>
-                          ))}
+                          {svcSearching ? (
+                            <div className="flex items-center gap-2 text-xs text-gray-400 px-3 py-2">
+                              <span className="w-3 h-3 border-2 border-gray-500 border-t-yellow-400 rounded-full animate-spin" /> Buscando…
+                            </div>
+                          ) : svcResults.length > 0 ? (
+                            svcResults.slice(0, 20).map((s: any) => (
+                              <button key={s.id} onClick={() => { setAddSvcId(s.id); setSvcSearch(`[${s.codigoCups}] ${s.nombre}`); }}
+                                className="w-full text-left px-3 py-2 rounded-lg text-xs transition hover:bg-white/5 text-gray-300">
+                                <span className="font-mono text-yellow-400 mr-2">{s.codigoCups}</span>{s.nombre}
+                              </button>
+                            ))
+                          ) : (
+                            <div className="text-xs text-gray-500 px-3 py-2">Sin resultados para "{svcSearch}"</div>
+                          )}
                         </div>
                       )}
                       <div className="flex items-center gap-3">
@@ -1223,8 +1255,13 @@ function TabPreparaciones() {
         svc.getTiposConsulta(),
       ]);
       const all = preps as any[];
+      const q = search.toLowerCase();
       const filtered = search
-        ? all.filter(p => p.nombre.toLowerCase().includes(search.toLowerCase()))
+        ? all.filter(p =>
+            p.nombre?.toLowerCase().includes(q) ||
+            (p.tipoConsulta?.nombre || '').toLowerCase().includes(q) ||
+            (p.especialidad?.nombre || '').toLowerCase().includes(q)
+          )
         : all;
       setItems(filtered); setEsps(e as any[]); setTcs(tc as any[]);
     } catch(ex: any) { setLoadErr(ex?.message || 'Error al cargar'); }
@@ -2045,6 +2082,288 @@ function TabMotivosCita() {
 // ════════════════════════════════════════════════
 // ESTRUCTURA DE MÓDULOS/SUBMÓDULOS  (3 módulos)
 // ════════════════════════════════════════════════
+// TAB: TEMAS DEL SISTEMA
+// ════════════════════════════════════════════════
+function TabTemasistema() {
+  const { theme, setTheme } = useTheme();
+
+  type TemaInfo = {
+    id: ThemeId;
+    name: string;
+    tagline: string;
+    desc: string;
+    bg: [string, string, string];
+    accent: string;
+    card: string;
+    txt: string;
+    border: string;
+    swatches: string[];
+    ideal: string[];
+  };
+
+  const TEMAS: TemaInfo[] = [
+    {
+      id: 'dark',
+      name: 'SARAI Dark',
+      tagline: 'Futurista · IA Médica · Gold',
+      desc: 'El estilo original de SARAI. Interfaz oscura premium con acentos dorados. Diseñada para entornos con poca luz y trabajo nocturno.',
+      bg: ['#0a0a0f', '#0f1117', '#14151f'],
+      accent: '#d4af37',
+      card: '#1a1d29',
+      txt: '#f1f5f9',
+      border: 'rgba(255,255,255,0.08)',
+      swatches: ['#0a0a0f', '#d4af37', '#1a1d29', '#0ea5e9'],
+      ideal: ['Noche y poca luz', 'Estética clínica premium', 'Trabajo prolongado'],
+    },
+    {
+      id: 'premium-light',
+      name: 'Premium Light',
+      tagline: 'Apple Health · Clean · Moderno',
+      desc: 'Interfaz clara premium estilo Apple Health. Blanca y elegante con acentos azul eléctrico. Ideal para consultorios bien iluminados.',
+      bg: ['#f0f4f8', '#f5f7fc', '#ffffff'],
+      accent: '#2563eb',
+      card: '#ffffff',
+      txt: '#0f172a',
+      border: 'rgba(15,23,42,0.10)',
+      swatches: ['#f0f4f8', '#2563eb', '#ffffff', '#06b6d4'],
+      ideal: ['Clínicas bien iluminadas', 'Consultas privadas', 'Dispositivos Apple'],
+    },
+    {
+      id: 'soft-medical',
+      name: 'Soft Medical',
+      tagline: 'Verde Salvia · Calma · Bienestar',
+      desc: 'Reduce la fatiga visual en jornadas largas. Tonos de verde salvia y esmeralda inspirados en entornos médicos calmados.',
+      bg: ['#e8f0eb', '#eff5f0', '#f7fbf7'],
+      accent: '#059669',
+      card: '#f7fbf7',
+      txt: '#1a3326',
+      border: 'rgba(26,51,38,0.10)',
+      swatches: ['#e8f0eb', '#059669', '#f7fbf7', '#0891b2'],
+      ideal: ['Jornadas largas (8h+)', 'Enfermería y auxiliares', 'Consulta general'],
+    },
+    {
+      id: 'executive-ai',
+      name: 'Executive AI',
+      tagline: 'Navy · Cyan · Ultra Premium',
+      desc: 'Estilo corporativo ultra-premium inspirado en dashboards de IA. Azul naval profundo con detalles cyan brillante.',
+      bg: ['#030712', '#060e1a', '#091525'],
+      accent: '#06b6d4',
+      card: '#091525',
+      txt: '#e2e8f0',
+      border: 'rgba(6,182,212,0.12)',
+      swatches: ['#030712', '#06b6d4', '#091525', '#7c3aed'],
+      ideal: ['Dirección médica', 'Tecnología avanzada', 'Uso ejecutivo'],
+    },
+  ];
+
+  return (
+    <div style={{ maxWidth: 860 }}>
+      {/* Header */}
+      <div style={{ marginBottom: 24 }}>
+        <h2 style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>Temas del Sistema</h2>
+        <p style={{ fontSize: 12, color: '#94a3b8', lineHeight: 1.6 }}>
+          Selecciona la paleta visual de SARAI. El cambio aplica inmediatamente en toda la interfaz.
+        </p>
+      </div>
+
+      {/* Grid 1 col mobile / 2 col desktop */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+        gap: 16,
+      }}>
+        {TEMAS.map(t => {
+          const active = theme === t.id;
+          return (
+            <motion.div
+              key={t.id}
+              whileHover={{ y: -3, transition: { duration: 0.15 } }}
+              onClick={() => setTheme(t.id)}
+              style={{
+                borderRadius: 16,
+                overflow: 'hidden',
+                border: `1.5px solid ${active ? t.accent : t.border}`,
+                boxShadow: active ? `0 0 22px ${t.accent}28` : '0 2px 8px rgba(0,0,0,0.18)',
+                cursor: 'pointer',
+                position: 'relative',
+                background: t.bg[1],
+              }}
+            >
+              {/* Badge activo */}
+              {active && (
+                <div style={{
+                  position: 'absolute', top: 10, right: 10, zIndex: 10,
+                  display: 'flex', alignItems: 'center', gap: 5,
+                  padding: '3px 10px',
+                  background: `${t.accent}22`,
+                  border: `1px solid ${t.accent}55`,
+                  borderRadius: 99,
+                  fontSize: 10, fontWeight: 700,
+                  color: t.accent,
+                }}>
+                  <span style={{
+                    width: 6, height: 6, borderRadius: '50%',
+                    background: t.accent,
+                    display: 'inline-block',
+                    boxShadow: `0 0 4px ${t.accent}`,
+                  }} />
+                  ACTIVO
+                </div>
+              )}
+
+              {/* Preview mini-UI */}
+              <div style={{
+                height: 108,
+                background: `linear-gradient(135deg, ${t.bg[0]}, ${t.bg[1]}, ${t.bg[2]})`,
+                padding: '10px 12px',
+                display: 'flex',
+                gap: 8,
+                overflow: 'hidden',
+              }}>
+                {/* Sidebar mock */}
+                <div style={{
+                  width: 32, flexShrink: 0,
+                  background: t.bg[0],
+                  border: `1px solid ${t.border}`,
+                  borderRadius: 7,
+                  padding: '6px 5px',
+                  display: 'flex', flexDirection: 'column', gap: 5,
+                }}>
+                  {([1,0,0,0] as number[]).map((hl, i) => (
+                    <div key={i} style={{
+                      height: 4, borderRadius: 3,
+                      background: hl ? t.accent : `${t.txt}18`,
+                      width: hl ? '80%' : '60%',
+                    }} />
+                  ))}
+                  <div style={{ flex: 1 }} />
+                  <div style={{ height: 4, borderRadius: 3, background: `${t.txt}10`, width: '70%' }} />
+                </div>
+                {/* Contenido */}
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 5 }}>
+                  {/* Navbar */}
+                  <div style={{
+                    height: 14, background: t.card,
+                    border: `1px solid ${t.border}`,
+                    borderRadius: 6,
+                    display: 'flex', alignItems: 'center', gap: 4, padding: '0 6px',
+                  }}>
+                    <div style={{ height: 3, width: '30%', borderRadius: 2, background: `${t.txt}25` }} />
+                    <div style={{ flex: 1 }} />
+                    <div style={{ width: 12, height: 6, borderRadius: 3, background: t.accent }} />
+                  </div>
+                  {/* Stat cards */}
+                  <div style={{ display: 'flex', gap: 4, flex: 1 }}>
+                    {([t.accent, `${t.accent}80`, `${t.accent}44`] as string[]).map((c, i) => (
+                      <div key={i} style={{
+                        flex: 1, background: t.card,
+                        border: `1px solid ${t.border}`,
+                        borderRadius: 6, padding: 4,
+                      }}>
+                        <div style={{ height: 3, width: '70%', background: c, borderRadius: 2, marginBottom: 3 }} />
+                        <div style={{ height: 2, width: '90%', background: `${t.txt}20`, borderRadius: 2 }} />
+                        <div style={{ height: 2, width: '50%', background: `${t.txt}12`, borderRadius: 2, marginTop: 2 }} />
+                      </div>
+                    ))}
+                  </div>
+                  {/* Table rows */}
+                  <div style={{ background: t.card, border: `1px solid ${t.border}`, borderRadius: 6, overflow: 'hidden' }}>
+                    {([0, 1] as number[]).map(i => (
+                      <div key={i} style={{
+                        display: 'flex', alignItems: 'center', gap: 4,
+                        padding: '3px 6px',
+                        background: i === 0 ? `${t.accent}10` : 'transparent',
+                        borderBottom: i === 0 ? `1px solid ${t.border}` : 'none',
+                      }}>
+                        <div style={{ height: 2, flex: 1, background: `${t.txt}20`, borderRadius: 2 }} />
+                        <div style={{ height: 5, width: 20, background: i === 0 ? t.accent : `${t.txt}15`, borderRadius: 3 }} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Info */}
+              <div style={{
+                padding: '14px 16px',
+                background: t.bg[1],
+                borderTop: `1px solid ${t.border}`,
+              }}>
+                {/* Nombre + swatches */}
+                <div style={{
+                  display: 'flex', alignItems: 'flex-start',
+                  justifyContent: 'space-between', marginBottom: 6,
+                }}>
+                  <div>
+                    <p style={{ fontSize: 13, fontWeight: 700, color: t.txt, marginBottom: 2 }}>{t.name}</p>
+                    <p style={{ fontSize: 10, fontWeight: 600, color: t.accent }}>{t.tagline}</p>
+                  </div>
+                  <div style={{ display: 'flex', gap: 3, flexShrink: 0, marginTop: 2 }}>
+                    {t.swatches.map((c, i) => (
+                      <div key={i} style={{
+                        width: 12, height: 12, borderRadius: '50%',
+                        background: c, border: `1.5px solid ${t.border}`,
+                      }} />
+                    ))}
+                  </div>
+                </div>
+                {/* Descripción */}
+                <p style={{ fontSize: 11, color: `${t.txt}bb`, lineHeight: 1.55, marginBottom: 8 }}>
+                  {t.desc}
+                </p>
+                {/* Ideal para */}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 10 }}>
+                  {t.ideal.map((label, i) => (
+                    <span key={i} style={{
+                      fontSize: 9, padding: '2px 8px', borderRadius: 99, fontWeight: 600,
+                      background: `${t.accent}15`,
+                      color: t.accent,
+                      border: `1px solid ${t.accent}30`,
+                    }}>{label}</span>
+                  ))}
+                </div>
+                {/* Botón */}
+                <button
+                  onClick={e => { e.stopPropagation(); setTheme(t.id); }}
+                  style={{
+                    width: '100%', padding: '8px 0', borderRadius: 10,
+                    fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                    transition: 'opacity 0.15s',
+                    border: active ? `1.5px solid ${t.accent}55` : 'none',
+                    background: active ? `${t.accent}18` : t.accent,
+                    color: active
+                      ? t.accent
+                      : (t.id === 'premium-light' || t.id === 'soft-medical' ? '#ffffff' : '#0a0a0f'),
+                  }}
+                >
+                  {active ? '✓ Tema activo' : 'Activar tema'}
+                </button>
+              </div>
+            </motion.div>
+          );
+        })}
+      </div>
+
+      {/* Info banner */}
+      <div style={{
+        marginTop: 20, padding: '12px 16px', borderRadius: 12,
+        background: 'rgba(6,182,212,0.06)', border: '1px solid rgba(6,182,212,0.12)',
+        display: 'flex', gap: 10, alignItems: 'flex-start',
+      }}>
+        <SlidersHorizontal size={14} style={{ color: '#06b6d4', flexShrink: 0, marginTop: 1 }} />
+        <div>
+          <p style={{ fontSize: 12, fontWeight: 600, color: '#22d3ee', marginBottom: 3 }}>Sobre los temas visuales</p>
+          <p style={{ fontSize: 11, color: 'rgba(34,211,238,0.6)', lineHeight: 1.55 }}>
+            Los temas cambian la paleta de colores de toda la interfaz SARAI. Tu preferencia se guarda
+            en el dispositivo y se aplica automáticamente al iniciar sesión.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════
 
 const MODULOS = [
   {
@@ -2077,6 +2396,14 @@ const MODULOS = [
       { id:'config-clinica',    label:'Datos de la Clínica', icon:Stethoscope,   component:TabConfigClinica       },
       { id:'param-agenda',      label:'Parámetros de Agenda',icon:Calendar,      component:TabParamAgenda         },
       { id:'motivos-cita',      label:'Motivos de Cita',     icon:MessageSquare, component:TabMotivosCita         },
+    ],
+  },
+  {
+    id: 'temas',
+    label: 'Temas del Sistema',
+    icon: Palette,
+    submodulos: [
+      { id:'temas-visuales',    label:'Temas Visuales',      icon:Palette,       component:TabTemasistema         },
     ],
   },
 ];
