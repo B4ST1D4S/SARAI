@@ -261,9 +261,9 @@ model FotoClinica {
 }
 
 model MapaCorporal {
-  id                 String        @id @default(cuid())
+  id                 String         @id @default(cuid())
   pacienteId         String
-  procedimientoId    String
+  procedimientoId    String?
   fechaEvaluacion    DateTime
   zonasMarcadas      Json
   edemaZonas         Json
@@ -272,10 +272,10 @@ model MapaCorporal {
   colorIndicator     String?
   anotacionesClinics String?
   evaluadoPor        String
-  createdAt          DateTime      @default(now())
-  updatedAt          DateTime      @updatedAt
-  paciente           Paciente      @relation(fields: [pacienteId], references: [id])
-  procedimiento      Procedimiento @relation(fields: [procedimientoId], references: [id])
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+  paciente           Paciente       @relation(fields: [pacienteId], references: [id])
+  procedimiento      Procedimiento? @relation(fields: [procedimientoId], references: [id])
 
   @@index([pacienteId])
   @@index([procedimientoId])
@@ -596,8 +596,8 @@ model ConfigServicioConsulta {
   hcModuloId         String?
   usuarioCreacion    String?
   createdAt          DateTime           @default(now())
-  ServicioFacturable ServicioFacturable @relation(fields: [servicioId], references: [id])
-  TipoConsulta       TipoConsulta       @relation(fields: [tipoConsultaId], references: [id], onDelete: Cascade)
+  servicio           ServicioFacturable @relation(fields: [servicioId], references: [id])
+  tipoConsulta       TipoConsulta       @relation(fields: [tipoConsultaId], references: [id], onDelete: Cascade)
 
   @@unique([tipoConsultaId, servicioId])
   @@index([servicioId])
@@ -714,8 +714,8 @@ model Preparacion {
   usuarioCreacion String?
   createdAt       DateTime      @default(now())
   updatedAt       DateTime
-  Especialidad    Especialidad? @relation(fields: [especialidadId], references: [id])
-  TipoConsulta    TipoConsulta? @relation(fields: [tipoConsultaId], references: [id])
+  especialidad    Especialidad? @relation(fields: [especialidadId], references: [id])
+  tipoConsulta    TipoConsulta? @relation(fields: [tipoConsultaId], references: [id])
 
   @@index([estado])
   @@index([tipoConsultaId])
@@ -735,8 +735,8 @@ model ReglaOperativa {
   manejaCentroCosto      Boolean            @default(false)
   createdAt              DateTime           @default(now())
   updatedAt              DateTime
-  Departamento           Departamento       @relation(fields: [departamentoId], references: [id], onDelete: Cascade)
-  ServicioFacturable     ServicioFacturable @relation(fields: [servicioId], references: [id])
+  departamento           Departamento       @relation(fields: [departamentoId], references: [id], onDelete: Cascade)
+  servicio               ServicioFacturable @relation(fields: [servicioId], references: [id])
 
   @@unique([departamentoId, servicioId])
   @@index([departamentoId])
@@ -789,11 +789,11 @@ model TipoConsulta {
   usuarioCreacion          String?
   createdAt                DateTime                 @default(now())
   updatedAt                DateTime
-  ConfigServicioConsulta   ConfigServicioConsulta[]
-  Preparacion              Preparacion[]
-  Departamento             Departamento?            @relation(fields: [departamentoId], references: [id])
-  Especialidad             Especialidad?            @relation(fields: [especialidadId], references: [id])
-  HCModulo                 HCModulo?                @relation(fields: [hcModuloId], references: [id])
+  serviciosConfig          ConfigServicioConsulta[]
+  preparaciones            Preparacion[]
+  departamento             Departamento?            @relation(fields: [departamentoId], references: [id])
+  especialidad             Especialidad?            @relation(fields: [especialidadId], references: [id])
+  hcModulo                 HCModulo?                @relation(fields: [hcModuloId], references: [id])
 
   @@index([especialidadId])
   @@index([estado])
