@@ -9,6 +9,10 @@ import {
   createBloqueo,
   deleteBloqueo,
   getSlotsDisponibles,
+  getSlotsConEstado,
+  getDisponibilidadesConCitas,
+  getMedicosPorTipoConsulta,
+  getDiasDisponibles,
 } from '../services/disponibilidadService.js';
 
 // GET /api/disponibilidad/medico/:medicoId
@@ -47,6 +51,7 @@ export async function getMedicosList(req: Request, res: Response): Promise<void>
         especialidad: true,
         registroMedico: true,
         email: true,
+        numeroDocumento: true,
       },
       orderBy: [{ apellido: 'asc' }, { nombre: 'asc' }],
     });
@@ -115,19 +120,31 @@ export async function deleteDisponibilidadCtrl(req: Request, res: Response): Pro
     await deleteDisponibilidad(req.params.id);
     res.json({ success: true, message: 'Disponibilidad desactivada' });
   } catch (error: any) {
+    const status = error.message?.startsWith('No se puede eliminar') ? 409 : 500;
+    res.status(status).json({ error: error.message });
+  }
+}
+
+// GET /api/disponibilidad/con-citas/:medicoId
+export async function getDisponibilidadesConCitasCtrl(req: Request, res: Response): Promise<void> {
+  try {
+    const disponibilidades = await getDisponibilidadesConCitas(req.params.medicoId);
+    res.json({ disponibilidades });
+  } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
 }
 
-// GET /api/disponibilidad/slots?medicoId=X&fecha=YYYY-MM-DD
+// GET /api/disponibilidad/slots?medicoId=X&fecha=YYYY-MM-DD&duracion=30
 export async function getSlots(req: Request, res: Response): Promise<void> {
   try {
-    const { medicoId, fecha } = req.query as { medicoId: string; fecha: string };
+    const { medicoId, fecha, duracion } = req.query as { medicoId: string; fecha: string; duracion?: string };
     if (!medicoId || !fecha) {
       res.status(400).json({ error: 'medicoId y fecha son requeridos' });
       return;
     }
-    const slots = await getSlotsDisponibles(medicoId, fecha);
+    const duracionMinutos = duracion ? parseInt(duracion, 10) : undefined;
+    const slots = await getSlotsConEstado(medicoId, fecha, duracionMinutos);
     res.json({ success: true, slots });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -160,6 +177,39 @@ export async function deleteBloqueoCtrl(req: Request, res: Response): Promise<vo
   try {
     await deleteBloqueo(req.params.id);
     res.json({ success: true, message: 'Bloqueo eliminado' });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+}
+
+// GET /api/disponibilidad/medicos-por-tipo?tipoConsultaNombre=X
+export async function getMedicosPorTipoCtrl(req: Request, res: Response): Promise<void> {
+  try {
+    const { tipoConsultaNombre } = req.query as { tipoConsultaNombre?: string };
+    const medicos = await getMedicosPorTipoConsulta(tipoConsultaNombre);
+    res.json({ success: true, medicos });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+}
+
+// GET /api/disponibilidad/dias-disponibles?medicoId=X&mes=6&anio=2026&duracion=30
+export async function getDiasDisponiblesCtrl(req: Request, res: Response): Promise<void> {
+  try {
+    const { medicoId, mes, anio, duracion } = req.query as {
+      medicoId: string; mes: string; anio: string; duracion?: string;
+    };
+    if (!medicoId || !mes || !anio) {
+      res.status(400).json({ error: 'medicoId, mes y anio son requeridos' });
+      return;
+    }
+    const dias = await getDiasDisponibles(
+      medicoId,
+      parseInt(mes, 10),
+      parseInt(anio, 10),
+      duracion ? parseInt(duracion, 10) : undefined,
+    );
+    res.json({ success: true, dias });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }

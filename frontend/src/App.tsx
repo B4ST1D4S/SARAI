@@ -1,6 +1,7 @@
 ﻿import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import AuthPage from './pages/AuthPage';
+import NeuralCanvas from './components/NeuralCanvas';
 import DashboardPage from './pages/DashboardPage';
 import PacientesPage from './pages/PacientesPage';
 import HistoriaClinicaPage from './pages/HistoriaClinicaPage';
@@ -21,7 +22,6 @@ import UsuariosPage from './pages/UsuariosPage';
 import AdminPage from './pages/AdminPage';
 import CentralImpresionPage from './pages/CentralImpresionPage';
 import SaraiAssistant from './components/SaraiAssistant';
-import NeuralCanvas from './components/NeuralCanvas';
 import saraiLogo from './assets/logo1.png';
 
 const NAV_SECTIONS = [

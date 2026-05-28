@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
+import { randomUUID } from 'crypto';
 
 const prisma = new PrismaClient();
 
@@ -257,9 +258,9 @@ export async function getTiposConsulta(req: Request, res: Response) {
         manejaProtocolos: true, esPsicologia: true,
         especialidadId: true, departamentoId: true, hcModuloId: true,
         bodegaId: true,
-        especialidad: { select: { id: true, nombre: true, codigo: true } },
-        departamento: { select: { id: true, nombre: true, codigo: true } },
-        hcModulo:     { select: { id: true, nombre: true, codigo: true } },
+        Especialidad: { select: { id: true, nombre: true, codigo: true } },
+        Departamento: { select: { id: true, nombre: true, codigo: true } },
+        HCModulo:     { select: { id: true, nombre: true, codigo: true } },
       },
       orderBy: { nombre: 'asc' },
     });
@@ -275,11 +276,11 @@ export async function getTipoConsultaById(req: Request, res: Response) {
     const item = await prisma.tipoConsulta.findUnique({
       where: { id },
       include: {
-        especialidad: true,
-        departamento: true,
-        hcModulo: true,
-        serviciosConfig: { include: { servicio: true } },
-        preparaciones: true,
+        Especialidad: true,
+        Departamento: true,
+        HCModulo: true,
+        ConfigServicioConsulta: { include: { ServicioFacturable: true } },
+        Preparacion: true,
       },
     });
     if (!item) return res.status(404).json({ error: 'Tipo de consulta no encontrado' });
@@ -357,10 +358,10 @@ export async function createTipoConsulta(req: Request, res: Response) {
     const result = await prisma.tipoConsulta.findUnique({
       where: { id: tipoConsulta.id },
       include: {
-        especialidad: true,
-        departamento: true,
-        hcModulo: true,
-        serviciosConfig: { include: { servicio: true } },
+        Especialidad: true,
+        Departamento: true,
+        HCModulo: true,
+        ConfigServicioConsulta: { include: { ServicioFacturable: true } },
       },
     });
     res.status(201).json(result);
@@ -419,10 +420,10 @@ export async function updateTipoConsulta(req: Request, res: Response) {
     const result = await prisma.tipoConsulta.findUnique({
       where: { id },
       include: {
-        especialidad: true,
-        departamento: true,
-        hcModulo: true,
-        serviciosConfig: { include: { servicio: true } },
+        Especialidad: true,
+        Departamento: true,
+        HCModulo: true,
+        ConfigServicioConsulta: { include: { ServicioFacturable: true } },
       },
     });
     res.json(result);
@@ -450,7 +451,7 @@ export async function getConfigServicios(req: Request, res: Response) {
     const { tipoConsultaId } = req.params;
     const items = await prisma.configServicioConsulta.findMany({
       where: { tipoConsultaId },
-      include: { servicio: true },
+      include: { ServicioFacturable: true },
     });
     res.json(items);
   } catch {
@@ -519,7 +520,7 @@ export async function getReglasOperativas(req: Request, res: Response) {
     const { departamentoId } = req.params;
     const items = await prisma.reglaOperativa.findMany({
       where: { departamentoId },
-      include: { servicio: { select: { id: true, codigoCups: true, nombre: true } } },
+      include: { ServicioFacturable: { select: { id: true, codigoCups: true, nombre: true } } },
     });
     res.json(items);
   } catch {
@@ -573,8 +574,8 @@ export async function getPreparaciones(req: Request, res: Response) {
     const items = await prisma.preparacion.findMany({
       where,
       include: {
-        especialidad: { select: { id: true, nombre: true } },
-        tipoConsulta: { select: { id: true, nombre: true } },
+        Especialidad: { select: { id: true, nombre: true } },
+        TipoConsulta: { select: { id: true, nombre: true } },
       },
       orderBy: { nombre: 'asc' },
     });
@@ -1148,13 +1149,15 @@ export async function updateParametroSistema(req: Request, res: Response) {
   try {
     const { grupo, clave } = req.params;
     const { valor } = req.body;
+    const now = new Date();
     const item = await prisma.parametroSistema.upsert({
       where: { grupo_clave: { grupo, clave } },
-      update: { valor },
-      create: { grupo, clave, valor, etiqueta: clave, tipo: 'text', orden: 99 },
+      update: { valor, updatedAt: now },
+      create: { id: randomUUID(), grupo, clave, valor, etiqueta: clave, tipo: 'text', orden: 99, updatedAt: now },
     });
     res.json(item);
-  } catch {
+  } catch (e) {
+    console.error('updateParametroSistema error:', e);
     res.status(500).json({ error: 'Error al actualizar parámetro' });
   }
 }

@@ -5,12 +5,13 @@
   "main": "dist/index.js",
   "type": "module",
   "scripts": {
-    "dev": "node --loader ts-node/esm src/index.ts",
+    "dev": "nodemon --watch src --ext ts --exec \"node --loader ts-node/esm src/index.ts\"",
     "build": "tsc",
     "start": "node dist/index.js",
     "lint": "eslint src --ext ts",
     "migrate": "prisma migrate dev",
     "seed": "node --loader ts-node/esm prisma/seed.ts",
+    "setup-disp": "node --loader ts-node/esm setup-disponibilidad.ts",
     "generate": "prisma generate",
     "test": "node --experimental-vm-modules --no-warnings node_modules/jest/bin/jest.js --config jest.config.cjs",
     "test:watch": "node --experimental-vm-modules --no-warnings node_modules/jest/bin/jest.js --config jest.config.cjs --watch"

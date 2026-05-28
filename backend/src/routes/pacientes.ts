@@ -6,6 +6,7 @@ import {
   update,
   deletePac,
   search,
+  verificarDuplicados,
 } from '../controllers/pacientesController.js';
 import { authenticateToken, authorizeRole } from '../middleware/auth.js';
 
@@ -16,6 +17,9 @@ router.use(authenticateToken);
 
 // GET /api/pacientes/search - Buscar pacientes (DEBE ir antes de /:id)
 router.get('/search', search);
+
+// GET /api/pacientes/verificar-duplicados - Verificar homónimos y duplicados (DEBE ir antes de /:id)
+router.get('/verificar-duplicados', verificarDuplicados);
 
 // POST /api/pacientes - Crear paciente (solo médicos, auxiliares, recepcionistas)
 router.post('/', authorizeRole('MEDICO', 'AUXILIAR', 'RECEPCIONISTA'), create);

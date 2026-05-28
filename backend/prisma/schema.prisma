@@ -332,6 +332,7 @@ model Cita {
   pacienteId           String
   medicoId             String
   tipoCita             String
+  entidadSalud         String?
   fechaHora            DateTime
   duracionMinutos      Int      @default(60)
   estado               String   @default("PENDIENTE")
