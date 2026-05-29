@@ -64,7 +64,7 @@ export default function MapaCorporalPage() {
   const [selectedMark, setSelectedMark] = useState<string | null>(null);
   const [showTimeline, setShowTimeline] = useState(false);
   const [comparisonDates, setComparisonDates] = useState<[string, string]>(['2026-03-25', '2026-04-10']);
-  const [view360, setView360] = useState<'TODAS' | 'FRONTAL' | 'POSTERIOR' | 'LATERAL'>('TODAS');
+  const [view360, setView360] = useState<'TODAS' | 'FRONTAL' | 'POSTERIOR' | 'LATERAL'>('FRONTAL');
   const [viewType, setViewType] = useState<'2D' | '3D'>('2D');
   const canvasRef = useRef<SVGSVGElement>(null);
   // ── Refs para save-on-unmount (evitar stale closures) ──
@@ -866,22 +866,41 @@ export default function MapaCorporalPage() {
             {/* Recomendaciones */}
             <div>
               <label className="text-xs font-bold text-blue-400 block mb-1.5">💡 RECOMENDACIONES QUIRÚRGICAS</label>
-              {/* Chips predefinidos — clic para agregar */}
+              {/* Chips predefinidos — verde si ya está agregada, azul si pendiente */}
               <div className="flex flex-wrap gap-1 mb-1.5">
-                {RECOMENDACIONES_PREDEFINIDAS.map((rec, i) => (
-                  <button
-                    key={i}
-                    onClick={() => {
-                      const current = evolucionForm.recomendaciones;
-                      const newVal = current ? current + '\n• ' + rec : '• ' + rec;
-                      setEvolucionForm(prev => ({ ...prev, recomendaciones: newVal }));
-                      autoSaveEvolucion(evolucionForm.observacionesFrontal, newVal);
-                    }}
-                    className="px-1.5 py-0.5 bg-blue-900/40 hover:bg-blue-700/60 border border-blue-600/40 text-blue-300 text-[10px] rounded-full transition cursor-pointer leading-tight"
-                  >
-                    + {rec}
-                  </button>
-                ))}
+                {RECOMENDACIONES_PREDEFINIDAS.map((rec, i) => {
+                  const isAdded = evolucionForm.recomendaciones.includes(rec);
+                  return (
+                    <button
+                      key={i}
+                      onClick={() => {
+                        if (isAdded) {
+                          const newVal = evolucionForm.recomendaciones
+                            .split('\n')
+                            .filter(line => !line.includes(rec))
+                            .join('\n')
+                            .replace(/\n{2,}/g, '\n')
+                            .trim();
+                          setEvolucionForm(prev => ({ ...prev, recomendaciones: newVal }));
+                          autoSaveEvolucion(evolucionForm.observacionesFrontal, newVal);
+                        } else {
+                          const current = evolucionForm.recomendaciones;
+                          const newVal = current ? current + '\n• ' + rec : '• ' + rec;
+                          setEvolucionForm(prev => ({ ...prev, recomendaciones: newVal }));
+                          autoSaveEvolucion(evolucionForm.observacionesFrontal, newVal);
+                        }
+                      }}
+                      className={`px-1.5 py-0.5 border text-[10px] rounded-full transition cursor-pointer leading-tight ${
+                        isAdded
+                          ? 'bg-emerald-900/60 hover:bg-red-900/60 border-emerald-500/60 text-emerald-300 hover:text-red-300 hover:border-red-500/60'
+                          : 'bg-blue-900/40 hover:bg-blue-700/60 border-blue-600/40 text-blue-300'
+                      }`}
+                      title={isAdded ? 'Clic para eliminar' : 'Clic para agregar'}
+                    >
+                      {isAdded ? `− ${rec}` : `+ ${rec}`}
+                    </button>
+                  );
+                })}
               </div>
               <textarea
                 value={evolucionForm.recomendaciones}
@@ -891,7 +910,7 @@ export default function MapaCorporalPage() {
                 }}
                 rows={3}
                 placeholder="Recomendaciones para el paciente..."
-                className="w-full bg-slate-700/80 border border-slate-600 focus:border-blue-500 text-white rounded px-2 py-1.5 text-xs outline-none resize-none placeholder-gray-500 transition"
+                className="w-full bg-slate-700/80 border border-slate-600 focus:border-blue-500 text-white rounded px-2 py-1.5 text-xs outline-none resize-y placeholder-gray-500 transition min-h-[60px]"
               />
             </div>
           </motion.div>
@@ -901,7 +920,7 @@ export default function MapaCorporalPage() {
             {/* Tabs de vista */}
             <div className="flex items-center gap-1.5 flex-wrap px-1">
               <span className="text-xs text-gray-400 mr-1">👆 Haz clic en zonas</span>
-              {(['TODAS','FRONTAL','LATERAL'] as const).map(v => (
+              {(['FRONTAL','LATERAL','TODAS'] as const).map(v => (
                 <button
                   key={v}
                   onClick={() => setView360(v as any)}
