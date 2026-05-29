@@ -11,46 +11,84 @@ import {
   ArrowRight,
 } from 'lucide-react';
 
+const getToken = () => localStorage.getItem('accessToken') || '';
+const getStoredUser = () => {
+  try { return JSON.parse(localStorage.getItem('user') || '{}'); } catch { return {}; }
+};
+
 export default function DashboardPage() {
   const [stats, setStats] = useState({
-    pacientesHoy: 3,
-    citasProximas: 5,
-    historiasActivas: 12,
-    tasaComplecion: 95,
+    pacientesHoy: 0,
+    citasProximas: 0,
+    historiasActivas: 0,
+    tasaComplecion: 0,
   });
 
-  const [citasProximas, setCitasProximas] = useState([
-    {
-      id: 1,
-      paciente: 'Valeria Gómez',
-      hora: '09:00',
-      procedimiento: 'Rinoplastia',
-      estado: 'Confirmada',
-      color: 'from-emerald-500 to-teal-500',
-    },
-    {
-      id: 2,
-      paciente: 'Carla López',
-      hora: '10:30',
-      procedimiento: 'Liposucción',
-      estado: 'Pendiente',
-      color: 'from-amber-500 to-orange-500',
-    },
-    {
-      id: 3,
-      paciente: 'María García',
-      hora: '14:00',
-      procedimiento: 'Aumento de Glúteos',
-      estado: 'Confirmada',
-      color: 'from-emerald-500 to-teal-500',
-    },
-  ]);
+  const [citasProximas, setCitasProximas] = useState<any[]>([]);
 
+  const storedUser = getStoredUser();
   const user = {
-    nombre: 'Dr. Test',
-    apellido: 'User',
+    nombre: storedUser.nombre || 'Dr.',
+    apellido: storedUser.apellido || '',
     especialidad: 'Cirugía Estética',
   };
+
+  useEffect(() => {
+    const cargarDatos = async () => {
+      const token = getToken();
+      if (!token) return;
+      try {
+        const hoyInicio = new Date(); hoyInicio.setHours(0, 0, 0, 0);
+        const hoyFin = new Date(); hoyFin.setHours(23, 59, 59, 999);
+        const semanaFin = new Date(); semanaFin.setDate(semanaFin.getDate() + 7); semanaFin.setHours(23, 59, 59, 999);
+
+        const [resHoy, resSemana] = await Promise.all([
+          fetch(`/api/citas/medico/agenda?fechaInicio=${hoyInicio.toISOString()}&fechaFin=${hoyFin.toISOString()}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          fetch(`/api/citas/medico/agenda?fechaInicio=${hoyInicio.toISOString()}&fechaFin=${semanaFin.toISOString()}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+        ]);
+
+        const dataHoy = resHoy.ok ? await resHoy.json() : { citas: [] };
+        const dataSemana = resSemana.ok ? await resSemana.json() : { citas: [] };
+        const citasHoy = dataHoy.citas || [];
+        const citasSem = dataSemana.citas || [];
+
+        const confirmadas = citasHoy.filter((c: any) => c.estado === 'CONFIRMADA').length;
+        const tasaComp = citasHoy.length > 0 ? Math.round((confirmadas / citasHoy.length) * 100) : 0;
+
+        setStats({
+          pacientesHoy: citasHoy.length,
+          citasProximas: citasSem.length,
+          historiasActivas: citasHoy.filter((c: any) => c.estado === 'COMPLETADA').length,
+          tasaComplecion: tasaComp,
+        });
+
+        const estadoLabel: Record<string, string> = {
+          CONFIRMADA: 'Confirmada',
+          EN_SALA:    'En Sala',
+          COMPLETADA: 'Atendida',
+          CANCELADA:  'Cancelada',
+          PENDIENTE:  'Pendiente',
+        };
+        const normalizadas = citasSem.map((c: any) => ({
+          id: c.id,
+          paciente: c.paciente?.nombreCompleto || 'Paciente',
+          hora: new Date(c.fechaHora).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: false }),
+          procedimiento: c.tipoCita || c.motivo || 'Consulta',
+          estado: c.estado,
+          estadoLabel: estadoLabel[c.estado] || c.estado,
+        }));
+        normalizadas.sort((a: any, b: any) => a.hora.localeCompare(b.hora));
+        setCitasProximas(normalizadas);
+      } catch (e) {
+        console.error('Error cargando dashboard:', e);
+      }
+    };
+    cargarDatos();
+  }, []);
 
   const cardVariants = {
     hidden: { opacity: 0, y: 20 },
@@ -66,21 +104,21 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-3 sm:p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header Premium */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-10"
+          className="mb-5 sm:mb-10"
         >
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-5xl font-bold bg-gradient-to-r from-yellow-400 via-yellow-500 to-amber-600 bg-clip-text text-transparent mb-2">
-                Dashboard Premium
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <h1 className="text-2xl sm:text-4xl lg:text-5xl font-bold bg-gradient-to-r from-yellow-400 via-yellow-500 to-amber-600 bg-clip-text text-transparent mb-1 sm:mb-2">
+                Dashboard
               </h1>
-              <p className="text-gray-400 text-lg">
-                Bienvenido, {user.nombre} {user.apellido} • Especialidad: {user.especialidad}
+              <p className="text-gray-400 text-xs sm:text-base lg:text-lg truncate">
+                {user.nombre} {user.apellido} • {user.especialidad}
               </p>
             </div>
             <div className="hidden lg:block">
@@ -102,7 +140,7 @@ export default function DashboardPage() {
           variants={containerVariants}
           initial="hidden"
           animate="visible"
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10"
+          className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-5 sm:mb-10"
         >
           {/* Card 1: Citas Hoy */}
           <motion.div
@@ -197,52 +235,60 @@ export default function DashboardPage() {
           </motion.div>
         </motion.div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-6">
           {/* Citas Próximas */}
           <motion.div
             variants={cardVariants}
             initial="hidden"
             animate="visible"
             transition={{ delay: 0.4 }}
-            className="lg:col-span-2 bg-gradient-to-br from-slate-800/40 to-slate-900/40 border border-yellow-500/10 rounded-2xl p-8"
+            className="lg:col-span-2 bg-gradient-to-br from-slate-800/40 to-slate-900/40 border border-yellow-500/10 rounded-2xl p-4 sm:p-8"
           >
-            <div className="flex items-center justify-between mb-8">
-              <h2 className="text-2xl font-bold text-white">Próximas Citas</h2>
-              <button className="px-4 py-2 bg-gradient-to-r from-yellow-500 to-amber-600 text-white font-semibold rounded-lg hover:shadow-lg hover:shadow-yellow-500/30 transition-all duration-200">
-                Ver Agenda Completa
+            <div className="flex items-center justify-between mb-4 sm:mb-8 gap-2">
+              <h2 className="text-lg sm:text-2xl font-bold text-white">Próximas Citas</h2>
+              <button className="px-3 py-1.5 sm:px-4 sm:py-2 bg-gradient-to-r from-yellow-500 to-amber-600 text-white font-semibold text-xs sm:text-sm rounded-lg hover:shadow-lg hover:shadow-yellow-500/30 transition-all duration-200 whitespace-nowrap">
+                Ver Agenda
               </button>
             </div>
 
             <div className="space-y-4">
-              {citasProximas.map((cita, index) => (
+              {citasProximas.length === 0 ? (
+                <div className="text-center py-10 text-gray-500">
+                  <Calendar size={40} className="mx-auto mb-3 opacity-30" />
+                  <p className="text-sm">No hay citas esta semana</p>
+                </div>
+              ) : (
+                citasProximas.map((cita, index) => (
                 <motion.div
                   key={cita.id}
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.5 + index * 0.1 }}
-                  className="group bg-gradient-to-r from-slate-700/30 to-slate-800/20 border border-slate-700/50 rounded-xl p-5 hover:border-yellow-500/30 transition-all duration-200 hover:shadow-lg hover:shadow-yellow-500/5"
+                  className="group bg-gradient-to-r from-slate-700/30 to-slate-800/20 border border-slate-700/50 rounded-xl p-3 sm:p-5 hover:border-yellow-500/30 transition-all duration-200 hover:shadow-lg hover:shadow-yellow-500/5"
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <h3 className="text-white font-semibold text-lg mb-1">{cita.paciente}</h3>
-                      <div className="flex items-center gap-4 text-gray-400 text-sm">
-                        <span className="flex items-center gap-2">
-                          <Calendar size={16} className="text-yellow-400" />
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-white font-semibold text-sm sm:text-lg mb-0.5 sm:mb-1 truncate">{cita.paciente}</h3>
+                      <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-gray-400 text-xs sm:text-sm">
+                        <span className="flex items-center gap-1">
+                          <Calendar size={12} className="text-yellow-400" />
                           {cita.hora}
                         </span>
-                        <span className="text-gray-600">•</span>
-                        <span>{cita.procedimiento}</span>
+                        <span className="hidden sm:inline text-gray-600">•</span>
+                        <span className="truncate">{cita.procedimiento}</span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1 sm:gap-3 flex-shrink-0">
                       <span
-                        className={`px-4 py-2 rounded-full font-semibold text-sm ${
-                          cita.estado === 'Confirmada'
-                            ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                            : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                        className={`px-2 sm:px-4 py-1 sm:py-2 rounded-full font-semibold text-xs ${
+                          cita.estado === 'CONFIRMADA' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                          : cita.estado === 'EN_SALA'    ? 'bg-cyan-500/20    text-cyan-400    border border-cyan-500/30'
+                          : cita.estado === 'COMPLETADA' ? 'bg-purple-500/20   text-purple-400  border border-purple-500/30'
+                          : cita.estado === 'CANCELADA'  ? 'bg-red-500/20      text-red-400     border border-red-500/30'
+                          :                               'bg-amber-500/20    text-amber-400   border border-amber-500/30'
                         }`}
                       >
-                        {cita.estado}
+                        {cita.estadoLabel}
                       </span>
                       <button className="p-2 hover:bg-yellow-500/20 rounded-lg transition-colors">
                         <ArrowRight size={20} className="text-yellow-400" />
@@ -250,7 +296,8 @@ export default function DashboardPage() {
                     </div>
                   </div>
                 </motion.div>
-              ))}
+                ))
+              )}
             </div>
           </motion.div>
 
@@ -260,9 +307,9 @@ export default function DashboardPage() {
             initial="hidden"
             animate="visible"
             transition={{ delay: 0.5 }}
-            className="bg-gradient-to-br from-slate-800/40 to-slate-900/40 border border-yellow-500/10 rounded-2xl p-8"
+            className="bg-gradient-to-br from-slate-800/40 to-slate-900/40 border border-yellow-500/10 rounded-2xl p-4 sm:p-8"
           >
-            <h2 className="text-2xl font-bold text-white mb-6">Acciones Rápidas</h2>
+            <h2 className="text-lg sm:text-2xl font-bold text-white mb-4 sm:mb-6">Acciones Rápidas</h2>
 
             <div className="space-y-3">
               <motion.button

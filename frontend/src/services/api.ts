@@ -3,7 +3,7 @@
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
 interface RequestOptions {
-  method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
+  method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
   body?: any;
   headers?: Record<string, string>;
   token?: string;
@@ -46,6 +46,20 @@ export async function apiCall<T>(
     const data = await response.json();
 
     if (!response.ok) {
+      // Token inválido/expirado: limpiar sesión y recargar para ir al login
+      if (response.status === 401 || response.status === 403) {
+        const isAuthError =
+          data.error?.toLowerCase().includes('token') ||
+          data.error?.toLowerCase().includes('no autenticado') ||
+          data.error?.toLowerCase().includes('expirado') ||
+          data.error?.toLowerCase().includes('inválido');
+        if (isAuthError) {
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('user');
+          window.location.reload();
+          return { error: 'Sesión expirada. Vuelve a iniciar sesión.', status: response.status };
+        }
+      }
       return {
         error: data.error || 'Error en la solicitud',
         status: response.status,
@@ -69,16 +83,8 @@ export async function apiCall<T>(
 // ============================================
 
 export interface LoginRequest {
-  email: string;
+  username: string;
   password: string;
-}
-
-export interface RegisterRequest {
-  email: string;
-  password: string;
-  nombre: string;
-  apellido: string;
-  rol?: string;
 }
 
 export interface AuthResponse {
@@ -86,7 +92,7 @@ export interface AuthResponse {
   refreshToken: string;
   user: {
     id: string;
-    email: string;
+    username: string;
     nombre: string;
     apellido: string;
     rol: string;
@@ -97,13 +103,6 @@ export async function login(credentials: LoginRequest) {
   return apiCall<AuthResponse>('/auth/login', {
     method: 'POST',
     body: credentials,
-  });
-}
-
-export async function register(data: RegisterRequest) {
-  return apiCall<AuthResponse>('/auth/register', {
-    method: 'POST',
-    body: data,
   });
 }
 
@@ -236,3 +235,174 @@ export async function updateHistoriaClinica(
     token,
   });
 }
+
+// ============================================
+// CITAS ENDPOINTS
+// ============================================
+
+export async function getCitasMedico(token: string) {
+  return apiCall('/citas/medico/agenda', { method: 'GET', token });
+}
+
+export async function completarCita(citaId: string, token: string) {
+  return apiCall(`/citas/${citaId}/completar`, { method: 'POST', token });
+}
+
+export async function cancelarCitaApi(citaId: string, token: string) {
+  return apiCall(`/citas/${citaId}`, { method: 'DELETE', token });
+}
+
+export async function updateCitaEstado(citaId: string, estado: string, token: string) {
+  return apiCall(`/citas/${citaId}`, { method: 'PUT', body: { estado }, token });
+}
+
+// ============================================
+// USUARIOS ENDPOINTS
+// ============================================
+
+export interface CreateUserRequest {
+  username: string;
+  password: string;
+  nombre: string;
+  apellido: string;
+  email?: string;
+  telefono?: string;
+  rol: string;
+  especialidad?: string;
+  // Campos para profesionales (MEDICO, AUXILIAR)
+  tipoDocumento?: string;
+  numeroDocumento?: string;
+  registroProfesional?: string;
+  registroMedico?: string;
+  firmaBase64?: string;
+}
+
+export interface UpdateUserRequest extends Partial<Omit<CreateUserRequest, 'password'>> {
+  password?: string;
+}
+
+export async function createUsuario(data: CreateUserRequest, token: string) {
+  return apiCall('/usuarios', {
+    method: 'POST',
+    body: data,
+    token,
+  });
+}
+
+export async function getAllUsuarios(token: string) {
+  return apiCall('/usuarios', {
+    method: 'GET',
+    token,
+  });
+}
+
+export async function getUsuarioById(id: string, token: string) {
+  return apiCall(`/usuarios/${id}`, {
+    method: 'GET',
+    token,
+  });
+}
+
+export async function updateUsuario(id: string, data: UpdateUserRequest, token: string) {
+  return apiCall(`/usuarios/${id}`, {
+    method: 'PUT',
+    body: data,
+    token,
+  });
+}
+
+export async function toggleUsuarioStatus(id: string, token: string) {
+  return apiCall(`/usuarios/${id}/toggle-status`, {
+    method: 'PATCH',
+    token,
+  });
+}
+
+// ============================================
+// ESPECIALIDADES ENDPOINTS
+// ============================================
+
+export interface EspecialidadItem {
+  id: string;
+  codigo: string;
+  nombre: string;
+}
+
+export async function getEspecialidades(token: string) {
+  return apiCall<EspecialidadItem[]>('/especialidades', {
+    method: 'GET',
+    token,
+  });
+}
+
+// ============================================
+// MAPA CORPORAL ENDPOINTS
+// ============================================
+
+export interface MapaMark {
+  id: string;
+  tipo: string;
+  posicionX: number;
+  posicionY: number;
+  intensidad: number;
+  zona: string;
+  fecha: string;
+  vista: 'FRONTAL' | 'POSTERIOR' | 'LATERAL_IZQ' | 'LATERAL_DER';
+  nota?: string;
+}
+
+export interface SaveMapaCorporalRequest {
+  pacienteId: string;
+  procedimientoId: string;
+  zonasMarcadas: MapaMark[];
+  edemaZonas?: Record<string, any>[];
+  fibrosisZonas?: Record<string, any>[];
+  dolorZonas?: Record<string, any>[];
+  anotacionesClinics?: string;
+}
+
+export async function saveMapaCorporal(data: SaveMapaCorporalRequest, token: string) {
+  return apiCall('/mapa-corporal', {
+    method: 'POST',
+    body: data,
+    token,
+  });
+}
+
+export async function getMapaCorporalByProcedimiento(
+  procedimientoId: string,
+  pacienteId: string,
+  token: string
+) {
+  return apiCall(
+    `/mapa-corporal/procedimiento/${procedimientoId}/${pacienteId}`,
+    { method: 'GET', token }
+  );
+}
+
+export async function getMapaCorporalPorPaciente(pacienteId: string, token: string) {
+  return apiCall(`/mapa-corporal/paciente/${pacienteId}`, {
+    method: 'GET',
+    token,
+  });
+}
+
+export async function updateMapaCorporal(
+  id: string,
+  data: Partial<SaveMapaCorporalRequest>,
+  token: string
+) {
+  return apiCall(`/mapa-corporal/${id}`, {
+    method: 'PUT',
+    body: data,
+    token,
+  });
+}
+
+export async function deleteMapaCorporal(id: string, token: string) {
+  return apiCall(`/mapa-corporal/${id}`, {
+    method: 'DELETE',
+    token,
+  });
+}
+

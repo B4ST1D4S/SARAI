@@ -41,22 +41,22 @@ export default function FotosPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-3 sm:p-6">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-8"
+          className="mb-5 sm:mb-8"
         >
-          <h1 className="text-4xl font-bold text-white mb-2">Fotos Clínicas</h1>
-          <p className="text-gray-400">
-            Manage antes y después con comparador visual premium
+          <h1 className="text-xl sm:text-3xl lg:text-4xl font-bold text-white mb-1 sm:mb-2">Fotos Clínicas</h1>
+          <p className="text-gray-400 text-xs sm:text-sm">
+            Comparador visual antes y después
           </p>
         </motion.div>
 
         {/* Upload Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-6 mb-5 sm:mb-8">
           {/* Subir Antes */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}

@@ -59,7 +59,7 @@ export default function VistaCirujanoPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-3 sm:p-4">
       <motion.div
         variants={containerVariants}
         initial="hidden"
@@ -67,18 +67,18 @@ export default function VistaCirujanoPage() {
         className="max-w-7xl mx-auto"
       >
         {/* HEADER PRINCIPAL */}
-        <motion.div variants={itemVariants} className="mb-6">
-          <h1 className="text-4xl font-bold text-white">
-            Interfaz <span className="text-yellow-500">Detallada</span> para Cirujanos Estéticos Corporales
+        <motion.div variants={itemVariants} className="mb-4 sm:mb-6">
+          <h1 className="text-lg sm:text-2xl lg:text-4xl font-bold text-white">
+            Interfaz <span className="text-yellow-500">Detallada</span> para Cirujanos
           </h1>
         </motion.div>
 
         {/* LAYOUT: 3 SECCIONES */}
-        <div className="grid grid-cols-12 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-6">
           {/* === SIDEBAR LEFT === */}
           <motion.div
             variants={itemVariants}
-            className="col-span-3 space-y-6"
+            className="lg:col-span-3 space-y-6"
           >
             {/* PACIENTE CARD */}
             <motion.div
@@ -163,7 +163,7 @@ export default function VistaCirujanoPage() {
           </motion.div>
 
           {/* === MAIN CONTENT === */}
-          <motion.div variants={itemVariants} className="col-span-6">
+          <motion.div variants={itemVariants} className="lg:col-span-6">
             {/* TABS */}
             <div className="flex gap-2 mb-6 bg-slate-700/50 p-2 rounded-lg border border-slate-600/30">
               {tabs.map((tab) => (
@@ -298,7 +298,7 @@ export default function VistaCirujanoPage() {
           </motion.div>
 
           {/* === SIDEBAR RIGHT === */}
-          <motion.div variants={itemVariants} className="col-span-3 space-y-6">
+          <motion.div variants={itemVariants} className="lg:col-span-3 space-y-6">
             {/* BOTONES DE ACCIÓN RÁPIDA */}
             <div className="space-y-3">
               {[

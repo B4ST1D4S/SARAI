@@ -1,13 +1,11 @@
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import prisma from '../lib/prisma.js';
 
 export interface CreatePacienteRequest {
   numeroDocumento: string;
   tipoDocumento: string;
   nombreCompleto: string;
-  fechaNacimiento: string;
-  genero: string;
+  fechaNacimiento?: string;
+  genero?: string;
   telefonos: string[];
   email?: string;
   whatsapp?: string;
@@ -32,8 +30,8 @@ export async function createPaciente(data: CreatePacienteRequest) {
         numeroDocumento: data.numeroDocumento,
         tipoDocumento: data.tipoDocumento,
         nombreCompleto: data.nombreCompleto,
-        fechaNacimiento: new Date(data.fechaNacimiento),
-        genero: data.genero,
+        fechaNacimiento: data.fechaNacimiento ? new Date(data.fechaNacimiento) : new Date('1900-01-01'),
+        genero: data.genero || 'No especificado',
         telefonos: data.telefonos,
         email: data.email,
         whatsapp: data.whatsapp,
