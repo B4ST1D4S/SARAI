@@ -64,7 +64,7 @@ export default function MapaCorporalPage() {
   const [selectedMark, setSelectedMark] = useState<string | null>(null);
   const [showTimeline, setShowTimeline] = useState(false);
   const [comparisonDates, setComparisonDates] = useState<[string, string]>(['2026-03-25', '2026-04-10']);
-  const [view360, setView360] = useState<'TODAS' | 'FRONTAL' | 'POSTERIOR' | 'LATERAL'>('TODAS');
+  const [view360, setView360] = useState<'TODAS' | 'FRONTAL' | 'POSTERIOR' | 'LATERAL'>('FRONTAL');
   const [viewType, setViewType] = useState<'2D' | '3D'>('2D');
   const canvasRef = useRef<SVGSVGElement>(null);
   // ── Refs para save-on-unmount (evitar stale closures) ──
@@ -548,8 +548,8 @@ export default function MapaCorporalPage() {
   };
 
   return (
-    <div className="h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-2 overflow-hidden">
-      <div className="h-full flex flex-col gap-2">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-2 overflow-y-auto lg:h-screen lg:overflow-hidden">
+      <div className="flex flex-col gap-2 lg:h-full">
         {/* ═══════════════════════════════════════════════════════════════ */}
         {/* HEADER COMPACTO - Control rápido */}
         {/* ═══════════════════════════════════════════════════════════════ */}
@@ -558,7 +558,7 @@ export default function MapaCorporalPage() {
           animate={{ opacity: 1, y: 0 }}
           className="bg-gradient-to-r from-slate-800 to-slate-900 border border-yellow-600/30 rounded-lg p-3"
         >
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             {/* Logo + Titulo */}
             <div className="flex-shrink-0">
               <h1 className="text-lg font-bold bg-gradient-to-r from-yellow-400 to-yellow-600 bg-clip-text text-transparent">
@@ -567,7 +567,7 @@ export default function MapaCorporalPage() {
             </div>
 
             {/* Buscador / Paciente seleccionado */}
-            <div className="flex-1 max-w-xs relative">
+            <div className="w-full order-last sm:order-none sm:flex-1 sm:max-w-xs relative">
               {pacienteId ? (
                 <div className="flex items-center gap-2">
                   <span className="text-emerald-400 text-xs font-bold truncate">👤 {pacienteNombreDisplay}</span>
@@ -631,7 +631,7 @@ export default function MapaCorporalPage() {
             </div>
 
             {/* Modo actual + Stats */}
-            <div className="flex items-center gap-3 text-xs">
+            <div className="hidden md:flex items-center gap-3 text-xs">
               {marks.length > 0 && (
                 <>
                   <span className="text-gray-400">Marcas: <span className="text-white font-bold">{marks.length}</span></span>
@@ -641,7 +641,7 @@ export default function MapaCorporalPage() {
             </div>
 
             {/* Botones Control Rápido */}
-            <div className="flex gap-1.5 relative">
+            <div className="flex gap-1.5 relative flex-shrink-0">
               {/* Botón historial de guardados */}
               {pacienteId && historialMapas.length > 0 && (
                 <div className="relative">
@@ -666,7 +666,7 @@ export default function MapaCorporalPage() {
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: -8, scale: 0.95 }}
                         transition={{ duration: 0.15 }}
-                        className="absolute right-0 top-full mt-1 w-72 bg-slate-800 border border-purple-600/40 rounded-lg shadow-2xl z-50 overflow-hidden"
+                        className="absolute right-0 top-full mt-1 w-72 max-w-[calc(100vw-1rem)] bg-slate-800 border border-purple-600/40 rounded-lg shadow-2xl z-50 overflow-hidden"
                         onClick={e => e.stopPropagation()}
                       >
                         <div className="px-3 py-2 bg-slate-900 border-b border-slate-700 flex items-center justify-between">
@@ -772,9 +772,9 @@ export default function MapaCorporalPage() {
             </div>
           </div>
         ) : (
-        <div className="flex-1 grid grid-cols-3 gap-2 overflow-hidden">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-2 lg:flex-1 lg:overflow-hidden">
           {/* COLUMNA 1: Selector de Procedimiento + Intensidad */}
-          <motion.div className="bg-slate-900/60 border border-slate-700/30 rounded-lg p-3 flex flex-col gap-2 overflow-y-auto">
+          <motion.div className="bg-slate-900/60 border border-slate-700/30 rounded-lg p-3 flex flex-col gap-2 overflow-y-auto max-h-[55vh] lg:max-h-none">
             {/* Tipo de Marca - Tarjetas de acceso rápido */}
             <div>
               <label className="text-xs font-bold text-yellow-400 block mb-1.5">PROCEDIMIENTO</label>
@@ -859,29 +859,47 @@ export default function MapaCorporalPage() {
                 }}
                 rows={3}
                 placeholder="Registrar evolución del tratamiento..."
-                className="w-full bg-slate-700/80 border border-slate-600 focus:border-emerald-500 text-white rounded px-2 py-1.5 text-xs outline-none resize-none placeholder-gray-500 transition"
+                className="w-full bg-slate-700/80 border border-slate-600 focus:border-emerald-500 text-white rounded px-2 py-1.5 text-xs outline-none resize-y placeholder-gray-500 transition min-h-[60px]"
               />
             </div>
 
             {/* Recomendaciones */}
             <div>
               <label className="text-xs font-bold text-blue-400 block mb-1.5">💡 RECOMENDACIONES QUIRÚRGICAS</label>
-              {/* Chips predefinidos — clic para agregar */}
+              {/* Chips predefinidos — clic para agregar/quitar */}
               <div className="flex flex-wrap gap-1 mb-1.5">
-                {RECOMENDACIONES_PREDEFINIDAS.map((rec, i) => (
-                  <button
-                    key={i}
-                    onClick={() => {
-                      const current = evolucionForm.recomendaciones;
-                      const newVal = current ? current + '\n• ' + rec : '• ' + rec;
-                      setEvolucionForm(prev => ({ ...prev, recomendaciones: newVal }));
-                      autoSaveEvolucion(evolucionForm.observacionesFrontal, newVal);
-                    }}
-                    className="px-1.5 py-0.5 bg-blue-900/40 hover:bg-blue-700/60 border border-blue-600/40 text-blue-300 text-[10px] rounded-full transition cursor-pointer leading-tight"
-                  >
-                    + {rec}
-                  </button>
-                ))}
+                {RECOMENDACIONES_PREDEFINIDAS.map((rec, i) => {
+                  const isSelected = evolucionForm.recomendaciones.includes(rec);
+                  return (
+                    <button
+                      key={i}
+                      onClick={() => {
+                        const current = evolucionForm.recomendaciones;
+                        let newVal: string;
+                        if (isSelected) {
+                          // Quitar la recomendación del texto
+                          newVal = current
+                            .replace('\n• ' + rec, '')
+                            .replace('• ' + rec, '')
+                            .trim();
+                        } else {
+                          // Agregar la recomendación
+                          newVal = current ? current + '\n• ' + rec : '• ' + rec;
+                        }
+                        setEvolucionForm(prev => ({ ...prev, recomendaciones: newVal }));
+                        autoSaveEvolucion(evolucionForm.observacionesFrontal, newVal);
+                      }}
+                      className={`px-1.5 py-0.5 border text-[10px] rounded-full transition cursor-pointer leading-tight font-semibold ${
+                        isSelected
+                          ? 'bg-emerald-700/70 hover:bg-red-700/70 border-emerald-500/70 text-emerald-200 hover:text-red-200 hover:border-red-500/70'
+                          : 'bg-blue-900/40 hover:bg-blue-700/60 border-blue-600/40 text-blue-300'
+                      }`}
+                      title={isSelected ? 'Clic para eliminar' : 'Clic para agregar'}
+                    >
+                      {isSelected ? '− ' : '+ '}{rec}
+                    </button>
+                  );
+                })}
               </div>
               <textarea
                 value={evolucionForm.recomendaciones}
@@ -891,17 +909,17 @@ export default function MapaCorporalPage() {
                 }}
                 rows={3}
                 placeholder="Recomendaciones para el paciente..."
-                className="w-full bg-slate-700/80 border border-slate-600 focus:border-blue-500 text-white rounded px-2 py-1.5 text-xs outline-none resize-none placeholder-gray-500 transition"
+                className="w-full bg-slate-700/80 border border-slate-600 focus:border-blue-500 text-white rounded px-2 py-1.5 text-xs outline-none resize-y placeholder-gray-500 transition min-h-[60px]"
               />
             </div>
           </motion.div>
 
           {/* COLUMNAS 2+3: Vistas corporales con filtro por pestaña */}
-          <motion.div className="col-span-2 bg-slate-900/60 border border-slate-700/30 rounded-lg p-2 flex flex-col gap-2 overflow-hidden">
+          <motion.div className="lg:col-span-2 bg-slate-900/60 border border-slate-700/30 rounded-lg p-2 flex flex-col gap-2 min-h-[360px] lg:min-h-0 lg:overflow-hidden">
             {/* Tabs de vista */}
             <div className="flex items-center gap-1.5 flex-wrap px-1">
               <span className="text-xs text-gray-400 mr-1">👆 Haz clic en zonas</span>
-              {(['TODAS','FRONTAL','LATERAL'] as const).map(v => (
+              {(['FRONTAL','LATERAL','TODAS'] as const).map(v => (
                 <button
                   key={v}
                   onClick={() => setView360(v as any)}
@@ -911,24 +929,24 @@ export default function MapaCorporalPage() {
                       : 'bg-slate-700/80 text-gray-300 hover:bg-slate-600 border border-slate-600/50'
                   }`}
                 >
-                  {v === 'TODAS' ? '⊞ Todas' : v === 'FRONTAL' ? '⊞ Frontal' : '⊞ Lateral'}
+                  {v === 'FRONTAL' ? '⊞ Frontal' : v === 'LATERAL' ? '⊞ Lateral' : '⊞ Todas'}
                 </button>
               ))}
             </div>
 
-            {/* TODAS: 4 columnas en fila */}
+            {/* TODAS: 4 columnas en fila (2 en móvil) */}
             {view360 === 'TODAS' && (
-              <div className="flex-1 grid grid-cols-4 gap-2 overflow-hidden min-h-0">
-                <div className="bg-slate-800/80 rounded-lg overflow-hidden flex flex-col">
+              <div className="flex-1 grid grid-cols-2 lg:grid-cols-4 gap-2 overflow-hidden min-h-0">
+                <div className="bg-slate-800/80 rounded-lg overflow-hidden flex flex-col min-h-[160px] lg:min-h-0">
                   <BodyViewSVG viewLabel="FRONTAL" isBack={false} marks={marks} mode={mode} handleBodyClick={handleBodyClick} getMarkConfig={getMarkConfig} />
                 </div>
-                <div className="bg-slate-800/80 rounded-lg overflow-hidden flex flex-col">
+                <div className="bg-slate-800/80 rounded-lg overflow-hidden flex flex-col min-h-[160px] lg:min-h-0">
                   <BodyViewSVG viewLabel="POSTERIOR" isBack={true} marks={marks} mode={mode} handleBodyClick={handleBodyClick} getMarkConfig={getMarkConfig} />
                 </div>
-                <div className="bg-slate-800/80 rounded-lg overflow-hidden flex flex-col">
+                <div className="bg-slate-800/80 rounded-lg overflow-hidden flex flex-col min-h-[160px] lg:min-h-0">
                   <BodyViewSVG viewLabel="LATERAL IZQ" isBack={false} marks={marks} mode={mode} handleBodyClick={handleBodyClick} getMarkConfig={getMarkConfig} />
                 </div>
-                <div className="bg-slate-800/80 rounded-lg overflow-hidden flex flex-col">
+                <div className="bg-slate-800/80 rounded-lg overflow-hidden flex flex-col min-h-[160px] lg:min-h-0">
                   <BodyViewSVG viewLabel="LATERAL DER" isBack={true} marks={marks} mode={mode} handleBodyClick={handleBodyClick} getMarkConfig={getMarkConfig} />
                 </div>
               </div>
@@ -936,11 +954,11 @@ export default function MapaCorporalPage() {
 
             {/* FRONTAL: Frontal + Posterior juntos */}
             {(view360 === 'FRONTAL' || view360 === 'POSTERIOR') && (
-              <div className="flex-1 grid grid-cols-2 gap-2 overflow-hidden min-h-0">
-                <div className="bg-slate-800/80 rounded-lg overflow-hidden flex flex-col">
+              <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-2 overflow-hidden min-h-0">
+                <div className="bg-slate-800/80 rounded-lg overflow-hidden flex flex-col min-h-[280px] sm:min-h-0">
                   <BodyViewSVG viewLabel="FRONTAL" isBack={false} marks={marks} mode={mode} handleBodyClick={handleBodyClick} getMarkConfig={getMarkConfig} fullSize />
                 </div>
-                <div className="bg-slate-800/80 rounded-lg overflow-hidden flex flex-col">
+                <div className="bg-slate-800/80 rounded-lg overflow-hidden flex flex-col min-h-[280px] sm:min-h-0">
                   <BodyViewSVG viewLabel="POSTERIOR" isBack={true} marks={marks} mode={mode} handleBodyClick={handleBodyClick} getMarkConfig={getMarkConfig} fullSize />
                 </div>
               </div>
@@ -948,11 +966,11 @@ export default function MapaCorporalPage() {
 
             {/* LATERAL: IZQ + DER lado a lado grandes */}
             {view360 === 'LATERAL' && (
-              <div className="flex-1 grid grid-cols-2 gap-2 overflow-hidden min-h-0">
-                <div className="bg-slate-800/80 rounded-lg overflow-hidden flex flex-col">
+              <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-2 overflow-hidden min-h-0">
+                <div className="bg-slate-800/80 rounded-lg overflow-hidden flex flex-col min-h-[280px] sm:min-h-0">
                   <BodyViewSVG viewLabel="LATERAL IZQ" isBack={false} marks={marks} mode={mode} handleBodyClick={handleBodyClick} getMarkConfig={getMarkConfig} fullSize />
                 </div>
-                <div className="bg-slate-800/80 rounded-lg overflow-hidden flex flex-col">
+                <div className="bg-slate-800/80 rounded-lg overflow-hidden flex flex-col min-h-[280px] sm:min-h-0">
                   <BodyViewSVG viewLabel="LATERAL DER" isBack={true} marks={marks} mode={mode} handleBodyClick={handleBodyClick} getMarkConfig={getMarkConfig} fullSize />
                 </div>
               </div>
