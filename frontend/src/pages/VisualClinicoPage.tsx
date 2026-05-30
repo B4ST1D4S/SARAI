@@ -664,7 +664,7 @@ export default function VisualClinicoPage() {
                 <p className="text-xs font-semibold text-white mb-3 flex items-center gap-2">
                   <ChevronsLeftRight size={13} className="text-blue-400"/>
                   Comparador Antes / Despues
-                  {primerAntes && primerDespues && (
+                  {antesComp && despuesComp && (
                     <span className="ml-auto text-[10px] text-gray-600 flex items-center gap-1">
                       <ZoomIn size={9}/> Arrastra para comparar
                     </span>
@@ -715,7 +715,7 @@ export default function VisualClinicoPage() {
             </div>
             <div className="lg:col-span-1">
               <DatosClinicosPanel
-                registro={selRegistro ?? primerDespues ?? primerAntes}
+                registro={selRegistro ?? despuesComp ?? antesComp}
                 total={registros.length}
                 onVerTodos={() => setVerGaleria(true)}
               />
