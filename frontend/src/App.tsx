@@ -5,7 +5,7 @@ import NeuralCanvas from './components/NeuralCanvas';
 import DashboardPage from './pages/DashboardPage';
 import PacientesPage from './pages/PacientesPage';
 import HistoriaClinicaPage from './pages/HistoriaClinicaPage';
-import FotosPage from './pages/FotosPage';
+import VisualClinicoPage from './pages/VisualClinicoPage';
 import ConsentimientoPage from './pages/ConsentimientoPage';
 import AgendaPage from './pages/AgendaPage';
 import AgendaProfesionalPage from './pages/AgendaProfesionalPage';
@@ -32,7 +32,7 @@ const NAV_SECTIONS = [
       { id: 'dashboard',     label: 'Dashboard',          sym: 'M' },
       { id: 'pacientes',     label: 'Pacientes',          sym: 'P' },
       { id: 'historia',      label: 'Historia Clinica',   sym: 'H' },
-      { id: 'fotos',         label: 'Fotos',              sym: 'F' },
+      { id: 'fotos',         label: 'Visual Clínico',     sym: 'V' },
       { id: 'mapa-corporal', label: 'Mapa Corporal',      sym: 'C' },
     ],
   },
@@ -350,7 +350,7 @@ function App() {
               pacienteIdExterno={historiaPacienteId}
             />
           )}
-          {currentPage === 'fotos'               && <FotosPage />}
+          {currentPage === 'fotos'               && <VisualClinicoPage />}
           {currentPage === 'consentimiento'      && <ConsentimientoPage />}
           {currentPage === 'agenda'              && <AgendaPage />}
           {currentPage === 'admision'            && <AdmisionPage />}
