@@ -7,8 +7,9 @@ import {
   Eye, Camera, Upload, X, Plus, Brain,
   ChevronsLeftRight, Clock, MapPin, Tag,
   FileText, ZoomIn, Activity, Layers, ChevronLeft, ChevronRight,
-  Trash2,
+  Trash2, User, Search,
 } from 'lucide-react';
+import { searchPacientes } from '../services/api';
 
 type FaseEvolucion = 'ANTES' | 'DURANTE' | 'DESPUES' | 'SEGUIMIENTO' | 'MANTENIMIENTO' | 'REINTERVENCION';
 
@@ -23,6 +24,8 @@ interface RegistroVisual {
   tags: string[];
   diaProcedimiento: number;
   ia_ready: boolean;
+  pacienteNombre?: string;
+  pacienteId?: string;
 }
 
 const FASES: {
@@ -549,15 +552,21 @@ function ModalNuevaCaptura({ faseInicial, diaInicial, onClose, onGuardar }: {
 
 // PAGINA PRINCIPAL
 export default function VisualClinicoPage() {
-  const [registros, setRegistros]         = useState<RegistroVisual[]>([]);
-  const [showModal, setShowModal]         = useState(false);
-  const [faseModal, setFaseModal]         = useState<FaseEvolucion>('ANTES');
-  const [diaModal, setDiaModal]           = useState(0);
-  const [verGaleria, setVerGaleria]       = useState(false);
-  const [zoom, setZoom]                   = useState<RegistroVisual | null>(null);
-  const [selRegistro, setSelRegistro]     = useState<RegistroVisual | null>(null);
-  const [antesSelIdx, setAntesSelIdx]     = useState(0);
-  const [despuesSelIdx, setDespuesSelIdx] = useState(0);
+  const [registros, setRegistros]               = useState<RegistroVisual[]>([]);
+  const [showModal, setShowModal]               = useState(false);
+  const [faseModal, setFaseModal]               = useState<FaseEvolucion>('ANTES');
+  const [diaModal, setDiaModal]                 = useState(0);
+  const [verGaleria, setVerGaleria]             = useState(true);
+  const [zoom, setZoom]                         = useState<RegistroVisual | null>(null);
+  const [selRegistro, setSelRegistro]           = useState<RegistroVisual | null>(null);
+  const [antesSelIdx, setAntesSelIdx]           = useState(0);
+  const [despuesSelIdx, setDespuesSelIdx]       = useState(0);
+  // Paciente
+  const [pacienteNombreDisplay, setPacienteNombreDisplay] = useState('');
+  const [pacienteId, setPacienteId]             = useState<string | null>(null);
+  const [pacienteSearch, setPacienteSearch]     = useState('');
+  const [pacientesBuscados, setPacientesBuscados] = useState<any[]>([]);
+  const [buscandoPaciente, setBuscandoPaciente] = useState(false);
 
   const listaAntes   = registros.filter(r => r.fase === 'ANTES');
   const listaDespues = registros.filter(r => r.fase === 'DESPUES');
@@ -590,11 +599,32 @@ export default function VisualClinicoPage() {
     return () => window.removeEventListener('keydown', handler);
   }, [zoom, navZoom]);
 
+  const buscarPaciente = async () => {
+    const q = pacienteSearch.trim();
+    if (!q) return;
+    const token = localStorage.getItem('accessToken');
+    if (!token) return;
+    setBuscandoPaciente(true);
+    try {
+      const res = await searchPacientes(q, token);
+      const list = Array.isArray(res.data) ? res.data : (res.data ? [res.data] : []);
+      setPacientesBuscados(list);
+    } catch {
+      setPacientesBuscados([]);
+    } finally {
+      setBuscandoPaciente(false);
+    }
+  };
+
   const agregar = useCallback((r: Omit<RegistroVisual, 'id'>) => {
-    const nuevo = { ...r, id: Date.now() };
+    const nuevo = {
+      ...r, id: Date.now(),
+      pacienteNombre: pacienteNombreDisplay || undefined,
+      pacienteId: pacienteId || undefined,
+    };
     setRegistros(prev => [nuevo, ...prev]);
     setSelRegistro(nuevo);
-  }, []);
+  }, [pacienteNombreDisplay, pacienteId]);
 
   const abrirModal = (fase: FaseEvolucion = 'ANTES', dia = 0) => {
     setFaseModal(fase); setDiaModal(dia); setShowModal(true);
@@ -627,6 +657,65 @@ export default function VisualClinicoPage() {
               <Camera size={14}/> Nueva Captura
             </button>
           </div>
+        </div>
+      </div>
+
+      {/* SELECTOR DE PACIENTE */}
+      <div className="px-6 py-3 border-b border-white/5 bg-[#080a0f]/90 flex-shrink-0">
+        <div className="max-w-[1600px] mx-auto relative">
+          {pacienteNombreDisplay ? (
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center flex-shrink-0">
+                <User size={14} className="text-emerald-400"/>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[10px] text-gray-600 uppercase tracking-wider leading-none">Paciente activo</p>
+                <p className="text-sm text-white font-semibold truncate mt-0.5">{pacienteNombreDisplay}</p>
+              </div>
+              <button
+                onClick={() => { setPacienteNombreDisplay(''); setPacienteId(null); setRegistros([]); setSelRegistro(null); }}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/8 text-gray-500 hover:text-gray-300 rounded-xl text-xs transition">
+                <X size={11}/> Cambiar paciente
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center flex-shrink-0">
+                <User size={14} className="text-gray-600"/>
+              </div>
+              <p className="text-sm text-gray-600">Sin paciente —</p>
+              <div className="flex items-center gap-2 flex-1">
+                <input
+                  value={pacienteSearch}
+                  onChange={e => setPacienteSearch(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && buscarPaciente()}
+                  placeholder="Buscar por nombre o documento..."
+                  className="flex-1 max-w-xs bg-white/5 border border-white/10 rounded-xl px-3 py-1.5 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-blue-500/50"
+                />
+                <button onClick={buscarPaciente} disabled={buscandoPaciente}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/40 text-blue-400 rounded-xl text-xs font-medium transition disabled:opacity-50">
+                  <Search size={12}/> {buscandoPaciente ? 'Buscando...' : 'Buscar'}
+                </button>
+              </div>
+              {pacientesBuscados.length > 0 && (
+                <div className="absolute top-full left-0 mt-1 w-72 bg-[#0d1117] border border-white/10 rounded-2xl overflow-hidden shadow-2xl z-30">
+                  {pacientesBuscados.map((p: any) => (
+                    <button key={p.id}
+                      onClick={() => { setPacienteNombreDisplay(p.nombreCompleto); setPacienteId(p.id); setPacientesBuscados([]); setPacienteSearch(''); }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-white/8 border-b border-white/5 last:border-0 text-left transition">
+                      <div className="w-7 h-7 rounded-lg bg-emerald-500/15 border border-emerald-500/25 flex items-center justify-center flex-shrink-0">
+                        <User size={12} className="text-emerald-400"/>
+                      </div>
+                      <div>
+                        <p className="text-white text-xs font-medium">{p.nombreCompleto}</p>
+                        <p className="text-gray-500 text-[10px]">{p.tipoDocumento} {p.numeroDocumento}</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -759,12 +848,16 @@ export default function VisualClinicoPage() {
                         <motion.div key={r.id} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
                           onClick={() => { setZoom(r); setSelRegistro(r); }}
                           className="group relative bg-[#080a0f] border border-white/8 rounded-xl overflow-hidden cursor-pointer hover:border-white/20 transition-all">
-                          <div className="aspect-square overflow-hidden">
+                          <div className="aspect-square overflow-hidden relative">
                             <img src={r.src} alt={r.fase} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"/>
+                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 flex items-center justify-center transition-all duration-200">
+                              <ZoomIn size={18} className="text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200"/>
+                            </div>
                           </div>
-                          <div className="p-1.5">
+                          <div className="p-1.5 space-y-0.5">
                             <FaseBadge fase={r.fase}/>
-                            {r.diaProcedimiento > 0 && <p className="text-[9px] text-gray-600 mt-0.5">Dia {r.diaProcedimiento}</p>}
+                            {r.pacienteNombre && <p className="text-[9px] text-emerald-400 font-medium truncate">{r.pacienteNombre}</p>}
+                            {r.diaProcedimiento > 0 && <p className="text-[9px] text-gray-600">Dia {r.diaProcedimiento}</p>}
                           </div>
                           {r.ia_ready && (
                             <div className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-purple-500/30 border border-purple-500/50 flex items-center justify-center">
@@ -898,8 +991,14 @@ export default function VisualClinicoPage() {
               </div>
 
               {/* Info inferior */}
-              {(zoom.procedimiento || zoom.region || zoom.notas) && (
+              {(zoom.procedimiento || zoom.region || zoom.notas || zoom.pacienteNombre) && (
                 <div className="absolute bottom-3 left-3 right-3 bg-black/80 backdrop-blur-sm px-3 py-2.5 rounded-xl space-y-1">
+                  {zoom.pacienteNombre && (
+                    <div className="flex items-center gap-1.5 pb-1.5 border-b border-white/8">
+                      <User size={10} className="text-emerald-400 flex-shrink-0"/>
+                      <p className="text-emerald-400 text-[10px] font-semibold truncate">{zoom.pacienteNombre}</p>
+                    </div>
+                  )}
                   <div className="flex items-start justify-between gap-3">
                     <div className="space-y-0.5 min-w-0">
                       {zoom.procedimiento && (
