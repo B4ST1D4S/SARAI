@@ -1,12 +1,13 @@
 ﻿/**
  * SARAI - Centro de Inteligencia Visual Clinica v2.0
  */
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Eye, Camera, Upload, X, Plus, Brain,
   ChevronsLeftRight, Clock, MapPin, Tag,
   FileText, ZoomIn, Activity, Layers, ChevronLeft, ChevronRight,
+  Trash2,
 } from 'lucide-react';
 
 type FaseEvolucion = 'ANTES' | 'DURANTE' | 'DESPUES' | 'SEGUIMIENTO' | 'MANTENIMIENTO' | 'REINTERVENCION';
@@ -548,16 +549,46 @@ function ModalNuevaCaptura({ faseInicial, diaInicial, onClose, onGuardar }: {
 
 // PAGINA PRINCIPAL
 export default function VisualClinicoPage() {
-  const [registros, setRegistros]     = useState<RegistroVisual[]>([]);
-  const [showModal, setShowModal]     = useState(false);
-  const [faseModal, setFaseModal]     = useState<FaseEvolucion>('ANTES');
-  const [diaModal, setDiaModal]       = useState(0);
-  const [verGaleria, setVerGaleria]   = useState(false);
-  const [zoom, setZoom]               = useState<RegistroVisual | null>(null);
-  const [selRegistro, setSelRegistro] = useState<RegistroVisual | null>(null);
+  const [registros, setRegistros]         = useState<RegistroVisual[]>([]);
+  const [showModal, setShowModal]         = useState(false);
+  const [faseModal, setFaseModal]         = useState<FaseEvolucion>('ANTES');
+  const [diaModal, setDiaModal]           = useState(0);
+  const [verGaleria, setVerGaleria]       = useState(false);
+  const [zoom, setZoom]                   = useState<RegistroVisual | null>(null);
+  const [selRegistro, setSelRegistro]     = useState<RegistroVisual | null>(null);
+  const [antesSelIdx, setAntesSelIdx]     = useState(0);
+  const [despuesSelIdx, setDespuesSelIdx] = useState(0);
 
-  const primerAntes   = registros.find(r => r.fase === 'ANTES');
-  const primerDespues = registros.find(r => r.fase === 'DESPUES');
+  const listaAntes   = registros.filter(r => r.fase === 'ANTES');
+  const listaDespues = registros.filter(r => r.fase === 'DESPUES');
+  const antesComp    = listaAntes[antesSelIdx] ?? listaAntes[0];
+  const despuesComp  = listaDespues[despuesSelIdx] ?? listaDespues[0];
+
+  const navZoom = useCallback((dir: 1 | -1) => {
+    setZoom(prev => {
+      if (!prev) return null;
+      const idx = registros.findIndex(r => r.id === prev.id);
+      const next = registros[(idx + dir + registros.length) % registros.length];
+      setSelRegistro(next);
+      return next;
+    });
+  }, [registros]);
+
+  const eliminarRegistro = useCallback((id: number) => {
+    setRegistros(prev => prev.filter(r => r.id !== id));
+    setZoom(prev => (prev?.id === id ? null : prev));
+    setSelRegistro(prev => (prev?.id === id ? null : prev));
+  }, []);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { setZoom(null); return; }
+      if (e.key === 'ArrowLeft')  navZoom(-1);
+      if (e.key === 'ArrowRight') navZoom(1);
+    };
+    if (zoom) window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [zoom, navZoom]);
 
   const agregar = useCallback((r: Omit<RegistroVisual, 'id'>) => {
     const nuevo = { ...r, id: Date.now() };
@@ -640,11 +671,46 @@ export default function VisualClinicoPage() {
                   )}
                 </p>
                 <ComparadorSlider
-                  antes={primerAntes}
-                  despues={primerDespues}
+                  antes={antesComp}
+                  despues={despuesComp}
                   onSubirAntes={() => abrirModal('ANTES', 0)}
                   onSubirDespues={() => abrirModal('DESPUES', 7)}
                 />
+                {/* Selector cuando hay múltiples fotos ANTES o DESPUÉS */}
+                {(listaAntes.length > 1 || listaDespues.length > 1) && (
+                  <div className="mt-3 flex gap-4 border-t border-white/5 pt-3">
+                    {listaAntes.length > 1 && (
+                      <div className="flex-1">
+                        <p className="text-[10px] text-gray-600 mb-1.5">🔵 Elegir foto ANTES ({listaAntes.length})</p>
+                        <div className="flex gap-1.5 flex-wrap">
+                          {listaAntes.map((r, i) => (
+                            <button key={r.id} onClick={() => setAntesSelIdx(i)}
+                              className={`w-10 h-10 rounded-xl overflow-hidden border-2 transition flex-shrink-0 ${
+                                i === antesSelIdx ? 'border-blue-500 ring-1 ring-blue-500/40' : 'border-white/10 hover:border-white/30'
+                              }`}>
+                              <img src={r.src} alt="" className="w-full h-full object-cover"/>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {listaDespues.length > 1 && (
+                      <div className="flex-1">
+                        <p className="text-[10px] text-gray-600 mb-1.5">✅ Elegir foto DESPUÉS ({listaDespues.length})</p>
+                        <div className="flex gap-1.5 flex-wrap">
+                          {listaDespues.map((r, i) => (
+                            <button key={r.id} onClick={() => setDespuesSelIdx(i)}
+                              className={`w-10 h-10 rounded-xl overflow-hidden border-2 transition flex-shrink-0 ${
+                                i === despuesSelIdx ? 'border-emerald-500 ring-1 ring-emerald-500/40' : 'border-white/10 hover:border-white/30'
+                              }`}>
+                              <img src={r.src} alt="" className="w-full h-full object-cover"/>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
             <div className="lg:col-span-1">
@@ -770,23 +836,109 @@ export default function VisualClinicoPage() {
       <AnimatePresence>
         {zoom && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center p-4"
+            className="fixed inset-0 z-50 bg-black/92 backdrop-blur-sm flex items-center justify-center p-4"
             onClick={() => setZoom(null)}>
-            <motion.div initial={{ scale: 0.92 }} animate={{ scale: 1 }}
+            <motion.div initial={{ scale: 0.93 }} animate={{ scale: 1 }}
               className="relative max-w-4xl w-full" onClick={e => e.stopPropagation()}>
-              <img src={zoom.src} alt="Zoom" className="w-full max-h-[80vh] object-contain rounded-2xl"/>
-              <div className="absolute top-3 left-3"><FaseBadge fase={zoom.fase}/></div>
-              <button onClick={() => setZoom(null)}
-                className="absolute top-3 right-3 w-8 h-8 rounded-xl bg-black/60 hover:bg-black/80 flex items-center justify-center transition">
-                <X size={16} className="text-white"/>
-              </button>
-              {(zoom.region || zoom.procedimiento) && (
-                <div className="absolute bottom-3 left-3 bg-black/80 backdrop-blur-sm px-3 py-2 rounded-xl space-y-0.5">
-                  {zoom.procedimiento && <p className="text-white text-xs font-semibold">{zoom.procedimiento}</p>}
-                  <p className="text-gray-400 text-[10px]">{zoom.region} · {zoom.fecha.toLocaleDateString('es-CO')}</p>
-                  {zoom.diaProcedimiento >= 0 && <p className="text-yellow-400 text-[10px]">Dia {zoom.diaProcedimiento}</p>}
+
+              {/* Navegación anterior */}
+              {registros.length > 1 && (
+                <button onClick={() => navZoom(-1)}
+                  className="absolute -left-14 top-1/2 -translate-y-1/2 w-11 h-11 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/15 flex items-center justify-center transition z-10">
+                  <ChevronLeft size={20} className="text-white"/>
+                </button>
+              )}
+
+              <img src={zoom.src} alt="Zoom" className="w-full max-h-[75vh] object-contain rounded-2xl"/>
+
+              {/* Navegación siguiente */}
+              {registros.length > 1 && (
+                <button onClick={() => navZoom(1)}
+                  className="absolute -right-14 top-1/2 -translate-y-1/2 w-11 h-11 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/15 flex items-center justify-center transition z-10">
+                  <ChevronRight size={20} className="text-white"/>
+                </button>
+              )}
+
+              {/* Barra superior: fase + contador */}
+              <div className="absolute top-3 left-3 flex items-center gap-2">
+                <FaseBadge fase={zoom.fase}/>
+                {registros.length > 1 && (
+                  <span className="text-[10px] text-gray-400 bg-black/60 backdrop-blur-sm px-2 py-0.5 rounded-lg">
+                    {registros.findIndex(r => r.id === zoom.id) + 1} / {registros.length}
+                  </span>
+                )}
+              </div>
+
+              {/* Acciones: usar en comparador + eliminar + cerrar */}
+              <div className="absolute top-3 right-3 flex items-center gap-1.5">
+                {zoom.fase === 'ANTES' && listaAntes.length > 0 && (
+                  <button
+                    onClick={() => { const i = listaAntes.findIndex(r => r.id === zoom.id); if (i !== -1) setAntesSelIdx(i); setZoom(null); }}
+                    className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/40 text-blue-400 rounded-xl text-[10px] font-semibold transition">
+                    🔵 Usar en comparador
+                  </button>
+                )}
+                {zoom.fase === 'DESPUES' && listaDespues.length > 0 && (
+                  <button
+                    onClick={() => { const i = listaDespues.findIndex(r => r.id === zoom.id); if (i !== -1) setDespuesSelIdx(i); setZoom(null); }}
+                    className="flex items-center gap-1 px-2.5 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-400 rounded-xl text-[10px] font-semibold transition">
+                    ✅ Usar en comparador
+                  </button>
+                )}
+                <button onClick={() => eliminarRegistro(zoom.id)}
+                  title="Eliminar registro"
+                  className="w-8 h-8 rounded-xl bg-red-500/15 hover:bg-red-500/30 border border-red-500/30 flex items-center justify-center transition">
+                  <Trash2 size={14} className="text-red-400"/>
+                </button>
+                <button onClick={() => setZoom(null)}
+                  title="Cerrar (ESC)"
+                  className="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 flex items-center justify-center transition">
+                  <X size={16} className="text-white"/>
+                </button>
+              </div>
+
+              {/* Info inferior */}
+              {(zoom.procedimiento || zoom.region || zoom.notas) && (
+                <div className="absolute bottom-3 left-3 right-3 bg-black/80 backdrop-blur-sm px-3 py-2.5 rounded-xl space-y-1">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="space-y-0.5 min-w-0">
+                      {zoom.procedimiento && (
+                        <p className="text-white text-xs font-semibold truncate">{zoom.procedimiento}</p>
+                      )}
+                      <p className="text-gray-400 text-[10px]">
+                        {zoom.region}
+                        {zoom.region && ' · '}
+                        {zoom.fecha.toLocaleDateString('es-CO')}
+                        {zoom.diaProcedimiento > 0 && (
+                          <span className="text-yellow-400 ml-1">· Día {zoom.diaProcedimiento}</span>
+                        )}
+                      </p>
+                    </div>
+                    {zoom.ia_ready && (
+                      <span className="flex items-center gap-1 text-[9px] text-purple-400 bg-purple-500/10 border border-purple-500/20 px-1.5 py-0.5 rounded-lg flex-shrink-0">
+                        <Brain size={8}/> IA Ready
+                      </span>
+                    )}
+                  </div>
+                  {zoom.notas && (
+                    <p className="text-gray-400 text-[10px] border-t border-white/8 pt-1.5 leading-relaxed line-clamp-2">
+                      {zoom.notas}
+                    </p>
+                  )}
+                  {zoom.tags.length > 0 && (
+                    <div className="flex gap-1 flex-wrap pt-0.5">
+                      {zoom.tags.map(t => (
+                        <span key={t} className="text-[9px] px-1.5 py-0.5 bg-purple-500/10 text-purple-400 rounded-full border border-purple-500/20">{t}</span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
+
+              {/* Hint teclado */}
+              <div className="absolute -bottom-7 left-1/2 -translate-x-1/2 text-[10px] text-gray-700 flex items-center gap-2 whitespace-nowrap">
+                <span>← → navegar</span><span>·</span><span>ESC cerrar</span>
+              </div>
             </motion.div>
           </motion.div>
         )}
