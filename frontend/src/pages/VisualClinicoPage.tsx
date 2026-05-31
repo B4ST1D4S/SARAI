@@ -7,7 +7,7 @@ import {
   Eye, Camera, Upload, X, Plus, Brain,
   ChevronsLeftRight, Clock, MapPin, Tag,
   FileText, ZoomIn, Activity, Layers, ChevronLeft, ChevronRight,
-  Trash2, User, Search,
+  Trash2, User, Search, TrendingUp, Minus, AlertCircle, BarChart2,
 } from 'lucide-react';
 import { searchPacientes } from '../services/api';
 
@@ -26,6 +26,26 @@ interface RegistroVisual {
   ia_ready: boolean;
   pacienteNombre?: string;
   pacienteId?: string;
+}
+
+type Tendencia = 'mejora' | 'estable' | 'revision';
+
+interface MetricaCambio {
+  label: string;
+  valor: string;
+  tendencia: Tendencia;
+}
+
+interface AnalisisCambio {
+  id: number;
+  fechaAnalisis: Date;
+  faseA: FaseEvolucion;
+  diaA: number;
+  faseB: FaseEvolucion;
+  diaB: number;
+  observacion: string;
+  metricas: MetricaCambio[];
+  score: number; // 0-100
 }
 
 const FASES: {
@@ -563,10 +583,318 @@ function ModalNuevaCaptura({ faseInicial, diaInicial, onClose, onGuardar }: {
   );
 }
 
+// ⑤ MODAL NUEVO ANALISIS DE CAMBIOS
+function ModalNuevoAnalisis({ onClose, onGuardar }: {
+  onClose: () => void;
+  onGuardar: (a: Omit<AnalisisCambio, 'id'>) => void;
+}) {
+  const [faseA, setFaseA]         = useState<FaseEvolucion>('ANTES');
+  const [diaA, setDiaA]           = useState(0);
+  const [faseB, setFaseB]         = useState<FaseEvolucion>('DESPUES');
+  const [diaB, setDiaB]           = useState(7);
+  const [observacion, setObs]     = useState('');
+  const [score, setScore]         = useState(70);
+  const [metricas, setMetricas]   = useState<MetricaCambio[]>([
+    { label: 'Inflamación', valor: '', tendencia: 'mejora' },
+    { label: 'Cicatriz',    valor: '', tendencia: 'estable' },
+  ]);
+
+  const addMetrica = () => setMetricas(m => [...m, { label: '', valor: '', tendencia: 'estable' }]);
+  const removeMetrica = (i: number) => setMetricas(m => m.filter((_, idx) => idx !== i));
+  const updateMetrica = (i: number, key: keyof MetricaCambio, val: string) =>
+    setMetricas(m => m.map((x, idx) => idx === i ? { ...x, [key]: val } : x));
+
+  const scoreColor = score >= 70 ? 'text-emerald-400' : score >= 40 ? 'text-yellow-400' : 'text-red-400';
+  const scoreLabel = score >= 70 ? 'Evolución favorable' : score >= 40 ? 'Evolución moderada' : 'Requiere atención';
+
+  const guardar = () => {
+    if (!observacion.trim()) return;
+    onGuardar({
+      fechaAnalisis: new Date(),
+      faseA, diaA, faseB, diaB,
+      observacion: observacion.trim(),
+      metricas: metricas.filter(m => m.label && m.valor),
+      score,
+    });
+    onClose();
+  };
+
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4"
+      onClick={onClose}>
+      <motion.div initial={{ scale: 0.95, y: 10 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95 }}
+        onClick={e => e.stopPropagation()}
+        className="bg-[#0d1117] border border-orange-500/20 rounded-3xl w-full max-w-lg shadow-2xl shadow-orange-500/10 max-h-[90vh] overflow-y-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-white/5 sticky top-0 bg-[#0d1117] z-10">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-xl bg-orange-500/20 border border-orange-500/30 flex items-center justify-center">
+              <BarChart2 size={13} className="text-orange-400"/>
+            </div>
+            <p className="text-white font-bold text-sm">Nuevo Análisis de Cambios</p>
+          </div>
+          <button onClick={onClose} className="w-7 h-7 rounded-xl hover:bg-white/10 flex items-center justify-center transition">
+            <X size={14} className="text-gray-400"/>
+          </button>
+        </div>
+
+        <div className="p-6 space-y-5">
+          {/* Período de comparación */}
+          <div>
+            <label className="text-[11px] text-gray-500 uppercase tracking-wider font-medium block mb-3">Período de comparación</label>
+            <div className="grid grid-cols-2 gap-3">
+              {/* Desde */}
+              <div className="space-y-2">
+                <p className="text-[10px] text-blue-400 font-semibold uppercase tracking-wider">Desde</p>
+                <div className="grid grid-cols-3 gap-1">
+                  {FASES.slice(0, 3).map(f => (
+                    <button key={f.id} onClick={() => setFaseA(f.id)}
+                      className={`flex flex-col items-center gap-0.5 px-1 py-2 rounded-xl text-[9px] font-medium transition border ${
+                        faseA === f.id ? `${f.bg} ${f.color} ${f.border}` : 'bg-white/3 text-gray-600 border-white/8 hover:border-white/15'
+                      }`}>
+                      <span>{f.emoji}</span>
+                      <span>{f.label}</span>
+                    </button>
+                  ))}
+                  {FASES.slice(3).map(f => (
+                    <button key={f.id} onClick={() => setFaseA(f.id)}
+                      className={`flex flex-col items-center gap-0.5 px-1 py-2 rounded-xl text-[9px] font-medium transition border ${
+                        faseA === f.id ? `${f.bg} ${f.color} ${f.border}` : 'bg-white/3 text-gray-600 border-white/8 hover:border-white/15'
+                      }`}>
+                      <span>{f.emoji}</span>
+                      <span>{f.label}</span>
+                    </button>
+                  ))}
+                </div>
+                <select value={diaA} onChange={e => setDiaA(Number(e.target.value))}
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-2 py-1.5 text-white text-xs focus:outline-none focus:border-blue-500/50 [color-scheme:dark]">
+                  {HITOS_DIAS.map(h => <option key={h.dia} value={h.dia}>{h.label}</option>)}
+                </select>
+              </div>
+              {/* Hasta */}
+              <div className="space-y-2">
+                <p className="text-[10px] text-emerald-400 font-semibold uppercase tracking-wider">Hasta</p>
+                <div className="grid grid-cols-3 gap-1">
+                  {FASES.slice(0, 3).map(f => (
+                    <button key={f.id} onClick={() => setFaseB(f.id)}
+                      className={`flex flex-col items-center gap-0.5 px-1 py-2 rounded-xl text-[9px] font-medium transition border ${
+                        faseB === f.id ? `${f.bg} ${f.color} ${f.border}` : 'bg-white/3 text-gray-600 border-white/8 hover:border-white/15'
+                      }`}>
+                      <span>{f.emoji}</span>
+                      <span>{f.label}</span>
+                    </button>
+                  ))}
+                  {FASES.slice(3).map(f => (
+                    <button key={f.id} onClick={() => setFaseB(f.id)}
+                      className={`flex flex-col items-center gap-0.5 px-1 py-2 rounded-xl text-[9px] font-medium transition border ${
+                        faseB === f.id ? `${f.bg} ${f.color} ${f.border}` : 'bg-white/3 text-gray-600 border-white/8 hover:border-white/15'
+                      }`}>
+                      <span>{f.emoji}</span>
+                      <span>{f.label}</span>
+                    </button>
+                  ))}
+                </div>
+                <select value={diaB} onChange={e => setDiaB(Number(e.target.value))}
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-2 py-1.5 text-white text-xs focus:outline-none focus:border-emerald-500/50 [color-scheme:dark]">
+                  {HITOS_DIAS.map(h => <option key={h.dia} value={h.dia}>{h.label}</option>)}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Score de evolución */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-[11px] text-gray-500 uppercase tracking-wider font-medium">Score de evolución</label>
+              <span className={`text-sm font-bold ${scoreColor}`}>{score}/100 <span className="text-[10px] font-normal">{scoreLabel}</span></span>
+            </div>
+            <input type="range" min={0} max={100} value={score} onChange={e => setScore(Number(e.target.value))}
+              className="w-full accent-orange-400 h-2 rounded-full"/>
+            <div className="flex justify-between text-[9px] text-gray-700 mt-1">
+              <span>Requiere atención</span><span>Moderado</span><span>Favorable</span>
+            </div>
+          </div>
+
+          {/* Observación clínica */}
+          <div>
+            <label className="text-[11px] text-gray-500 uppercase tracking-wider font-medium block mb-2">Observación clínica del período</label>
+            <textarea value={observacion} onChange={e => setObs(e.target.value)} rows={3}
+              placeholder="Describe los cambios observados en este período: respuesta al tratamiento, evolución de la cicatriz, cambios en volumen..."
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-orange-500/50 focus:ring-1 focus:ring-orange-500/20 resize-none"/>
+          </div>
+
+          {/* Métricas */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-[11px] text-gray-500 uppercase tracking-wider font-medium">Métricas de seguimiento</label>
+              <button onClick={addMetrica}
+                className="flex items-center gap-1 text-[10px] text-orange-400 hover:text-orange-300 transition px-2 py-1 rounded-lg bg-orange-500/10 border border-orange-500/20">
+                <Plus size={10}/> Agregar
+              </button>
+            </div>
+            <div className="space-y-2">
+              {metricas.map((m, i) => (
+                <div key={i} className="flex gap-2 items-center">
+                  <input value={m.label} onChange={e => updateMetrica(i, 'label', e.target.value)}
+                    placeholder="Aspecto (ej: Inflamación)"
+                    className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white text-xs placeholder-gray-600 focus:outline-none focus:border-orange-500/40"/>
+                  <input value={m.valor} onChange={e => updateMetrica(i, 'valor', e.target.value)}
+                    placeholder="Resultado"
+                    className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white text-xs placeholder-gray-600 focus:outline-none focus:border-orange-500/40"/>
+                  <select value={m.tendencia} onChange={e => updateMetrica(i, 'tendencia', e.target.value as Tendencia)}
+                    className="bg-white/5 border border-white/10 rounded-xl px-2 py-2 text-xs focus:outline-none [color-scheme:dark] text-white">
+                    <option value="mejora">↑ Mejora</option>
+                    <option value="estable">→ Estable</option>
+                    <option value="revision">↓ Revisión</option>
+                  </select>
+                  <button onClick={() => removeMetrica(i)} className="w-7 h-7 rounded-lg hover:bg-red-500/20 flex items-center justify-center text-gray-600 hover:text-red-400 transition flex-shrink-0">
+                    <X size={11}/>
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Botones */}
+          <div className="flex gap-2 pt-1">
+            <button onClick={onClose}
+              className="flex-1 py-2.5 bg-white/5 hover:bg-white/8 border border-white/8 text-gray-400 rounded-xl text-sm font-medium transition">
+              Cancelar
+            </button>
+            <button onClick={guardar} disabled={!observacion.trim()}
+              className="flex-1 py-2.5 bg-orange-600 hover:bg-orange-500 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl text-sm font-bold transition">
+              Guardar Análisis
+            </button>
+          </div>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// ⑥ PANEL ANALISIS DE CAMBIOS
+const TENDENCIA_CONFIG: Record<Tendencia, { icon: React.ElementType; color: string; bg: string; label: string }> = {
+  mejora:   { icon: TrendingUp,   color: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/20', label: 'Mejora'   },
+  estable:  { icon: Minus,        color: 'text-yellow-400',  bg: 'bg-yellow-500/10  border-yellow-500/20',  label: 'Estable'  },
+  revision: { icon: AlertCircle,  color: 'text-red-400',     bg: 'bg-red-500/10     border-red-500/20',     label: 'Revisión' },
+};
+
+function PanelAnalisisCambios({ analisis, onNuevo, onEliminar }: {
+  analisis: AnalisisCambio[];
+  onNuevo: () => void;
+  onEliminar: (id: number) => void;
+}) {
+  return (
+    <div className="bg-[#0d1117] border border-orange-500/15 rounded-2xl overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between px-5 py-4 border-b border-white/5">
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-xl bg-orange-500/15 border border-orange-500/25 flex items-center justify-center">
+            <BarChart2 size={13} className="text-orange-400"/>
+          </div>
+          <div>
+            <p className="text-sm font-bold text-white">Análisis de Cambios</p>
+            <p className="text-[10px] text-gray-600">Evolución clínica documentada por períodos</p>
+          </div>
+        </div>
+        <button onClick={onNuevo}
+          className="flex items-center gap-1.5 px-3 py-2 bg-orange-600/20 hover:bg-orange-600/30 border border-orange-500/35 text-orange-400 rounded-xl text-xs font-semibold transition">
+          <Plus size={12}/> Nuevo análisis
+        </button>
+      </div>
+
+      {/* Contenido */}
+      <div className="p-5">
+        {analisis.length === 0 ? (
+          <div className="flex flex-col items-center py-8 gap-2 text-center">
+            <div className="w-12 h-12 rounded-2xl bg-orange-500/8 border border-orange-500/15 flex items-center justify-center mb-1">
+              <BarChart2 size={20} className="text-orange-400/50"/>
+            </div>
+            <p className="text-gray-500 text-sm font-medium">Sin análisis registrados</p>
+            <p className="text-gray-700 text-xs max-w-xs">Documenta la evolución del paciente comparando dos momentos del tratamiento</p>
+            <button onClick={onNuevo}
+              className="mt-2 px-4 py-2 bg-orange-600/15 hover:bg-orange-600/25 border border-orange-500/30 text-orange-400 rounded-xl text-xs font-medium transition">
+              + Primer análisis
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {analisis.map(a => {
+              const fA = getFase(a.faseA);
+              const fB = getFase(a.faseB);
+              const scoreColor = a.score >= 70 ? 'text-emerald-400' : a.score >= 40 ? 'text-yellow-400' : 'text-red-400';
+              const scoreBg    = a.score >= 70 ? 'bg-emerald-500/10 border-emerald-500/20' : a.score >= 40 ? 'bg-yellow-500/10 border-yellow-500/20' : 'bg-red-500/10 border-red-500/20';
+              return (
+                <motion.div key={a.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
+                  className="bg-[#080a0f] border border-white/8 rounded-2xl p-4 space-y-3">
+                  {/* Top row */}
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-2 flex-wrap min-w-0">
+                      {/* Período */}
+                      <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white/3 border border-white/8">
+                        <span className={`text-[10px] font-bold ${fA.color}`}>{fA.emoji} {fA.label}</span>
+                        <span className="text-[10px] text-gray-600">·</span>
+                        <span className="text-[10px] text-yellow-500">{HITOS_DIAS.find(h => h.dia === a.diaA)?.label ?? `Día ${a.diaA}`}</span>
+                        <ChevronRight size={10} className="text-gray-600"/>
+                        <span className={`text-[10px] font-bold ${fB.color}`}>{fB.emoji} {fB.label}</span>
+                        <span className="text-[10px] text-gray-600">·</span>
+                        <span className="text-[10px] text-yellow-500">{HITOS_DIAS.find(h => h.dia === a.diaB)?.label ?? `Día ${a.diaB}`}</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {/* Score */}
+                      <div className={`flex items-center gap-1 px-2.5 py-1 rounded-xl border text-xs font-bold ${scoreBg} ${scoreColor}`}>
+                        <Activity size={10}/>
+                        {a.score}/100
+                      </div>
+                      <button onClick={() => onEliminar(a.id)}
+                        className="w-7 h-7 rounded-lg hover:bg-red-500/15 flex items-center justify-center text-gray-700 hover:text-red-400 transition">
+                        <Trash2 size={11}/>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Observación */}
+                  <p className="text-gray-300 text-xs leading-relaxed border-l-2 border-orange-500/40 pl-3">{a.observacion}</p>
+
+                  {/* Métricas */}
+                  {a.metricas.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {a.metricas.map((m, i) => {
+                        const tc = TENDENCIA_CONFIG[m.tendencia];
+                        const Icon = tc.icon;
+                        return (
+                          <div key={i} className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl border text-[10px] ${tc.bg}`}>
+                            <Icon size={9} className={tc.color}/>
+                            <span className="text-gray-400 font-medium">{m.label}:</span>
+                            <span className={tc.color}>{m.valor}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Fecha */}
+                  <p className="text-[9px] text-gray-700 flex items-center gap-1">
+                    <Clock size={8}/> Registrado el {a.fechaAnalisis.toLocaleDateString('es-CO', { day:'2-digit', month:'long', year:'numeric' })}
+                  </p>
+                </motion.div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // PAGINA PRINCIPAL
 export default function VisualClinicoPage() {
   const [registros, setRegistros]               = useState<RegistroVisual[]>([]);
+  const [analisis, setAnalisis]                 = useState<AnalisisCambio[]>([]);
   const [showModal, setShowModal]               = useState(false);
+  const [showAnalisisModal, setShowAnalisisModal] = useState(false);
   const [faseModal, setFaseModal]               = useState<FaseEvolucion>('ANTES');
   const [diaModal, setDiaModal]                 = useState(0);
   const [verGaleria, setVerGaleria]             = useState(true);
@@ -621,6 +949,14 @@ export default function VisualClinicoPage() {
       // Cuota de almacenamiento excedida
     }
   }, [registros, pacienteId]);
+
+  // Auto-guardar análisis
+  useEffect(() => {
+    if (!pacienteId) return;
+    try {
+      localStorage.setItem(`sarai_analisis_${pacienteId}`, JSON.stringify(analisis));
+    } catch { /* cuota */ }
+  }, [analisis, pacienteId]);
 
   const buscarPaciente = async () => {
     const q = pacienteSearch.trim();
@@ -696,7 +1032,7 @@ export default function VisualClinicoPage() {
                 <p className="text-sm text-white font-semibold truncate mt-0.5">{pacienteNombreDisplay}</p>
               </div>
               <button
-                onClick={() => { setPacienteNombreDisplay(''); setPacienteId(null); setRegistros([]); setSelRegistro(null); }}
+                onClick={() => { setPacienteNombreDisplay(''); setPacienteId(null); setRegistros([]); setSelRegistro(null); setAnalisis([]); }}
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/8 text-gray-500 hover:text-gray-300 rounded-xl text-xs transition">
                 <X size={11}/> Cambiar paciente
               </button>
@@ -737,6 +1073,18 @@ export default function VisualClinicoPage() {
                           }
                         } catch {
                           setRegistros([]);
+                        }
+                        // Cargar análisis guardados
+                        try {
+                          const savedA = localStorage.getItem(`sarai_analisis_${pid}`);
+                          if (savedA) {
+                            const parsedA = JSON.parse(savedA);
+                            setAnalisis(parsedA.map((a: any) => ({ ...a, fechaAnalisis: new Date(a.fechaAnalisis) })));
+                          } else {
+                            setAnalisis([]);
+                          }
+                        } catch {
+                          setAnalisis([]);
                         }
                         setPacienteNombreDisplay(p.nombreCompleto);
                         setPacienteId(pid);
@@ -857,6 +1205,13 @@ export default function VisualClinicoPage() {
             <TimelineDias registros={registros} onAgregarEnDia={(dia, fase) => abrirModal(fase, dia)}/>
           </div>
 
+          {/* ANALISIS DE CAMBIOS */}
+          <PanelAnalisisCambios
+            analisis={analisis}
+            onNuevo={() => setShowAnalisisModal(true)}
+            onEliminar={id => setAnalisis(prev => prev.filter(a => a.id !== id))}
+          />
+
           {/* GALERIA */}
           <AnimatePresence>
             {verGaleria && (
@@ -927,8 +1282,8 @@ export default function VisualClinicoPage() {
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
               {[
                 { num: 1, label: 'Documentacion clinica',    estado: 'activa'    },
-                { num: 2, label: 'Comparacion avanzada',     estado: 'progreso'  },
-                { num: 3, label: 'Analisis de cambios',      estado: 'pendiente' },
+                { num: 2, label: 'Comparacion avanzada',     estado: 'activa'    },
+                { num: 3, label: 'Analisis de cambios',      estado: 'activa'    },
                 { num: 4, label: 'IA asistida (CV)',         estado: 'pendiente' },
                 { num: 5, label: 'Gemelo Digital Clinico',   estado: 'pendiente' },
                 { num: 6, label: 'Prediccion terapeutica',   estado: 'pendiente' },
@@ -964,6 +1319,16 @@ export default function VisualClinicoPage() {
         {showModal && (
           <ModalNuevaCaptura faseInicial={faseModal} diaInicial={diaModal}
             onClose={() => setShowModal(false)} onGuardar={agregar}/>
+        )}
+      </AnimatePresence>
+
+      {/* MODAL ANALISIS */}
+      <AnimatePresence>
+        {showAnalisisModal && (
+          <ModalNuevoAnalisis
+            onClose={() => setShowAnalisisModal(false)}
+            onGuardar={a => setAnalisis(prev => [{ ...a, id: Date.now() }, ...prev])}
+          />
         )}
       </AnimatePresence>
 
