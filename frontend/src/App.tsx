@@ -352,47 +352,46 @@ function App() {
           const fechaCompleta = hoy.toLocaleDateString('es-CO', { day: '2-digit', month: 'long', year: 'numeric' });
 
           return (
-            <div className={`sticky top-0 z-20 ${T.bg} backdrop-blur-xl border-b ${T.border} shadow-[0_1px_20px_rgba(0,0,0,0.35)] h-[72px] flex items-center gap-3 px-4 sm:px-5`}>
+            <div className={`sticky top-0 z-20 ${T.bg} backdrop-blur-xl border-b ${T.border} shadow-[0_2px_24px_rgba(0,0,0,0.45)] h-[80px] flex items-center px-4 sm:px-6 relative`}>
 
-              {/* Hamburger móvil */}
-              <button className="lg:hidden flex flex-col gap-[5px] p-2 rounded-lg text-gray-400 hover:text-yellow-400 hover:bg-yellow-500/10 transition-all flex-shrink-0"
-                onClick={() => setMobileMenuOpen(true)} aria-label="Abrir menú">
-                <span className="block w-5 h-[2px] bg-current rounded-full" />
-                <span className="block w-5 h-[2px] bg-current rounded-full" />
-                <span className="block w-3.5 h-[2px] bg-current rounded-full" />
-              </button>
-
-              {/* LOGO */}
-              {clinicaConfig.logoUrl && (
-                <div className="h-12 flex-shrink-0 flex items-center">
+              {/* ── IZQUIERDA: hamburger + logo ── */}
+              <div className="flex items-center gap-3 flex-shrink-0 z-10">
+                <button className="lg:hidden flex flex-col gap-[5px] p-2 rounded-lg text-gray-400 hover:text-yellow-400 hover:bg-yellow-500/10 transition-all"
+                  onClick={() => setMobileMenuOpen(true)} aria-label="Abrir menú">
+                  <span className="block w-5 h-[2px] bg-current rounded-full" />
+                  <span className="block w-5 h-[2px] bg-current rounded-full" />
+                  <span className="block w-3.5 h-[2px] bg-current rounded-full" />
+                </button>
+                {clinicaConfig.logoUrl && (
                   <img
                     src={clinicaConfig.logoUrl}
                     alt="Logo clínica"
-                    className="h-12 w-auto object-contain drop-shadow-[0_2px_8px_rgba(0,0,0,0.4)]"
-                    style={{ maxWidth: '120px' }}
+                    className="h-14 w-auto object-contain"
+                    style={{ maxWidth: '140px', filter: 'drop-shadow(0 2px 10px rgba(0,0,0,0.5))' }}
                   />
-                </div>
-              )}
-
-              {/* Divisor vertical */}
-              {clinicaConfig.logoUrl && clinicaConfig.nombre && (
-                <div className="h-10 w-px flex-shrink-0" style={{ background: 'linear-gradient(to bottom, transparent, rgba(255,255,255,0.12), transparent)' }} />
-              )}
-
-              {/* NOMBRE CLÍNICA */}
-              <div className="flex items-center flex-1 min-w-0 overflow-hidden">
-                <h1 className={`text-[22px] sm:text-[28px] font-black bg-gradient-to-r ${T.nameGrad} bg-clip-text text-transparent tracking-tight whitespace-nowrap overflow-hidden text-ellipsis`}>
-                  {clinicaConfig.nombre || 'EstetIA'}
-                </h1>
+                )}
               </div>
 
-              {/* FECHA + ONLINE */}
-              <div className="flex items-center gap-4 flex-shrink-0 ml-auto">
-                <div className={`hidden sm:flex flex-col items-end leading-snug`}>
+              {/* ── CENTRO ABSOLUTO: nombre clínica ── */}
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none select-none">
+                <h1
+                  className={`text-[28px] sm:text-[34px] font-black tracking-wide bg-gradient-to-r ${T.nameGrad} bg-clip-text text-transparent leading-none whitespace-nowrap`}
+                  style={{ letterSpacing: '0.04em' }}
+                >
+                  {clinicaConfig.nombre || 'EstetIA'}
+                </h1>
+                {/* Línea decorativa bajo el nombre */}
+                <div className="mt-[5px] h-[2px] w-48 sm:w-64 rounded-full"
+                  style={{ background: `linear-gradient(90deg, transparent, ${theme === 'premium-light' || theme === 'soft-medical' ? 'rgba(99,102,241,0.45)' : 'rgba(212,175,55,0.55)'}, transparent)` }} />
+              </div>
+
+              {/* ── DERECHA: fecha + online ── */}
+              <div className="flex items-center gap-3 flex-shrink-0 ml-auto z-10">
+                <div className="hidden sm:flex flex-col items-end leading-snug">
                   <span className={`text-[11px] font-semibold capitalize ${T.date}`}>{diaSemana}</span>
                   <span className={`text-[10px] capitalize ${T.dateSub}`}>{fechaCompleta}</span>
                 </div>
-                <div className="w-px h-8 hidden sm:block" style={{ background: 'linear-gradient(to bottom, transparent, rgba(255,255,255,0.08), transparent)' }} />
+                <div className="w-px h-8 hidden sm:block" style={{ background: 'linear-gradient(to bottom, transparent, rgba(255,255,255,0.1), transparent)' }} />
                 <div className="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/25 rounded-full px-3 py-1.5">
                   <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse"/>
                   <span className="text-emerald-400 text-[10px] font-bold tracking-widest">ONLINE</span>
