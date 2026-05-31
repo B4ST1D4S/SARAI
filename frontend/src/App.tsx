@@ -282,7 +282,7 @@ function App() {
       .then((data) => {
         const map: Record<string, string> = {};
         data.forEach((p: any) => { map[p.clave] = p.valor; });
-        setClinicaConfig({ nombre: map['nombre'] || '', logoUrl: map['logo_url'] || '' });
+        setClinicaConfig({ nombre: map['nombre_clinica'] || '', logoUrl: map['logo_url'] || '' });
       })
       .catch(() => { /* noop */ });
   }, [user]);
@@ -333,55 +333,65 @@ function App() {
         {/* ══════ TOPBAR PREMIUM ══════ */}
         {(() => {
           const T = {
-            'dark':          { bg: 'bg-[#0a0c12]',     border: 'border-white/[0.07]', shadow: 'shadow-black/60',   nameGrad: 'from-yellow-300 via-amber-400 to-yellow-500',  sub: 'text-yellow-500/45',  date: 'text-gray-500' },
-            'premium-light': { bg: 'bg-white',          border: 'border-slate-200',    shadow: 'shadow-slate-200/60',nameGrad: 'from-blue-700 via-indigo-600 to-blue-800',     sub: 'text-blue-500/55',    date: 'text-slate-500'},
-            'soft-medical':  { bg: 'bg-slate-50',       border: 'border-slate-200',    shadow: 'shadow-slate-100/80',nameGrad: 'from-teal-600 via-cyan-600 to-teal-700',       sub: 'text-teal-500/55',    date: 'text-slate-500'},
-            'executive-ai':  { bg: 'bg-[#0c1220]',      border: 'border-blue-500/15',  shadow: 'shadow-blue-900/60', nameGrad: 'from-blue-400 via-violet-400 to-blue-500',     sub: 'text-blue-400/40',    date: 'text-blue-300/60'},
-          }[theme] ?? { bg: 'bg-[#0a0c12]', border: 'border-white/[0.07]', shadow: 'shadow-black/60', nameGrad: 'from-yellow-300 via-amber-400 to-yellow-500', sub: 'text-yellow-500/45', date: 'text-gray-500' };
+            'dark':          { bg: 'bg-[#0a0c13]',    border: 'border-white/[0.06]',  nameGrad: 'from-yellow-300 via-amber-400 to-yellow-500', sub: 'text-yellow-500/50', date: 'text-gray-400',    dateSub: 'text-gray-600'    },
+            'premium-light': { bg: 'bg-white',         border: 'border-slate-200',     nameGrad: 'from-blue-700 via-indigo-600 to-blue-800',    sub: 'text-blue-500/60',   date: 'text-slate-600',   dateSub: 'text-slate-400'   },
+            'soft-medical':  { bg: 'bg-slate-50',      border: 'border-slate-200',     nameGrad: 'from-teal-600 via-cyan-600 to-teal-700',      sub: 'text-teal-500/60',   date: 'text-slate-500',   dateSub: 'text-slate-400'   },
+            'executive-ai':  { bg: 'bg-[#0c1220]',     border: 'border-blue-400/12',   nameGrad: 'from-blue-400 via-violet-400 to-blue-500',    sub: 'text-blue-400/45',   date: 'text-blue-300/70', dateSub: 'text-blue-400/40' },
+          }[theme] ?? { bg: 'bg-[#0a0c13]', border: 'border-white/[0.06]', nameGrad: 'from-yellow-300 via-amber-400 to-yellow-500', sub: 'text-yellow-500/50', date: 'text-gray-400', dateSub: 'text-gray-600' };
+
+          const hoy = new Date();
+          const diaSemana = hoy.toLocaleDateString('es-CO', { weekday: 'long' });
+          const fechaCompleta = hoy.toLocaleDateString('es-CO', { day: '2-digit', month: 'long', year: 'numeric' });
+
           return (
-            <div className={`sticky top-0 z-20 ${T.bg} backdrop-blur-xl border-b ${T.border} shadow-sm ${T.shadow} px-4 sm:px-6 h-16 flex items-center gap-4`}>
+            <div className={`sticky top-0 z-20 ${T.bg} backdrop-blur-xl border-b ${T.border} shadow-[0_1px_20px_rgba(0,0,0,0.35)] h-[72px] flex items-center gap-3 px-4 sm:px-5`}>
 
               {/* Hamburger móvil */}
-              <button className="lg:hidden flex flex-col gap-1 p-1.5 rounded-md text-gray-400 hover:text-yellow-400 hover:bg-yellow-500/10 transition-all flex-shrink-0"
+              <button className="lg:hidden flex flex-col gap-[5px] p-2 rounded-lg text-gray-400 hover:text-yellow-400 hover:bg-yellow-500/10 transition-all flex-shrink-0"
                 onClick={() => setMobileMenuOpen(true)} aria-label="Abrir menú">
-                <span className="block w-5 h-0.5 bg-current rounded" />
-                <span className="block w-5 h-0.5 bg-current rounded" />
-                <span className="block w-4 h-0.5 bg-current rounded" />
+                <span className="block w-5 h-[2px] bg-current rounded-full" />
+                <span className="block w-5 h-[2px] bg-current rounded-full" />
+                <span className="block w-3.5 h-[2px] bg-current rounded-full" />
               </button>
 
               {/* LOGO */}
               {clinicaConfig.logoUrl && (
-                <div className="h-11 w-11 rounded-2xl overflow-hidden border border-white/10 bg-white/5 shadow-lg flex-shrink-0 flex items-center justify-center p-1">
-                  <img src={clinicaConfig.logoUrl} alt="Logo clínica" className="h-full w-full object-contain"/>
+                <div className="h-12 flex-shrink-0 flex items-center">
+                  <img
+                    src={clinicaConfig.logoUrl}
+                    alt="Logo clínica"
+                    className="h-12 w-auto object-contain drop-shadow-[0_2px_8px_rgba(0,0,0,0.4)]"
+                    style={{ maxWidth: '120px' }}
+                  />
                 </div>
               )}
 
-              {/* NOMBRE CLÍNICA */}
-              <div className="flex flex-col leading-tight min-w-0 flex-1">
-                {clinicaConfig.nombre ? (
-                  <>
-                    <span className={`text-[9px] uppercase tracking-[0.2em] font-bold ${T.sub}`}>Sistema de Gestión Clínica</span>
-                    <span className={`text-xl font-black bg-gradient-to-r ${T.nameGrad} bg-clip-text text-transparent leading-tight tracking-tight truncate`}>
-                      {clinicaConfig.nombre}
-                    </span>
-                  </>
-                ) : (
-                  <span className={`text-xl font-black bg-gradient-to-r ${T.nameGrad} bg-clip-text text-transparent leading-tight`}>
-                    EstetIA
-                  </span>
-                )}
+              {/* Divisor vertical */}
+              {clinicaConfig.logoUrl && clinicaConfig.nombre && (
+                <div className="h-10 w-px flex-shrink-0" style={{ background: 'linear-gradient(to bottom, transparent, rgba(255,255,255,0.12), transparent)' }} />
+              )}
+
+              {/* NOMBRE + SUBTÍTULO */}
+              <div className="flex flex-col justify-center leading-tight flex-1 min-w-0 overflow-hidden">
+                <span className={`text-[9px] uppercase tracking-[0.22em] font-bold ${T.sub} whitespace-nowrap`}>
+                  Sistema de Gestión Clínica
+                </span>
+                <h1 className={`text-[22px] sm:text-[26px] font-black bg-gradient-to-r ${T.nameGrad} bg-clip-text text-transparent leading-tight tracking-tight whitespace-nowrap overflow-hidden text-ellipsis`}
+                  style={{ lineHeight: '1.1' }}>
+                  {clinicaConfig.nombre || 'EstetIA'}
+                </h1>
               </div>
 
               {/* FECHA + ONLINE */}
-              <div className="flex items-center gap-3 flex-shrink-0 ml-auto">
-                <div className={`hidden sm:flex flex-col items-end leading-tight ${T.date}`}>
-                  <span className="text-[10px] font-semibold capitalize">
-                    {new Date().toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-                  </span>
+              <div className="flex items-center gap-4 flex-shrink-0 ml-auto">
+                <div className={`hidden sm:flex flex-col items-end leading-snug`}>
+                  <span className={`text-[11px] font-semibold capitalize ${T.date}`}>{diaSemana}</span>
+                  <span className={`text-[10px] capitalize ${T.dateSub}`}>{fechaCompleta}</span>
                 </div>
-                <div className="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/20 rounded-full px-3 py-1">
+                <div className="w-px h-8 hidden sm:block" style={{ background: 'linear-gradient(to bottom, transparent, rgba(255,255,255,0.08), transparent)' }} />
+                <div className="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/25 rounded-full px-3 py-1.5">
                   <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse"/>
-                  <span className="text-emerald-400 text-[10px] font-semibold tracking-wide">ONLINE</span>
+                  <span className="text-emerald-400 text-[10px] font-bold tracking-widest">ONLINE</span>
                 </div>
               </div>
 
