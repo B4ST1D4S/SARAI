@@ -403,6 +403,7 @@ function ModalNuevaCaptura({ faseInicial, diaInicial, onClose, onGuardar }: {
   const [notas, setNotas]                 = useState('');
   const [tags, setTags]                   = useState('');
   const [dia, setDia]                     = useState(diaInicial);
+  const [fechaFoto, setFechaFoto]         = useState(() => new Date().toISOString().split('T')[0]);
   const [preview, setPreview]             = useState<string | null>(null);
   const [drag, setDrag]                   = useState(false);
   const inputRef                          = useRef<HTMLInputElement>(null);
@@ -418,7 +419,7 @@ function ModalNuevaCaptura({ faseInicial, diaInicial, onClose, onGuardar }: {
     if (!preview) return;
     onGuardar({
       fase, region, procedimiento, notas, diaProcedimiento: dia,
-      src: preview, fecha: new Date(),
+      src: preview, fecha: new Date(fechaFoto + 'T12:00:00'),
       tags: tags.split(',').map(t => t.trim()).filter(Boolean),
       ia_ready: !!(region && procedimiento && notas),
     });
@@ -482,17 +483,29 @@ function ModalNuevaCaptura({ faseInicial, diaInicial, onClose, onGuardar }: {
               ))}
             </div>
           </div>
-          <div>
-            <label className="text-[11px] text-gray-500 uppercase tracking-wider font-medium block mb-2">Dia post-procedimiento</label>
-            <div className="flex flex-wrap gap-1.5">
-              {HITOS_DIAS.map(h => (
-                <button key={h.dia} onClick={() => setDia(h.dia)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-medium transition border ${
-                    dia === h.dia ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/40' : 'bg-white/3 text-gray-500 border-white/8 hover:border-white/15'
-                  }`}>
-                  {h.label}
-                </button>
-              ))}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-[11px] text-gray-500 uppercase tracking-wider font-medium flex items-center gap-1 mb-2">
+                <Clock size={10}/> Fecha de la foto
+              </label>
+              <input
+                type="date"
+                value={fechaFoto}
+                onChange={e => setFechaFoto(e.target.value)}
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 [color-scheme:dark]"/>
+            </div>
+            <div>
+              <label className="text-[11px] text-gray-500 uppercase tracking-wider font-medium block mb-2">Dia post-procedimiento</label>
+              <div className="flex flex-wrap gap-1.5">
+                {HITOS_DIAS.map(h => (
+                  <button key={h.dia} onClick={() => setDia(h.dia)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-medium transition border ${
+                      dia === h.dia ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/40' : 'bg-white/3 text-gray-500 border-white/8 hover:border-white/15'
+                    }`}>
+                    {h.label}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
           <div>
@@ -885,7 +898,8 @@ export default function VisualClinicoPage() {
                           <div className="p-1.5 space-y-0.5">
                             <FaseBadge fase={r.fase}/>
                             {r.pacienteNombre && <p className="text-[9px] text-emerald-400 font-medium truncate">{r.pacienteNombre}</p>}
-                            {r.diaProcedimiento > 0 && <p className="text-[9px] text-gray-600">Dia {r.diaProcedimiento}</p>}
+                            <p className="text-[9px] text-gray-500">{r.fecha.toLocaleDateString('es-CO', { day:'2-digit', month:'short', year:'numeric' })}</p>
+                            {r.diaProcedimiento > 0 && <p className="text-[9px] text-yellow-500/70">Día {r.diaProcedimiento}</p>}
                           </div>
                           {r.ia_ready && (
                             <div className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-purple-500/30 border border-purple-500/50 flex items-center justify-center">
