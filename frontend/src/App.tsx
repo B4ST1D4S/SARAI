@@ -259,8 +259,12 @@ function App() {
   const [historiaSeccionActiva, setHistoriaSeccionActiva] = useState<string>('motivo-consulta');
   const [historiaPacienteId, setHistoriaPacienteId] = useState<string | undefined>(undefined);
   const camposHandlerRef = useRef<((c: Record<string, string>) => void) | null>(null);
-  const [clinicaConfig, setClinicaConfig] = useState<{ nombre: string; logoUrl: string }>({ nombre: '', logoUrl: '' });
-  const [clinicaLoaded, setClinicaLoaded] = useState(false);
+  const [clinicaConfig, setClinicaConfig] = useState<{ nombre: string; logoUrl: string }>(() => {
+    try {
+      const cached = localStorage.getItem('sarai_clinica_config');
+      return cached ? JSON.parse(cached) : { nombre: '', logoUrl: '' };
+    } catch { return { nombre: '', logoUrl: '' }; }
+  });
   const { theme } = useTheme();
   // Ref para currentPage — evita stale closure en callbacks de SARAI
   const currentPageRef = useRef(currentPage);
@@ -283,10 +287,11 @@ function App() {
       .then((data) => {
         const map: Record<string, string> = {};
         data.forEach((p: any) => { map[p.clave] = p.valor; });
-        setClinicaConfig({ nombre: map['nombre_clinica'] || '', logoUrl: map['logo_url'] || '' });
-        setClinicaLoaded(true);
+        const config = { nombre: map['nombre_clinica'] || '', logoUrl: map['logo_url'] || '' };
+        setClinicaConfig(config);
+        localStorage.setItem('sarai_clinica_config', JSON.stringify(config));
       })
-      .catch(() => { setClinicaLoaded(true); });
+      .catch(() => { /* mantener cache existente */ });
   }, [user]);
 
   const handleLogout = () => {
@@ -295,7 +300,7 @@ function App() {
     setUser(null);
     setCurrentPage('auth');
     setClinicaConfig({ nombre: '', logoUrl: '' });
-    setClinicaLoaded(false);
+    localStorage.removeItem('sarai_clinica_config');
   };
 
   if (!user) {
@@ -377,7 +382,7 @@ function App() {
               {/* NOMBRE CLÍNICA */}
               <div className="flex items-center flex-1 min-w-0 overflow-hidden">
                 <h1 className={`text-[22px] sm:text-[28px] font-black bg-gradient-to-r ${T.nameGrad} bg-clip-text text-transparent tracking-tight whitespace-nowrap overflow-hidden text-ellipsis`}>
-                  {clinicaLoaded ? (clinicaConfig.nombre || 'EstetIA') : ''}
+                  {clinicaConfig.nombre || 'EstetIA'}
                 </h1>
               </div>
 
