@@ -25,6 +25,7 @@ import CotizacionesPage from './pages/CotizacionesPage';
 import SaraiAssistant from './components/SaraiAssistant';
 import saraiLogo from './assets/logo1.png';
 import { getParametrosSistema } from './services/adminService';
+import { useTheme } from './hooks/useTheme';
 
 const NAV_SECTIONS = [
   {
@@ -259,6 +260,7 @@ function App() {
   const [historiaPacienteId, setHistoriaPacienteId] = useState<string | undefined>(undefined);
   const camposHandlerRef = useRef<((c: Record<string, string>) => void) | null>(null);
   const [clinicaConfig, setClinicaConfig] = useState<{ nombre: string; logoUrl: string }>({ nombre: '', logoUrl: '' });
+  const { theme } = useTheme();
   // Ref para currentPage — evita stale closure en callbacks de SARAI
   const currentPageRef = useRef(currentPage);
   useEffect(() => { currentPageRef.current = currentPage; }, [currentPage]);
@@ -328,53 +330,64 @@ function App() {
             sidebarCollapsed ? 'lg:ml-[68px]' : 'lg:ml-[236px]'
           }`}
         >
-        <div className="sticky top-0 z-20 bg-[#080a0f]/95 backdrop-blur-xl border-b border-white/[0.06] px-4 sm:px-6 h-14 flex items-center justify-between shadow-sm shadow-black/40">
-          {/* IZQUIERDA: hamburger + página + fecha */}
-          <div className="flex items-center gap-3 min-w-0">
-            <button
-              className="lg:hidden flex flex-col gap-1 p-1.5 mr-1 rounded-md text-gray-400 hover:text-yellow-400 hover:bg-yellow-500/10 transition-all"
-              onClick={() => setMobileMenuOpen(true)}
-              aria-label="Abrir menú"
-            >
-              <span className="block w-5 h-0.5 bg-current rounded" />
-              <span className="block w-5 h-0.5 bg-current rounded" />
-              <span className="block w-4 h-0.5 bg-current rounded" />
-            </button>
-            <div className="flex flex-col leading-tight">
-              <h2 className="text-white font-semibold text-sm leading-tight">{currentLabel}</h2>
-              <span className="text-gray-600 text-[10px] hidden sm:block capitalize leading-tight">
-                {new Date().toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long' })}
-              </span>
-            </div>
-          </div>
+        {/* ══════ TOPBAR PREMIUM ══════ */}
+        {(() => {
+          const T = {
+            'dark':          { bg: 'bg-[#0a0c12]',     border: 'border-white/[0.07]', shadow: 'shadow-black/60',   nameGrad: 'from-yellow-300 via-amber-400 to-yellow-500',  sub: 'text-yellow-500/45',  date: 'text-gray-500' },
+            'premium-light': { bg: 'bg-white',          border: 'border-slate-200',    shadow: 'shadow-slate-200/60',nameGrad: 'from-blue-700 via-indigo-600 to-blue-800',     sub: 'text-blue-500/55',    date: 'text-slate-500'},
+            'soft-medical':  { bg: 'bg-slate-50',       border: 'border-slate-200',    shadow: 'shadow-slate-100/80',nameGrad: 'from-teal-600 via-cyan-600 to-teal-700',       sub: 'text-teal-500/55',    date: 'text-slate-500'},
+            'executive-ai':  { bg: 'bg-[#0c1220]',      border: 'border-blue-500/15',  shadow: 'shadow-blue-900/60', nameGrad: 'from-blue-400 via-violet-400 to-blue-500',     sub: 'text-blue-400/40',    date: 'text-blue-300/60'},
+          }[theme] ?? { bg: 'bg-[#0a0c12]', border: 'border-white/[0.07]', shadow: 'shadow-black/60', nameGrad: 'from-yellow-300 via-amber-400 to-yellow-500', sub: 'text-yellow-500/45', date: 'text-gray-500' };
+          return (
+            <div className={`sticky top-0 z-20 ${T.bg} backdrop-blur-xl border-b ${T.border} shadow-sm ${T.shadow} px-4 sm:px-6 h-16 flex items-center gap-4`}>
 
-          {/* CENTRO: branding premium de la clínica */}
-          {(clinicaConfig.nombre || clinicaConfig.logoUrl) && (
-            <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2.5 pointer-events-none select-none">
+              {/* Hamburger móvil */}
+              <button className="lg:hidden flex flex-col gap-1 p-1.5 rounded-md text-gray-400 hover:text-yellow-400 hover:bg-yellow-500/10 transition-all flex-shrink-0"
+                onClick={() => setMobileMenuOpen(true)} aria-label="Abrir menú">
+                <span className="block w-5 h-0.5 bg-current rounded" />
+                <span className="block w-5 h-0.5 bg-current rounded" />
+                <span className="block w-4 h-0.5 bg-current rounded" />
+              </button>
+
+              {/* LOGO */}
               {clinicaConfig.logoUrl && (
-                <div className="w-8 h-8 rounded-xl overflow-hidden border border-yellow-400/25 bg-white/5 shadow-lg shadow-yellow-500/15 flex-shrink-0 p-0.5">
-                  <img src={clinicaConfig.logoUrl} alt="Logo" className="w-full h-full object-contain rounded-lg"/>
+                <div className="h-11 w-11 rounded-2xl overflow-hidden border border-white/10 bg-white/5 shadow-lg flex-shrink-0 flex items-center justify-center p-1">
+                  <img src={clinicaConfig.logoUrl} alt="Logo clínica" className="h-full w-full object-contain"/>
                 </div>
               )}
-              {clinicaConfig.nombre && (
-                <div className="flex flex-col leading-none">
-                  <span className="text-[8px] text-yellow-500/50 uppercase tracking-[0.18em] font-semibold">Centro Médico</span>
-                  <span className="text-sm font-black bg-gradient-to-r from-yellow-300 via-amber-400 to-yellow-500 bg-clip-text text-transparent tracking-tight leading-tight whitespace-nowrap" style={{ textShadow: 'none' }}>
-                    {clinicaConfig.nombre}
+
+              {/* NOMBRE CLÍNICA */}
+              <div className="flex flex-col leading-tight min-w-0 flex-1">
+                {clinicaConfig.nombre ? (
+                  <>
+                    <span className={`text-[9px] uppercase tracking-[0.2em] font-bold ${T.sub}`}>Sistema de Gestión Clínica</span>
+                    <span className={`text-xl font-black bg-gradient-to-r ${T.nameGrad} bg-clip-text text-transparent leading-tight tracking-tight truncate`}>
+                      {clinicaConfig.nombre}
+                    </span>
+                  </>
+                ) : (
+                  <span className={`text-xl font-black bg-gradient-to-r ${T.nameGrad} bg-clip-text text-transparent leading-tight`}>
+                    EstetIA
+                  </span>
+                )}
+              </div>
+
+              {/* FECHA + ONLINE */}
+              <div className="flex items-center gap-3 flex-shrink-0 ml-auto">
+                <div className={`hidden sm:flex flex-col items-end leading-tight ${T.date}`}>
+                  <span className="text-[10px] font-semibold capitalize">
+                    {new Date().toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
                   </span>
                 </div>
-              )}
-              {/* Línea decorativa lateral */}
-              <div className="w-px h-6 bg-gradient-to-b from-transparent via-yellow-400/30 to-transparent ml-0.5" />
-            </div>
-          )}
+                <div className="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/20 rounded-full px-3 py-1">
+                  <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse"/>
+                  <span className="text-emerald-400 text-[10px] font-semibold tracking-wide">ONLINE</span>
+                </div>
+              </div>
 
-          {/* DERECHA: indicador ONLINE */}
-          <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 rounded-full px-3 py-1 flex-shrink-0">
-            <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
-            <span className="text-emerald-400 text-[10px] font-medium tracking-wide">ONLINE</span>
-          </div>
-        </div>
+            </div>
+          );
+        })()}
         <div>
           {currentPage === 'dashboard'          && <DashboardPage onNavegar={setCurrentPage} />}
           {currentPage === 'pacientes'           && <PacientesPage />}
