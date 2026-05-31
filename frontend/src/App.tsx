@@ -371,13 +371,9 @@ function App() {
                 <div className="h-10 w-px flex-shrink-0" style={{ background: 'linear-gradient(to bottom, transparent, rgba(255,255,255,0.12), transparent)' }} />
               )}
 
-              {/* NOMBRE + SUBTÍTULO */}
-              <div className="flex flex-col justify-center leading-tight flex-1 min-w-0 overflow-hidden">
-                <span className={`text-[9px] uppercase tracking-[0.22em] font-bold ${T.sub} whitespace-nowrap`}>
-                  Sistema de Gestión Clínica
-                </span>
-                <h1 className={`text-[22px] sm:text-[26px] font-black bg-gradient-to-r ${T.nameGrad} bg-clip-text text-transparent leading-tight tracking-tight whitespace-nowrap overflow-hidden text-ellipsis`}
-                  style={{ lineHeight: '1.1' }}>
+              {/* NOMBRE CLÍNICA */}
+              <div className="flex items-center flex-1 min-w-0 overflow-hidden">
+                <h1 className={`text-[22px] sm:text-[28px] font-black bg-gradient-to-r ${T.nameGrad} bg-clip-text text-transparent tracking-tight whitespace-nowrap overflow-hidden text-ellipsis`}>
                   {clinicaConfig.nombre || 'EstetIA'}
                 </h1>
               </div>
