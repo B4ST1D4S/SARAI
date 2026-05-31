@@ -24,6 +24,7 @@ import CentralImpresionPage from './pages/CentralImpresionPage';
 import CotizacionesPage from './pages/CotizacionesPage';
 import SaraiAssistant from './components/SaraiAssistant';
 import saraiLogo from './assets/logo1.png';
+import { getParametrosSistema } from './services/adminService';
 
 const NAV_SECTIONS = [
   {
@@ -257,6 +258,7 @@ function App() {
   const [historiaSeccionActiva, setHistoriaSeccionActiva] = useState<string>('motivo-consulta');
   const [historiaPacienteId, setHistoriaPacienteId] = useState<string | undefined>(undefined);
   const camposHandlerRef = useRef<((c: Record<string, string>) => void) | null>(null);
+  const [clinicaConfig, setClinicaConfig] = useState<{ nombre: string; logoUrl: string }>({ nombre: '', logoUrl: '' });
   // Ref para currentPage — evita stale closure en callbacks de SARAI
   const currentPageRef = useRef(currentPage);
   useEffect(() => { currentPageRef.current = currentPage; }, [currentPage]);
@@ -271,11 +273,24 @@ function App() {
     }
   }, []);
 
+  // Cargar configuración de la clínica al iniciar sesión
+  useEffect(() => {
+    if (!user) return;
+    (getParametrosSistema('clinica') as Promise<any[]>)
+      .then((data) => {
+        const map: Record<string, string> = {};
+        data.forEach((p: any) => { map[p.clave] = p.valor; });
+        setClinicaConfig({ nombre: map['nombre'] || '', logoUrl: map['logo_url'] || '' });
+      })
+      .catch(() => { /* noop */ });
+  }, [user]);
+
   const handleLogout = () => {
     localStorage.removeItem('accessToken');
     localStorage.removeItem('user');
     setUser(null);
     setCurrentPage('auth');
+    setClinicaConfig({ nombre: '', logoUrl: '' });
   };
 
   if (!user) {
@@ -313,9 +328,9 @@ function App() {
             sidebarCollapsed ? 'lg:ml-[68px]' : 'lg:ml-[236px]'
           }`}
         >
-        <div className="sticky top-0 z-20 bg-[#080a0f]/90 backdrop-blur-md border-b border-white/5 px-4 sm:px-6 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            {/* Hamburger — solo visible en móvil */}
+        <div className="sticky top-0 z-20 bg-[#080a0f]/95 backdrop-blur-xl border-b border-white/[0.06] px-4 sm:px-6 h-14 flex items-center justify-between shadow-sm shadow-black/40">
+          {/* IZQUIERDA: hamburger + página + fecha */}
+          <div className="flex items-center gap-3 min-w-0">
             <button
               className="lg:hidden flex flex-col gap-1 p-1.5 mr-1 rounded-md text-gray-400 hover:text-yellow-400 hover:bg-yellow-500/10 transition-all"
               onClick={() => setMobileMenuOpen(true)}
@@ -325,12 +340,37 @@ function App() {
               <span className="block w-5 h-0.5 bg-current rounded" />
               <span className="block w-4 h-0.5 bg-current rounded" />
             </button>
-            <h2 className="text-white font-semibold text-sm">{currentLabel}</h2>
-            <span className="text-gray-700 text-xs hidden sm:block">
-              {new Date().toLocaleDateString('es-CO', { weekday: 'long', month: 'long', day: 'numeric' })}
-            </span>
+            <div className="flex flex-col leading-tight">
+              <h2 className="text-white font-semibold text-sm leading-tight">{currentLabel}</h2>
+              <span className="text-gray-600 text-[10px] hidden sm:block capitalize leading-tight">
+                {new Date().toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long' })}
+              </span>
+            </div>
           </div>
-          <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 rounded-full px-3 py-1">
+
+          {/* CENTRO: branding premium de la clínica */}
+          {(clinicaConfig.nombre || clinicaConfig.logoUrl) && (
+            <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2.5 pointer-events-none select-none">
+              {clinicaConfig.logoUrl && (
+                <div className="w-8 h-8 rounded-xl overflow-hidden border border-yellow-400/25 bg-white/5 shadow-lg shadow-yellow-500/15 flex-shrink-0 p-0.5">
+                  <img src={clinicaConfig.logoUrl} alt="Logo" className="w-full h-full object-contain rounded-lg"/>
+                </div>
+              )}
+              {clinicaConfig.nombre && (
+                <div className="flex flex-col leading-none">
+                  <span className="text-[8px] text-yellow-500/50 uppercase tracking-[0.18em] font-semibold">Centro Médico</span>
+                  <span className="text-sm font-black bg-gradient-to-r from-yellow-300 via-amber-400 to-yellow-500 bg-clip-text text-transparent tracking-tight leading-tight whitespace-nowrap" style={{ textShadow: 'none' }}>
+                    {clinicaConfig.nombre}
+                  </span>
+                </div>
+              )}
+              {/* Línea decorativa lateral */}
+              <div className="w-px h-6 bg-gradient-to-b from-transparent via-yellow-400/30 to-transparent ml-0.5" />
+            </div>
+          )}
+
+          {/* DERECHA: indicador ONLINE */}
+          <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 rounded-full px-3 py-1 flex-shrink-0">
             <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
             <span className="text-emerald-400 text-[10px] font-medium tracking-wide">ONLINE</span>
           </div>
