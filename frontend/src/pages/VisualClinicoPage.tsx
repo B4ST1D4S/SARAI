@@ -599,6 +599,16 @@ export default function VisualClinicoPage() {
     return () => window.removeEventListener('keydown', handler);
   }, [zoom, navZoom]);
 
+  // Auto-guardar registros en localStorage cuando cambian
+  useEffect(() => {
+    if (!pacienteId) return;
+    try {
+      localStorage.setItem(`sarai_visual_${pacienteId}`, JSON.stringify(registros));
+    } catch {
+      // Cuota de almacenamiento excedida
+    }
+  }, [registros, pacienteId]);
+
   const buscarPaciente = async () => {
     const q = pacienteSearch.trim();
     if (!q) return;
@@ -701,7 +711,25 @@ export default function VisualClinicoPage() {
                 <div className="absolute top-full left-0 mt-1 w-72 bg-[#0d1117] border border-white/10 rounded-2xl overflow-hidden shadow-2xl z-30">
                   {pacientesBuscados.map((p: any) => (
                     <button key={p.id}
-                      onClick={() => { setPacienteNombreDisplay(p.nombreCompleto); setPacienteId(p.id); setPacientesBuscados([]); setPacienteSearch(''); }}
+                      onClick={() => {
+                        const pid = p.id;
+                        // Cargar registros guardados para este paciente
+                        try {
+                          const saved = localStorage.getItem(`sarai_visual_${pid}`);
+                          if (saved) {
+                            const parsed = JSON.parse(saved);
+                            setRegistros(parsed.map((r: any) => ({ ...r, fecha: new Date(r.fecha) })));
+                          } else {
+                            setRegistros([]);
+                          }
+                        } catch {
+                          setRegistros([]);
+                        }
+                        setPacienteNombreDisplay(p.nombreCompleto);
+                        setPacienteId(pid);
+                        setPacientesBuscados([]);
+                        setPacienteSearch('');
+                      }}
                       className="w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-white/8 border-b border-white/5 last:border-0 text-left transition">
                       <div className="w-7 h-7 rounded-lg bg-emerald-500/15 border border-emerald-500/25 flex items-center justify-center flex-shrink-0">
                         <User size={12} className="text-emerald-400"/>
