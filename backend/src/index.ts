@@ -126,7 +126,13 @@ async function startServer() {
   });
 }
 
-startServer().catch((error) => {
-  console.error('Fatal error:', error);
-  process.exit(1);
-});
+// Exportar app para Vercel serverless
+export default app;
+
+// Iniciar servidor solo en entorno local (no en Vercel)
+if (!process.env.VERCEL) {
+  startServer().catch((error) => {
+    console.error('Fatal error:', error);
+    process.exit(1);
+  });
+}
