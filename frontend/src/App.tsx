@@ -24,6 +24,8 @@ import CentralImpresionPage from './pages/CentralImpresionPage';
 import CotizacionesPage from './pages/CotizacionesPage';
 import SaraiAssistant from './components/SaraiAssistant';
 import saraiLogo from './assets/logo1.png';
+import { getParametrosSistema } from './services/adminService';
+import { useTheme } from './hooks/useTheme';
 
 const NAV_SECTIONS = [
   {
@@ -257,6 +259,13 @@ function App() {
   const [historiaSeccionActiva, setHistoriaSeccionActiva] = useState<string>('motivo-consulta');
   const [historiaPacienteId, setHistoriaPacienteId] = useState<string | undefined>(undefined);
   const camposHandlerRef = useRef<((c: Record<string, string>) => void) | null>(null);
+  const [clinicaConfig, setClinicaConfig] = useState<{ nombre: string; logoUrl: string }>(() => {
+    try {
+      const cached = localStorage.getItem('sarai_clinica_config');
+      return cached ? JSON.parse(cached) : { nombre: '', logoUrl: '' };
+    } catch { return { nombre: '', logoUrl: '' }; }
+  });
+  const { theme } = useTheme();
   // Ref para currentPage — evita stale closure en callbacks de SARAI
   const currentPageRef = useRef(currentPage);
   useEffect(() => { currentPageRef.current = currentPage; }, [currentPage]);
@@ -271,11 +280,27 @@ function App() {
     }
   }, []);
 
+  // Cargar configuración de la clínica al iniciar sesión
+  useEffect(() => {
+    if (!user) return;
+    (getParametrosSistema('clinica') as Promise<any[]>)
+      .then((data) => {
+        const map: Record<string, string> = {};
+        data.forEach((p: any) => { map[p.clave] = p.valor; });
+        const config = { nombre: map['nombre_clinica'] || '', logoUrl: map['logo_url'] || '' };
+        setClinicaConfig(config);
+        localStorage.setItem('sarai_clinica_config', JSON.stringify(config));
+      })
+      .catch(() => { /* mantener cache existente */ });
+  }, [user]);
+
   const handleLogout = () => {
     localStorage.removeItem('accessToken');
     localStorage.removeItem('user');
     setUser(null);
     setCurrentPage('auth');
+    setClinicaConfig({ nombre: '', logoUrl: '' });
+    localStorage.removeItem('sarai_clinica_config');
   };
 
   if (!user) {
@@ -313,28 +338,69 @@ function App() {
             sidebarCollapsed ? 'lg:ml-[68px]' : 'lg:ml-[236px]'
           }`}
         >
-        <div className="sticky top-0 z-20 bg-[#080a0f]/90 backdrop-blur-md border-b border-white/5 px-4 sm:px-6 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            {/* Hamburger — solo visible en móvil */}
-            <button
-              className="lg:hidden flex flex-col gap-1 p-1.5 mr-1 rounded-md text-gray-400 hover:text-yellow-400 hover:bg-yellow-500/10 transition-all"
-              onClick={() => setMobileMenuOpen(true)}
-              aria-label="Abrir menú"
-            >
-              <span className="block w-5 h-0.5 bg-current rounded" />
-              <span className="block w-5 h-0.5 bg-current rounded" />
-              <span className="block w-4 h-0.5 bg-current rounded" />
-            </button>
-            <h2 className="text-white font-semibold text-sm">{currentLabel}</h2>
-            <span className="text-gray-700 text-xs hidden sm:block">
-              {new Date().toLocaleDateString('es-CO', { weekday: 'long', month: 'long', day: 'numeric' })}
-            </span>
-          </div>
-          <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 rounded-full px-3 py-1">
-            <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
-            <span className="text-emerald-400 text-[10px] font-medium tracking-wide">ONLINE</span>
-          </div>
-        </div>
+        {/* ══════ TOPBAR PREMIUM ══════ */}
+        {(() => {
+          const T = {
+            'dark':          { bg: 'bg-[#0a0c13]',    border: 'border-white/[0.06]',  nameGrad: 'from-yellow-300 via-amber-400 to-yellow-500', sub: 'text-yellow-500/50', date: 'text-gray-400',    dateSub: 'text-gray-600'    },
+            'premium-light': { bg: 'bg-white',         border: 'border-slate-200',     nameGrad: 'from-blue-700 via-indigo-600 to-blue-800',    sub: 'text-blue-500/60',   date: 'text-slate-600',   dateSub: 'text-slate-400'   },
+            'soft-medical':  { bg: 'bg-slate-50',      border: 'border-slate-200',     nameGrad: 'from-teal-600 via-cyan-600 to-teal-700',      sub: 'text-teal-500/60',   date: 'text-slate-500',   dateSub: 'text-slate-400'   },
+            'executive-ai':  { bg: 'bg-[#0c1220]',     border: 'border-blue-400/12',   nameGrad: 'from-blue-400 via-violet-400 to-blue-500',    sub: 'text-blue-400/45',   date: 'text-blue-300/70', dateSub: 'text-blue-400/40' },
+          }[theme] ?? { bg: 'bg-[#0a0c13]', border: 'border-white/[0.06]', nameGrad: 'from-yellow-300 via-amber-400 to-yellow-500', sub: 'text-yellow-500/50', date: 'text-gray-400', dateSub: 'text-gray-600' };
+
+          const hoy = new Date();
+          const diaSemana = hoy.toLocaleDateString('es-CO', { weekday: 'long' });
+          const fechaCompleta = hoy.toLocaleDateString('es-CO', { day: '2-digit', month: 'long', year: 'numeric' });
+
+          return (
+            <div className={`sticky top-0 z-20 ${T.bg} backdrop-blur-xl border-b ${T.border} shadow-[0_2px_24px_rgba(0,0,0,0.45)] h-[80px] flex items-center px-4 sm:px-6 relative`}>
+
+              {/* ── IZQUIERDA: hamburger + logo ── */}
+              <div className="flex items-center gap-3 flex-shrink-0 z-10">
+                <button className="lg:hidden flex flex-col gap-[5px] p-2 rounded-lg text-gray-400 hover:text-yellow-400 hover:bg-yellow-500/10 transition-all"
+                  onClick={() => setMobileMenuOpen(true)} aria-label="Abrir menú">
+                  <span className="block w-5 h-[2px] bg-current rounded-full" />
+                  <span className="block w-5 h-[2px] bg-current rounded-full" />
+                  <span className="block w-3.5 h-[2px] bg-current rounded-full" />
+                </button>
+                {clinicaConfig.logoUrl && (
+                  <img
+                    src={clinicaConfig.logoUrl}
+                    alt="Logo clínica"
+                    className="h-14 w-auto object-contain"
+                    style={{ maxWidth: '140px', filter: 'drop-shadow(0 2px 10px rgba(0,0,0,0.5))' }}
+                  />
+                )}
+              </div>
+
+              {/* ── CENTRO ABSOLUTO: nombre clínica ── */}
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none select-none">
+                <h1
+                  className={`text-[28px] sm:text-[34px] font-black tracking-wide bg-gradient-to-r ${T.nameGrad} bg-clip-text text-transparent leading-none whitespace-nowrap`}
+                  style={{ letterSpacing: '0.04em' }}
+                >
+                  {clinicaConfig.nombre || 'EstetIA'}
+                </h1>
+                {/* Línea decorativa bajo el nombre */}
+                <div className="mt-[5px] h-[2px] w-48 sm:w-64 rounded-full"
+                  style={{ background: `linear-gradient(90deg, transparent, ${theme === 'premium-light' || theme === 'soft-medical' ? 'rgba(99,102,241,0.45)' : 'rgba(212,175,55,0.55)'}, transparent)` }} />
+              </div>
+
+              {/* ── DERECHA: fecha + online ── */}
+              <div className="flex items-center gap-3 flex-shrink-0 ml-auto z-10">
+                <div className="hidden sm:flex flex-col items-end leading-snug">
+                  <span className={`text-[11px] font-semibold capitalize ${T.date}`}>{diaSemana}</span>
+                  <span className={`text-[10px] capitalize ${T.dateSub}`}>{fechaCompleta}</span>
+                </div>
+                <div className="w-px h-8 hidden sm:block" style={{ background: 'linear-gradient(to bottom, transparent, rgba(255,255,255,0.1), transparent)' }} />
+                <div className="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/25 rounded-full px-3 py-1.5">
+                  <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse"/>
+                  <span className="text-emerald-400 text-[10px] font-bold tracking-widest">ONLINE</span>
+                </div>
+              </div>
+
+            </div>
+          );
+        })()}
         <div>
           {currentPage === 'dashboard'          && <DashboardPage onNavegar={setCurrentPage} />}
           {currentPage === 'pacientes'           && <PacientesPage />}
