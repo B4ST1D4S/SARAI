@@ -32,6 +32,8 @@ model User {
   historiasEditadas        HistoriaClinica[]
   pacientesCreados         Paciente[]
   procedimientosRealizados Procedimiento[]
+  cotizaciones             Cotizacion[]
+  crmLeads                 CrmLead[]   @relation("CrmLeadCreador")
 
   @@index([rol])
   @@index([email])
@@ -87,6 +89,8 @@ model Paciente {
   procedimientos    Procedimiento[]
   seguimientos      SeguimientoPostOp[]
   transacciones     Transaccion[]
+  cotizaciones      Cotizacion[]
+  crmLeads          CrmLead[]
 
   @@unique([numeroDocumento, tipoDocumento])
   @@index([nombreCompleto])
@@ -820,4 +824,59 @@ enum Role {
   AUXILIAR
   RECEPCIONISTA
   PACIENTE
+}
+
+model Cotizacion {
+  id                  String    @id @default(cuid())
+  pacienteId          String
+  medicoId            String
+  citaId              String?
+  descripcionServicio String
+  lineas              Json
+  subtotal            Float
+  descuentoPorcentaje Float     @default(0)
+  descuentoValor      Float     @default(0)
+  total               Float
+  notasAdicionales    String?
+  vigenciaHasta       DateTime
+  estado              String    @default("GENERADA")
+  creadoEn            DateTime  @default(now())
+  aceptadaEn          DateTime?
+  rechazadaEn         DateTime?
+  paciente            Paciente  @relation(fields: [pacienteId], references: [id])
+  medico              User      @relation(fields: [medicoId], references: [id])
+
+  @@index([pacienteId])
+  @@index([medicoId])
+  @@index([estado])
+  @@index([creadoEn])
+}
+
+model CrmLead {
+  id                String    @id @default(cuid())
+  nombre            String
+  telefono          String?
+  email             String?
+  procedimientos    String[]
+  etapa             String    @default("NUEVO_LEAD")
+  calificacion      String    @default("COLD")
+  valorEstimado     Float     @default(0)
+  origen            String?
+  notas             String?
+  observaciones     String?
+  tags              String[]
+  pacienteId        String?
+  creadoPor         String?
+  proximoContacto   DateTime?
+  ultimaInteraccion DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  paciente          Paciente? @relation(fields: [pacienteId], references: [id])
+  creador           User?     @relation("CrmLeadCreador", fields: [creadoPor], references: [id])
+
+  @@index([etapa])
+  @@index([calificacion])
+  @@index([pacienteId])
+  @@index([creadoPor])
 }

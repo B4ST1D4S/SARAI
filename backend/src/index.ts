@@ -16,6 +16,7 @@ import especialidadesRoutes from './routes/especialidades.js';
 import adminRoutes from './routes/admin.js';
 import pdfRoutes from './routes/pdf.js';
 import mapaCorporalRoutes from './routes/mapaCorporal.js';
+import crmRoutes from './routes/crm.js';
 
 dotenv.config();
 
@@ -66,6 +67,7 @@ app.use('/api/especialidades', especialidadesRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/pdf',   pdfRoutes);
 app.use('/api/mapa-corporal', mapaCorporalRoutes);
+app.use('/api/crm',          crmRoutes);
 
 // ============================================
 // MANEJO DE ERRORES

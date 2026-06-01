@@ -4,7 +4,7 @@
  */
 import { Request, Response } from 'express';
 import puppeteer from 'puppeteer';
-import prisma from '../lib/prisma.js';
+import prisma from '../lib/prisma.ts';
 import { buildHCHtml, buildOrdenesHtml } from '../utils/htmlTemplates.js';
 
 async function htmlToPdf(html: string): Promise<Buffer> {

@@ -1,4 +1,4 @@
-import prisma from '../lib/prisma.js';
+import prisma from '../lib/prisma.ts';
 import bcrypt from 'bcryptjs';
 
 // Campos que se devuelven (nunca la contraseña)

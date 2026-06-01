@@ -16,7 +16,7 @@ const getStoredUser = () => {
   try { return JSON.parse(localStorage.getItem('user') || '{}'); } catch { return {}; }
 };
 
-export default function DashboardPage() {
+export default function DashboardPage({ onNavegar }: { onNavegar?: (page: string) => void }) {
   const [stats, setStats] = useState({
     pacientesHoy: 0,
     citasProximas: 0,
@@ -342,6 +342,7 @@ export default function DashboardPage() {
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
+                onClick={() => onNavegar?.('cotizaciones')}
                 className="w-full bg-gradient-to-r from-pink-500 to-rose-600 hover:from-pink-600 hover:to-rose-700 text-white font-semibold py-3 rounded-xl transition-all duration-200 shadow-lg shadow-pink-500/20 flex items-center justify-center gap-2"
               >
                 <FileText size={20} />

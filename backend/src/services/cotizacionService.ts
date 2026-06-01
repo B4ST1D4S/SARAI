@@ -1,4 +1,4 @@
-import prisma from '../lib/prisma.js';
+import prisma from '../lib/prisma.ts';
 import nodemailer from 'nodemailer';
 
 // Configurar transporter de email
@@ -264,6 +264,27 @@ export async function rechazarCotizacion(id: string, motivo?: string) {
     });
 
     return cotizacion;
+  } catch (error) {
+    throw error;
+  }
+}
+
+// Listar cotizaciones del médico
+export async function getCotizacionesMedico(medicoId: string) {
+  try {
+    const cotizaciones = await prisma.cotizacion.findMany({
+      where: { medicoId },
+      include: {
+        paciente: {
+          select: { id: true, nombreCompleto: true, email: true, numeroDocumento: true },
+        },
+        medico: {
+          select: { id: true, nombre: true, apellido: true },
+        },
+      },
+      orderBy: { creadoEn: 'desc' },
+    });
+    return cotizaciones;
   } catch (error) {
     throw error;
   }
