@@ -866,37 +866,38 @@ export default function MapaCorporalPage() {
             {/* Recomendaciones */}
             <div>
               <label className="text-xs font-bold text-blue-400 block mb-1.5">💡 RECOMENDACIONES QUIRÚRGICAS</label>
-              {/* Chips predefinidos — clic para agregar/quitar */}
+              {/* Chips predefinidos — verde si ya está agregada, azul si pendiente */}
               <div className="flex flex-wrap gap-1 mb-1.5">
                 {RECOMENDACIONES_PREDEFINIDAS.map((rec, i) => {
-                  const isSelected = evolucionForm.recomendaciones.includes(rec);
+                  const isAdded = evolucionForm.recomendaciones.includes(rec);
                   return (
                     <button
                       key={i}
                       onClick={() => {
-                        const current = evolucionForm.recomendaciones;
-                        let newVal: string;
-                        if (isSelected) {
-                          // Quitar la recomendación del texto
-                          newVal = current
-                            .replace('\n• ' + rec, '')
-                            .replace('• ' + rec, '')
+                        if (isAdded) {
+                          const newVal = evolucionForm.recomendaciones
+                            .split('\n')
+                            .filter(line => !line.includes(rec))
+                            .join('\n')
+                            .replace(/\n{2,}/g, '\n')
                             .trim();
+                          setEvolucionForm(prev => ({ ...prev, recomendaciones: newVal }));
+                          autoSaveEvolucion(evolucionForm.observacionesFrontal, newVal);
                         } else {
-                          // Agregar la recomendación
-                          newVal = current ? current + '\n• ' + rec : '• ' + rec;
+                          const current = evolucionForm.recomendaciones;
+                          const newVal = current ? current + '\n• ' + rec : '• ' + rec;
+                          setEvolucionForm(prev => ({ ...prev, recomendaciones: newVal }));
+                          autoSaveEvolucion(evolucionForm.observacionesFrontal, newVal);
                         }
-                        setEvolucionForm(prev => ({ ...prev, recomendaciones: newVal }));
-                        autoSaveEvolucion(evolucionForm.observacionesFrontal, newVal);
                       }}
-                      className={`px-1.5 py-0.5 border text-[10px] rounded-full transition cursor-pointer leading-tight font-semibold ${
-                        isSelected
-                          ? 'bg-emerald-700/70 hover:bg-red-700/70 border-emerald-500/70 text-emerald-200 hover:text-red-200 hover:border-red-500/70'
+                      className={`px-1.5 py-0.5 border text-[10px] rounded-full transition cursor-pointer leading-tight ${
+                        isAdded
+                          ? 'bg-emerald-900/60 hover:bg-red-900/60 border-emerald-500/60 text-emerald-300 hover:text-red-300 hover:border-red-500/60'
                           : 'bg-blue-900/40 hover:bg-blue-700/60 border-blue-600/40 text-blue-300'
                       }`}
-                      title={isSelected ? 'Clic para eliminar' : 'Clic para agregar'}
+                      title={isAdded ? 'Clic para eliminar' : 'Clic para agregar'}
                     >
-                      {isSelected ? '− ' : '+ '}{rec}
+                      {isAdded ? `− ${rec}` : `+ ${rec}`}
                     </button>
                   );
                 })}

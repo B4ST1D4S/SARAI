@@ -406,3 +406,22 @@ export async function deleteMapaCorporal(id: string, token: string) {
   });
 }
 
+// ─────────────────────────────────────────
+// Cotizaciones
+// ─────────────────────────────────────────
+export async function getCotizaciones(token: string) {
+  return apiCall<{ cotizaciones: any[] }>('/cotizaciones', { token });
+}
+
+export async function createCotizacion(data: any, token: string) {
+  return apiCall('/cotizaciones', { method: 'POST', body: data, token });
+}
+
+export async function aceptarCotizacion(id: string, token: string) {
+  return apiCall(`/cotizaciones/${id}/aceptar`, { method: 'POST', token });
+}
+
+export async function rechazarCotizacion(id: string, token: string) {
+  return apiCall(`/cotizaciones/${id}/rechazar`, { method: 'POST', token });
+}
+

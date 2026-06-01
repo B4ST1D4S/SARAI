@@ -21,6 +21,7 @@ import { Body3DTestPage } from './pages/Body3DTestPage';
 import UsuariosPage from './pages/UsuariosPage';
 import AdminPage from './pages/AdminPage';
 import CentralImpresionPage from './pages/CentralImpresionPage';
+import CotizacionesPage from './pages/CotizacionesPage';
 import SaraiAssistant from './components/SaraiAssistant';
 import saraiLogo from './assets/logo1.png';
 
@@ -50,6 +51,7 @@ const NAV_SECTIONS = [
     label: 'GESTION',
     items: [
       { id: 'consentimiento', label: 'Consentimiento', sym: 'K' },
+      { id: 'cotizaciones',   label: 'Cotizaciones',   sym: 'O' },
       { id: 'crm',            label: 'CRM',            sym: 'R' },
       { id: 'facturacion',    label: 'Facturacion',    sym: 'B' },
       { id: 'plantillas',     label: 'Plantillas',     sym: 'L' },
@@ -334,7 +336,7 @@ function App() {
           </div>
         </div>
         <div>
-          {currentPage === 'dashboard'          && <DashboardPage />}
+          {currentPage === 'dashboard'          && <DashboardPage onNavegar={setCurrentPage} />}
           {currentPage === 'pacientes'           && <PacientesPage />}
           {currentPage === 'historia' && (
             <HistoriaClinicaPage
@@ -366,7 +368,8 @@ function App() {
           )}
           {currentPage === 'vista-cirujano'      && <VistaCirujanoPage />}
           {currentPage === 'followup'            && <FollowUpPage />}
-          {currentPage === 'crm'                 && <CRMPage />}
+          {currentPage === 'crm'                 && <CRMPage onNavegar={setCurrentPage} />}
+          {currentPage === 'cotizaciones'        && <CotizacionesPage />}
           {currentPage === 'facturacion'         && <FacturacionPage />}
           {currentPage === 'plantillas'          && <PlantillasPage />}
           {currentPage === 'impresion'           && <CentralImpresionPage />}
