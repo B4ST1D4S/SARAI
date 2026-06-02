@@ -42,24 +42,24 @@ export default function FacturacionPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 p-6">
+    <div className="min-h-screen bg-slate-900 p-3 sm:p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="flex justify-between items-center mb-8">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-5 sm:mb-8">
           <div>
-            <h1 className="text-4xl font-bold text-white mb-2">💳 Facturación & Pagos</h1>
-            <p className="text-gray-400">Gestión de cobros, cuotas y paquetes</p>
+            <h1 className="text-xl sm:text-3xl lg:text-4xl font-bold text-white mb-1 sm:mb-2">💳 Facturación</h1>
+            <p className="text-gray-400 text-xs sm:text-sm">Gestión de cobros, cuotas y paquetes</p>
           </div>
           <button
             onClick={() => setShowNewFactura(!showNewFactura)}
-            className="px-6 py-3 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg font-semibold transition"
+            className="px-4 py-2 sm:px-6 sm:py-3 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg font-semibold text-sm transition self-start sm:self-auto"
           >
             + Nueva Factura
           </button>
         </div>
 
         {/* KPI Cards */}
-        <div className="grid grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4 sm:mb-6">
           <motion.div
             whileHover={{ scale: 1.05 }}
             className="bg-gradient-to-br from-emerald-600 to-emerald-800 rounded-lg p-4 border border-emerald-500/30"

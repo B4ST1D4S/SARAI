@@ -3,6 +3,7 @@ import {
   createCotizacion,
   getCotizacionById,
   getCotizacionesPaciente,
+  getCotizacionesMedico,
   aceptarCotizacion,
   rechazarCotizacion,
 } from '../services/cotizacionService.js';
@@ -141,5 +142,20 @@ export async function rechazar(req: Request, res: Response): Promise<void> {
   } catch (error: any) {
     console.error('Error en rechazar:', error);
     res.status(500).json({ error: error.message || 'Error al rechazar cotización' });
+  }
+}
+
+// Listar todas las cotizaciones del médico autenticado
+export async function getAll(req: Request, res: Response): Promise<void> {
+  try {
+    if (!req.user) {
+      res.status(401).json({ error: 'No autenticado' });
+      return;
+    }
+    const cotizaciones = await getCotizacionesMedico(req.user.userId);
+    res.json({ success: true, count: cotizaciones.length, cotizaciones });
+  } catch (error: any) {
+    console.error('Error en getAll:', error);
+    res.status(500).json({ error: error.message || 'Error al obtener cotizaciones' });
   }
 }

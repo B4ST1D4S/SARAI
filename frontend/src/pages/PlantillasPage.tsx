@@ -151,16 +151,16 @@ export default function PlantillasPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 p-6">
+    <div className="min-h-screen bg-slate-900 p-3 sm:p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-white mb-2">📋 Plantillas por Procedimiento</h1>
-          <p className="text-gray-400">Historias clínicas adaptables por tipo de procedimiento</p>
+        <div className="mb-5 sm:mb-8">
+          <h1 className="text-xl sm:text-3xl lg:text-4xl font-bold text-white mb-1 sm:mb-2">📋 Plantillas</h1>
+          <p className="text-gray-400 text-xs sm:text-sm">Historias clínicas adaptables por tipo de procedimiento</p>
         </div>
 
         {/* Grid de Plantillas */}
-        <div className="grid grid-cols-3 gap-6 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6 mb-4 sm:mb-6">
           {plantillas.map((plantilla) => (
             <motion.div
               key={plantilla.id}

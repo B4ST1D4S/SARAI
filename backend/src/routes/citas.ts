@@ -9,6 +9,7 @@ import {
   completar,
   cancelar,
   recordatorios,
+  admision,
 } from '../controllers/citasController.js';
 import { authenticateToken, authorizeRole } from '../middleware/auth.js';
 
@@ -48,6 +49,9 @@ router.post(
 
 // DELETE /api/citas/:id - Cancelar cita
 router.delete('/:id', authorizeRole('MEDICO', 'RECEPCIONISTA', 'AUXILIAR'), cancelar);
+
+// POST /api/citas/:id/admision - CU-03: Registrar llegada del paciente (EN_SALA)
+router.post('/:id/admision', authorizeRole('MEDICO', 'RECEPCIONISTA', 'AUXILIAR'), admision);
 
 // POST /api/citas/recordatorios/enviar - Enviar recordatorios
 router.post('/recordatorios/enviar', recordatorios);

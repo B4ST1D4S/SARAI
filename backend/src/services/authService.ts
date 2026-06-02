@@ -1,20 +1,10 @@
-import { PrismaClient, Role } from '@prisma/client';
+import prisma from '../lib/prisma.js';
 import bcrypt from 'bcryptjs';
 import { generateToken, generateRefreshToken, TokenPayload } from '../utils/jwt.js';
 
-const prisma = new PrismaClient();
-
 export interface LoginRequest {
-  email: string;
+  username: string;
   password: string;
-}
-
-export interface RegisterRequest {
-  email: string;
-  password: string;
-  nombre: string;
-  apellido: string;
-  rol?: string;
 }
 
 export interface AuthResponse {
@@ -22,7 +12,7 @@ export interface AuthResponse {
   refreshToken: string;
   user: {
     id: string;
-    email: string;
+    username: string;
     nombre: string;
     apellido: string;
     rol: string;
@@ -31,8 +21,11 @@ export interface AuthResponse {
 
 export async function loginUser(request: LoginRequest): Promise<AuthResponse | null> {
   try {
-    const user = await prisma.user.findUnique({
-      where: { email: request.email },
+    // Buscar por username (case-insensitive)
+    const user = await prisma.user.findFirst({
+      where: {
+        username: { equals: request.username.trim().toLowerCase(), mode: 'insensitive' },
+      },
     });
 
     if (!user) {
@@ -50,9 +43,9 @@ export async function loginUser(request: LoginRequest): Promise<AuthResponse | n
     }
 
     const tokenPayload: TokenPayload = {
-      userId: user.id as string,
-      email: user.email as string,
-      rol: user.rol as string,
+      userId: user.id,
+      email: user.email ?? user.username,
+      rol: user.rol,
     };
 
     const accessToken = generateToken(tokenPayload);
@@ -62,11 +55,11 @@ export async function loginUser(request: LoginRequest): Promise<AuthResponse | n
       accessToken,
       refreshToken,
       user: {
-        id: user.id as string,
-        email: user.email as string,
-        nombre: user.nombre as string,
-        apellido: user.apellido as string,
-        rol: user.rol as string,
+        id: user.id,
+        username: user.username,
+        nombre: user.nombre,
+        apellido: user.apellido,
+        rol: user.rol,
       },
     };
   } catch (error) {
@@ -93,15 +86,15 @@ export async function registerUser(request: RegisterRequest): Promise<AuthRespon
         password: hashedPassword,
         nombre: request.nombre,
         apellido: request.apellido,
-        rol: (request.rol || 'PACIENTE') as Role,
+        rol: request.rol || 'PACIENTE',
         activo: true,
       },
     });
 
     const tokenPayload: TokenPayload = {
-      userId: newUser.id as string,
-      email: newUser.email as string,
-      rol: newUser.rol as string,
+      userId: newUser.id,
+      email: newUser.email,
+      rol: newUser.rol,
     };
 
     const accessToken = generateToken(tokenPayload);
@@ -111,11 +104,11 @@ export async function registerUser(request: RegisterRequest): Promise<AuthRespon
       accessToken,
       refreshToken,
       user: {
-        id: newUser.id as string,
-        email: newUser.email as string,
-        nombre: newUser.nombre as string,
-        apellido: newUser.apellido as string,
-        rol: newUser.rol as string,
+        id: newUser.id,
+        email: newUser.email,
+        nombre: newUser.nombre,
+        apellido: newUser.apellido,
+        rol: newUser.rol,
       },
     };
   } catch (error) {

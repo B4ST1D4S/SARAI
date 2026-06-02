@@ -2,18 +2,25 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
-import { PrismaClient } from '@prisma/client';
+import prisma from './lib/prisma.js';
 import authRoutes from './routes/auth.js';
 import pacientesRoutes from './routes/pacientes.js';
 import historiaClinicaRoutes from './routes/historiaClinica.js';
 import cupsRoutes from './routes/cups.js';
 import citasRoutes from './routes/citas.js';
 import cotizacionesRoutes from './routes/cotizaciones.js';
+import saraiRoutes from './routes/sarai.js';
+import disponibilidadRoutes from './routes/disponibilidad.js';
+import usuariosRoutes from './routes/usuarios.js';
+import especialidadesRoutes from './routes/especialidades.js';
+import adminRoutes from './routes/admin.js';
+import pdfRoutes from './routes/pdf.js';
+import mapaCorporalRoutes from './routes/mapaCorporal.js';
+import crmRoutes from './routes/crm.js';
 
 dotenv.config();
 
 const app = express();
-const prisma = new PrismaClient();
 const PORT = process.env.PORT || 3001;
 
 // ============================================
@@ -22,8 +29,9 @@ const PORT = process.env.PORT || 3001;
 
 app.use(helmet());
 app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// 20 MB para soportar audio base64
+app.use(express.json({ limit: 20 * 1024 * 1024 }));
+app.use(express.urlencoded({ extended: true, limit: 20 * 1024 * 1024 }));
 
 // ============================================
 // RUTAS
@@ -52,6 +60,14 @@ app.use('/api/historia-clinica', historiaClinicaRoutes);
 app.use('/api/cups', cupsRoutes);
 app.use('/api/citas', citasRoutes);
 app.use('/api/cotizaciones', cotizacionesRoutes);
+app.use('/api/sarai', saraiRoutes);
+app.use('/api/disponibilidad', disponibilidadRoutes);
+app.use('/api/usuarios', usuariosRoutes);
+app.use('/api/especialidades', especialidadesRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/pdf',   pdfRoutes);
+app.use('/api/mapa-corporal', mapaCorporalRoutes);
+app.use('/api/crm',          crmRoutes);
 
 // ============================================
 // MANEJO DE ERRORES
@@ -110,7 +126,13 @@ async function startServer() {
   });
 }
 
-startServer().catch((error) => {
-  console.error('Fatal error:', error);
-  process.exit(1);
-});
+// Exportar app para Vercel serverless
+export default app;
+
+// Iniciar servidor solo en entorno local (no en Vercel)
+if (!process.env.VERCEL) {
+  startServer().catch((error) => {
+    console.error('Fatal error:', error);
+    process.exit(1);
+  });
+}

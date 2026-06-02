@@ -1,0 +1,16 @@
+{
+  "experimentalServices": {
+    "frontend": {
+      "framework": "vite",
+      "buildCommand": "vite build",
+      "outputDirectory": "dist",
+      "installCommand": "npm install"
+    },
+    "backend": {
+      "framework": "node",
+      "buildCommand": "npx prisma generate",
+      "outputDirectory": "dist",
+      "installCommand": "npm install"
+    }
+  }
+}
