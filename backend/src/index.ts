@@ -28,7 +28,14 @@ const PORT = process.env.PORT || 3001;
 // ============================================
 
 app.use(helmet());
-app.use(cors());
+app.use(cors({
+  origin: [
+    'https://app-sarai.vercel.app',
+    'http://localhost:5173',
+    'http://localhost:5174',
+  ],
+  credentials: true,
+}));
 // 20 MB para soportar audio base64
 app.use(express.json({ limit: 20 * 1024 * 1024 }));
 app.use(express.urlencoded({ extended: true, limit: 20 * 1024 * 1024 }));
