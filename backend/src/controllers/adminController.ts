@@ -869,9 +869,9 @@ export async function getDepartamentoCargos(req: Request, res: Response) {
     const items = await prisma.departamentoCargo.findMany({
       where: { departamentoId },
       include: {
-        cargo: { select: { id: true, codigo: true, nombre: true, tipo: true, valor: true } },
+        Cargo: { select: { id: true, codigo: true, nombre: true, tipo: true, valor: true } },
       },
-      orderBy: { cargo: { nombre: 'asc' } },
+      orderBy: { Cargo: { nombre: 'asc' } },
     });
     res.json(items);
   } catch {
@@ -904,7 +904,7 @@ export async function createDepartamentoCargo(req: Request, res: Response) {
         manejaCentroCosto: manejaCentroCosto ?? false,
         usuarioCreacion: (req as any).user?.id,
       },
-      include: { cargo: { select: { id: true, codigo: true, nombre: true, tipo: true } } },
+      include: { Cargo: { select: { id: true, codigo: true, nombre: true, tipo: true } } },
     });
     res.status(201).json(item);
   } catch {
@@ -927,7 +927,7 @@ export async function updateDepartamentoCargo(req: Request, res: Response) {
         tomadoAutomatico, interfaceExterno, generaOrden, liquidaHonorarios,
         cumplimientoParcial, manejaCentroCosto,
       },
-      include: { cargo: { select: { id: true, codigo: true, nombre: true, tipo: true } } },
+      include: { Cargo: { select: { id: true, codigo: true, nombre: true, tipo: true } } },
     });
     res.json(item);
   } catch {

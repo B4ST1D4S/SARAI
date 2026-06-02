@@ -52,7 +52,7 @@ model Especialidad {
   estado                Boolean        @default(true)
   usuarioCreacion       String?
   createdAt             DateTime       @default(now())
-  updatedAt             DateTime
+  updatedAt             DateTime  @updatedAt
   Preparacion           Preparacion[]
   TipoConsulta          TipoConsulta[]
 
@@ -184,6 +184,8 @@ model HistoriaClinica {
   firmadoPorMedico   Boolean            @default(false)
   fechaFirma         DateTime?
   hashIntegridad     String
+  entregadoEn        DateTime?
+  entregadoPor       String?
   plantillaId        String?
   usuario            User               @relation(fields: [editadoPor], references: [id])
   paciente           Paciente           @relation(fields: [pacienteId], references: [id])
@@ -545,7 +547,7 @@ model BloqueDisponibilidad {
 }
 
 model CampoPaciente {
-  id              String   @id
+  id              String   @id  @default(cuid())
   nombre          String   @unique
   etiqueta        String
   seccion         String
@@ -559,7 +561,7 @@ model CampoPaciente {
   estado          Boolean  @default(true)
   usuarioCreacion String?
   createdAt       DateTime @default(now())
-  updatedAt       DateTime
+  updatedAt       DateTime  @updatedAt
 
   @@index([esPersonalizado])
   @@index([esVisible])
@@ -567,7 +569,7 @@ model CampoPaciente {
 }
 
 model Cargo {
-  id                String              @id
+  id                String              @id  @default(cuid())
   codigo            String              @unique
   nombre            String
   descripcion       String?
@@ -582,7 +584,7 @@ model Cargo {
   estado            Boolean             @default(true)
   usuarioCreacion   String?
   createdAt         DateTime            @default(now())
-  updatedAt         DateTime
+  updatedAt         DateTime  @updatedAt
   DepartamentoCargo DepartamentoCargo[]
 
   @@index([estado])
@@ -590,7 +592,7 @@ model Cargo {
 }
 
 model ConfigServicioConsulta {
-  id                 String             @id
+  id                 String             @id  @default(cuid())
   tipoConsultaId     String
   servicioId         String
   esPrincipal        Boolean            @default(false)
@@ -610,13 +612,13 @@ model ConfigServicioConsulta {
 }
 
 model Departamento {
-  id                String              @id
+  id                String              @id  @default(cuid())
   codigo            String              @unique
   nombre            String
   descripcion       String?
   estado            Boolean             @default(true)
   createdAt         DateTime            @default(now())
-  updatedAt         DateTime
+  updatedAt         DateTime  @updatedAt
   DepartamentoCargo DepartamentoCargo[]
   ReglaOperativa    ReglaOperativa[]
   TipoConsulta      TipoConsulta[]
@@ -625,7 +627,7 @@ model Departamento {
 }
 
 model DepartamentoCargo {
-  id                     String       @id
+  id                     String       @id  @default(cuid())
   departamentoId         String
   cargoId                String
   permiteSeleccion       Boolean      @default(true)
@@ -639,7 +641,7 @@ model DepartamentoCargo {
   manejaCentroCosto      Boolean      @default(false)
   usuarioCreacion        String?
   createdAt              DateTime     @default(now())
-  updatedAt              DateTime
+  updatedAt              DateTime  @updatedAt
   Cargo                  Cargo        @relation(fields: [cargoId], references: [id])
   Departamento           Departamento @relation(fields: [departamentoId], references: [id], onDelete: Cascade)
 
@@ -648,7 +650,7 @@ model DepartamentoCargo {
 }
 
 model HCModulo {
-  id                      String         @id
+  id                      String         @id  @default(cuid())
   codigo                  String         @unique
   nombre                  String
   descripcion             String?
@@ -659,42 +661,42 @@ model HCModulo {
   programaId              String?
   usuarioCreacion         String?
   createdAt               DateTime       @default(now())
-  updatedAt               DateTime
+  updatedAt               DateTime  @updatedAt
   TipoConsulta            TipoConsulta[]
 
   @@index([activo])
 }
 
 model ListaValor {
-  id        String   @id
+  id        String   @id  @default(cuid())
   grupo     String
   valor     String
   etiqueta  String
   orden     Int      @default(0)
   activo    Boolean  @default(true)
   createdAt DateTime @default(now())
-  updatedAt DateTime
+  updatedAt DateTime  @updatedAt
 
   @@unique([grupo, valor])
   @@index([grupo])
 }
 
 model MotivoCita {
-  id          String   @id
+  id          String   @id  @default(cuid())
   nombre      String
   descripcion String?
   tipo        String   @default("consulta")
   orden       Int      @default(0)
   activo      Boolean  @default(true)
   createdAt   DateTime @default(now())
-  updatedAt   DateTime
+  updatedAt   DateTime  @updatedAt
 
   @@index([activo])
   @@index([tipo])
 }
 
 model ParametroSistema {
-  id        String   @id
+  id        String   @id  @default(cuid())
   grupo     String
   clave     String
   valor     String   @default("")
@@ -702,14 +704,14 @@ model ParametroSistema {
   tipo      String   @default("text")
   orden     Int      @default(0)
   estado    Boolean  @default(true)
-  updatedAt DateTime
+  updatedAt DateTime  @updatedAt
 
   @@unique([grupo, clave])
   @@index([grupo])
 }
 
 model Preparacion {
-  id              String        @id
+  id              String        @id  @default(cuid())
   nombre          String
   descripcion     String?
   tipo            String        @default("consulta")
@@ -718,7 +720,7 @@ model Preparacion {
   estado          Boolean       @default(true)
   usuarioCreacion String?
   createdAt       DateTime      @default(now())
-  updatedAt       DateTime
+  updatedAt       DateTime  @updatedAt
   especialidad    Especialidad? @relation(fields: [especialidadId], references: [id])
   tipoConsulta    TipoConsulta? @relation(fields: [tipoConsultaId], references: [id])
 
@@ -727,7 +729,7 @@ model Preparacion {
 }
 
 model ReglaOperativa {
-  id                     String             @id
+  id                     String             @id  @default(cuid())
   departamentoId         String
   servicioId             String
   permiteSeleccion       Boolean            @default(true)
@@ -739,7 +741,7 @@ model ReglaOperativa {
   cumplimientoParcial    Boolean            @default(false)
   manejaCentroCosto      Boolean            @default(false)
   createdAt              DateTime           @default(now())
-  updatedAt              DateTime
+  updatedAt              DateTime  @updatedAt
   departamento           Departamento       @relation(fields: [departamentoId], references: [id], onDelete: Cascade)
   servicio               ServicioFacturable @relation(fields: [servicioId], references: [id])
 
@@ -748,7 +750,7 @@ model ReglaOperativa {
 }
 
 model ServicioFacturable {
-  id                     String                   @id
+  id                     String                   @id  @default(cuid())
   codigoCups             String                   @unique
   nombre                 String
   descripcion            String?
@@ -763,7 +765,7 @@ model ServicioFacturable {
   esPOS                  Boolean                  @default(false)
   estado                 Boolean                  @default(true)
   createdAt              DateTime                 @default(now())
-  updatedAt              DateTime
+  updatedAt              DateTime  @updatedAt
   ConfigServicioConsulta ConfigServicioConsulta[]
   ReglaOperativa         ReglaOperativa[]
 
@@ -772,7 +774,7 @@ model ServicioFacturable {
 }
 
 model TipoConsulta {
-  id                       String                   @id
+  id                       String                   @id  @default(cuid())
   nombre                   String
   descripcion              String?
   especialidadId           String?
@@ -793,7 +795,7 @@ model TipoConsulta {
   estado                   Boolean                  @default(true)
   usuarioCreacion          String?
   createdAt                DateTime                 @default(now())
-  updatedAt                DateTime
+  updatedAt                DateTime  @updatedAt
   serviciosConfig          ConfigServicioConsulta[]
   preparaciones            Preparacion[]
   departamento             Departamento?            @relation(fields: [departamentoId], references: [id])
@@ -805,7 +807,7 @@ model TipoConsulta {
 }
 
 model TipoConsultorio {
-  id               String   @id
+  id               String   @id  @default(cuid())
   codigo           String   @unique
   tipoConsultorio  String
   descripcion      String?
@@ -813,7 +815,7 @@ model TipoConsultorio {
   estado           Boolean  @default(true)
   usuarioCreacion  String?
   createdAt        DateTime @default(now())
-  updatedAt        DateTime
+  updatedAt        DateTime  @updatedAt
 
   @@index([estado])
 }

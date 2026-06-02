@@ -15,7 +15,6 @@ async function htmlToPdf(html: string): Promise<Buffer> {
 
   const browser = await puppeteer.launch({
     args: chromium.args,
-    defaultViewport: chromium.defaultViewport,
     executablePath,
     headless: true,
   });
