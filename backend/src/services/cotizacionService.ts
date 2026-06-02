@@ -52,7 +52,7 @@ export async function createCotizacion(data: CreateCotizacionRequest) {
         medicoId: data.medicoId,
         citaId: data.citaId,
         descripcionServicio: data.descripcionServicio,
-        lineas: data.lineas,
+        lineas: data.lineas as any,
         subtotal,
         descuentoPorcentaje: data.descuentoPorcentaje || 0,
         descuentoValor: descuento,

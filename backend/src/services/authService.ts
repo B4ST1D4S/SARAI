@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Role } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { generateToken, generateRefreshToken, TokenPayload } from '../utils/jwt.js';
 
@@ -50,9 +50,9 @@ export async function loginUser(request: LoginRequest): Promise<AuthResponse | n
     }
 
     const tokenPayload: TokenPayload = {
-      userId: user.id,
-      email: user.email,
-      rol: user.rol,
+      userId: user.id as string,
+      email: user.email as string,
+      rol: user.rol as string,
     };
 
     const accessToken = generateToken(tokenPayload);
@@ -62,11 +62,11 @@ export async function loginUser(request: LoginRequest): Promise<AuthResponse | n
       accessToken,
       refreshToken,
       user: {
-        id: user.id,
-        email: user.email,
-        nombre: user.nombre,
-        apellido: user.apellido,
-        rol: user.rol,
+        id: user.id as string,
+        email: user.email as string,
+        nombre: user.nombre as string,
+        apellido: user.apellido as string,
+        rol: user.rol as string,
       },
     };
   } catch (error) {
@@ -93,15 +93,15 @@ export async function registerUser(request: RegisterRequest): Promise<AuthRespon
         password: hashedPassword,
         nombre: request.nombre,
         apellido: request.apellido,
-        rol: request.rol || 'PACIENTE',
+        rol: (request.rol || 'PACIENTE') as Role,
         activo: true,
       },
     });
 
     const tokenPayload: TokenPayload = {
-      userId: newUser.id,
-      email: newUser.email,
-      rol: newUser.rol,
+      userId: newUser.id as string,
+      email: newUser.email as string,
+      rol: newUser.rol as string,
     };
 
     const accessToken = generateToken(tokenPayload);
@@ -111,11 +111,11 @@ export async function registerUser(request: RegisterRequest): Promise<AuthRespon
       accessToken,
       refreshToken,
       user: {
-        id: newUser.id,
-        email: newUser.email,
-        nombre: newUser.nombre,
-        apellido: newUser.apellido,
-        rol: newUser.rol,
+        id: newUser.id as string,
+        email: newUser.email as string,
+        nombre: newUser.nombre as string,
+        apellido: newUser.apellido as string,
+        rol: newUser.rol as string,
       },
     };
   } catch (error) {

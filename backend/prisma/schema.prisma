@@ -35,6 +35,7 @@ model User {
   historiasEditadas HistoriaClinica[]
   citasAsignadas Cita[]
   auditLogs AuditLog[]
+  cotizacionesCreadas Cotizacion[]
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -87,6 +88,7 @@ model Paciente {
   consentimientos   Consentimiento[]
   mapaCorporal      MapaCorporal[]
   seguimientos      SeguimientoPostOp[]
+  cotizaciones      Cotizacion[]
   
   creadoPor         String?
   creadoBy          User?    @relation(fields: [creadoPor], references: [id])
@@ -221,6 +223,9 @@ model HistoriaClinica {
   fechaFirma        DateTime?
   
   hashIntegridad    String   // SHA-256 para auditoría
+  
+  entregadoEn       DateTime?
+  entregadoPor      String?
   
   @@index([pacienteId])
   @@index([procedimientoId])
@@ -713,4 +718,41 @@ model ChecklistCompletado {
   
   @@index([procedimientoId])
   @@index([completadoEn])
+}
+
+// ============================================
+// COTIZACIONES
+// ============================================
+
+model Cotizacion {
+  id                    String    @id @default(cuid())
+  pacienteId            String
+  paciente              Paciente  @relation(fields: [pacienteId], references: [id])
+
+  medicoId              String
+  medico                User      @relation(fields: [medicoId], references: [id])
+
+  citaId                String?
+
+  descripcionServicio   String
+  lineas                Json      // Array de LineaItemCotizacion
+  subtotal              Float
+  descuentoPorcentaje   Float     @default(0)
+  descuentoValor        Float     @default(0)
+  total                 Float
+  notasAdicionales      String?
+  vigenciaHasta         DateTime
+
+  estado                String    @default("GENERADA") // GENERADA, ACEPTADA, RECHAZADA
+
+  aceptadaEn            DateTime?
+  rechazadaEn           DateTime?
+
+  creadoEn              DateTime  @default(now())
+  actualizadoEn         DateTime  @updatedAt
+
+  @@index([pacienteId])
+  @@index([medicoId])
+  @@index([estado])
+  @@index([creadoEn])
 }
