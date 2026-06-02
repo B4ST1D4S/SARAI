@@ -3,8 +3,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import SaraiECGIcon from './SaraiECGIcon';
 
 // ─── Constantes de endpoints ──────────────────────────────────────────────────
-const WHISPER_URL = import.meta.env.VITE_WHISPER_URL || 'http://localhost:8000/transcribir';
-const GEMMA_URL   = `${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/sarai/procesar-voz`;
+const WHISPER_URL        = import.meta.env.VITE_WHISPER_URL || 'http://localhost:8000/transcribir';
+const GEMMA_URL          = `${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/sarai/procesar-voz`;
+const PROCESAR_AUDIO_URL = `${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/sarai/procesar-audio`;
 
 interface SaraiAssistantProps {
   onCamposDetectados: (campos: Record<string, string>) => void;
@@ -302,15 +303,12 @@ export default function SaraiAssistant({ onCamposDetectados, token, contexto, on
   const iniciarGrabacion = useCallback(async () => {
     // ── Validación Pre-grabación ──────────────────────────────────────────────
 
-    // 1. Verificar que Whisper está online
-    if (whisperStatus !== 'online') {
-      setError(
-        whisperStatus === 'offline' 
-          ? '❌ Whisper no está disponible. Inicia el servicio: python whisper_service/main.py'
-          : '⏳ Whisper se está conectando... espera 3 segundos'
-      );
+    // 1. Si aún está verificando la conexión inicial, esperar
+    if (whisperStatus === 'checking') {
+      setError('⏳ Iniciando... espera un momento');
       return;
     }
+    // Si Whisper está offline, se graba igualmente y se usa Gemini como fallback
 
     // 2. Verificar que el navegador soporta getUserMedia
     if (!navigator.mediaDevices?.getUserMedia) {
@@ -499,8 +497,47 @@ export default function SaraiAssistant({ onCamposDetectados, token, contexto, on
 
       setEst('transcribiendo');
 
-      // ── Enviar a Whisper ──────────────────────────────────────────────────
+      // ── Fallback: transcripción vía Gemini en el backend ─────────────────
+      const usarGemini = async (): Promise<void> => {
+        setResultado('🤖 Transcribiendo con Gemini...');
+        const base64 = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve((reader.result as string).split(',')[1] || '');
+          reader.readAsDataURL(blob);
+        });
+        const res = await fetch(PROCESAR_AUDIO_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ audio: base64, mimeType, contexto }),
+          signal: AbortSignal.timeout(120000),
+        });
+        if (!res.ok) throw new Error(`Backend error ${res.status}`);
+        const data = await res.json() as { campos: Record<string, string>; transcripcion: string };
+        const tx = (data.transcripcion || '').trim();
+        if (tx) setTranscripcion(tx);
+        const campos = data.campos || {};
+        if (Object.keys(campos).length > 0) {
+          onCamposDetectados(campos);
+          setResultado(`✅ ${Object.keys(campos).length} campos detectados`);
+          setEst('listo');
+          setTimeout(() => setEst('esperando'), 4000);
+        } else if (tx) {
+          await enviarTexto(tx);
+        } else {
+          setError('No se detectaron campos. Habla con más detalle clínico.');
+          setEst('error');
+          setTimeout(() => { setEst('esperando'); setError(''); }, 5000);
+        }
+      };
+
+      // ── Enviar a Whisper (local) o Gemini (producción/fallback) ───────────
       try {
+        // En producción o cuando Whisper está offline → ir directo a Gemini
+        if (whisperStatus !== 'online') {
+          await usarGemini();
+          return;
+        }
+
         const form = new FormData();
         form.append('audio', blob, 'grabacion.webm');
 
@@ -547,8 +584,6 @@ export default function SaraiAssistant({ onCamposDetectados, token, contexto, on
         const cmdWhisp = tNormWhisp.replace(MATCH_ACTIVACION_SARAI, '').trim() || tNormWhisp;
         const ACTIVAR_CMDS = ['activar comandos', 'activar voz', 'activar comando de voz', 'activar comandos de voz', 'comandos de voz', 'encender comandos'];
         if (ACTIVAR_CMDS.some(p => cmdWhisp.includes(normalizarTexto(p)))) {
-          // El permiso de micrófono ya fue concedido al grabar con Whisper,
-          // por lo que SpeechRecognition.start() funciona sin click adicional.
           setResultado('✅ Comandos de voz activados');
           setEst('listo');
           iniciarComandosVozRef.current();
@@ -561,19 +596,27 @@ export default function SaraiAssistant({ onCamposDetectados, token, contexto, on
       } catch (err: any) {
         if (err.name === 'TimeoutError' || err.message?.includes('timeout')) {
           setError('Whisper tardó demasiado. Acorta el audio o usa texto.');
-        } else if (err.message?.includes('fetch')) {
-          setError('Servicio Whisper offline. Ejecuta: cd whisper_service && .\\start.ps1');
+          setEst('error');
+          setTimeout(() => { setEst('esperando'); setError(''); }, 8000);
+        } else if (err.message?.includes('fetch') || err.name === 'TypeError') {
+          // Whisper caído → fallback automático a Gemini
+          console.warn('[SARAI] Whisper caído, usando Gemini:', err.message);
           setWhisperStatus('offline');
+          try { await usarGemini(); } catch (ge: any) {
+            setError(`Error: ${ge.message}`);
+            setEst('error');
+            setTimeout(() => { setEst('esperando'); setError(''); }, 8000);
+          }
         } else {
           setError(`Error: ${err.message}`);
+          setEst('error');
+          setTimeout(() => { setEst('esperando'); setError(''); }, 8000);
         }
-        setEst('error');
-        setTimeout(() => { setEst('esperando'); setError(''); }, 8000);
       }
     };
 
     try { rec.stop(); } catch { limpiarMedia(); }
-  }, [limpiarMedia, setEst, enviarTexto]);
+  }, [limpiarMedia, setEst, enviarTexto, token, contexto, onCamposDetectados, whisperStatus]);
 
   // Cleanup
   useEffect(() => {
