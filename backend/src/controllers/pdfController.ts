@@ -5,7 +5,7 @@
 import { Request, Response } from 'express';
 import puppeteer from 'puppeteer-core';
 import chromium from '@sparticuz/chromium';
-import prisma from '../lib/prisma.ts';
+import prisma from '../lib/prisma.js';
 import { buildHCHtml, buildOrdenesHtml } from '../utils/htmlTemplates.js';
 
 async function htmlToPdf(html: string): Promise<Buffer> {
