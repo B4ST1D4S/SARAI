@@ -3,3 +3,5 @@ uvicorn[standard]==0.32.1
 faster-whisper==1.1.0
 python-multipart==0.0.12
 requests>=2.31.0
+av>=14.0.0
+numpy>=1.26.0
