@@ -8,7 +8,7 @@
     },
     "backend": {
       "framework": "node",
-      "buildCommand": "npm run vercel-build",
+      "buildCommand": "npx prisma generate",
       "outputDirectory": "dist",
       "installCommand": "npm install"
     }
