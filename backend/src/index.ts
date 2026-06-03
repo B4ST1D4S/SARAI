@@ -28,14 +28,7 @@ const PORT = process.env.PORT || 3001;
 // ============================================
 
 app.use(helmet());
-app.use(cors({
-  origin: [
-    'https://app-sarai.vercel.app',
-    'http://localhost:5173',
-    'http://localhost:5174',
-  ],
-  credentials: true,
-}));
+app.use(cors());
 // 20 MB para soportar audio base64
 app.use(express.json({ limit: 20 * 1024 * 1024 }));
 app.use(express.urlencoded({ extended: true, limit: 20 * 1024 * 1024 }));
@@ -115,6 +108,12 @@ async function startServer() {
     process.exit(1);
   }
 
+  // En Vercel no se llama app.listen — Vercel inyecta el handler directamente
+  if (process.env.VERCEL) {
+    console.log('Running on Vercel serverless');
+    return;
+  }
+
   const server = app.listen(PORT, () => {
     console.log(`\n🚀 Server running on http://localhost:${PORT}`);
     console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
@@ -133,13 +132,11 @@ async function startServer() {
   });
 }
 
+// Iniciar servidor (local y Vercel)
+startServer().catch((error) => {
+  console.error('Fatal error:', error);
+  process.exit(1);
+});
+
 // Exportar app para Vercel serverless
 export default app;
-
-// Iniciar servidor solo en entorno local (no en Vercel)
-if (!process.env.VERCEL) {
-  startServer().catch((error) => {
-    console.error('Fatal error:', error);
-    process.exit(1);
-  });
-}

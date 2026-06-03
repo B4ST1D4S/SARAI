@@ -56,7 +56,7 @@ export async function saveMapaCorporal(data: CreateMapaCorporalRequest) {
       return await prisma.mapaCorporal.update({
         where: { id: existente.id },
         data: {
-          zonasMarcadas: data.zonasMarcadas as any,
+          zonasMarcadas: data.zonasMarcadas,
           edemaZonas: data.edemaZonas || [],
           fibrosisZonas: data.fibrosisZonas || [],
           dolorZonas: data.dolorZonas || [],
@@ -78,7 +78,7 @@ export async function saveMapaCorporal(data: CreateMapaCorporalRequest) {
           procedimientoId: data.procedimientoId || null,
           fechaEvaluacion: new Date(),
           evaluadoPor: data.medicoId,
-          zonasMarcadas: data.zonasMarcadas as any,
+          zonasMarcadas: data.zonasMarcadas,
           edemaZonas: data.edemaZonas || [],
           fibrosisZonas: data.fibrosisZonas || [],
           dolorZonas: data.dolorZonas || [],
@@ -160,7 +160,7 @@ export async function updateMapaCorporal(
     const updated = await prisma.mapaCorporal.update({
       where: { id },
       data: {
-        zonasMarcadas: data.zonasMarcadas as any,
+        zonasMarcadas: data.zonasMarcadas,
         edemaZonas: data.edemaZonas,
         fibrosisZonas: data.fibrosisZonas,
         dolorZonas: data.dolorZonas,

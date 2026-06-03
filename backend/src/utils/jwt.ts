@@ -13,13 +13,13 @@ export interface TokenPayload {
 
 export function generateToken(payload: TokenPayload): string {
   return jwt.sign(payload, JWT_SECRET, {
-    expiresIn: JWT_EXPIRATION as any,
+    expiresIn: JWT_EXPIRATION,
   });
 }
 
 export function generateRefreshToken(payload: TokenPayload): string {
   return jwt.sign(payload, JWT_REFRESH_SECRET, {
-    expiresIn: JWT_REFRESH_EXPIRATION as any,
+    expiresIn: JWT_REFRESH_EXPIRATION,
   });
 }
 
