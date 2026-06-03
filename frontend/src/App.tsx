@@ -23,6 +23,7 @@ import AdminPage from './pages/AdminPage';
 import CentralImpresionPage from './pages/CentralImpresionPage';
 import CotizacionesPage from './pages/CotizacionesPage';
 import SaraiAssistant from './components/SaraiAssistant';
+import ManualPage from './pages/ManualPage';
 import saraiLogo from './assets/logo1.png';
 import { getParametrosSistema } from './services/adminService';
 import { useTheme } from './hooks/useTheme';
@@ -65,6 +66,7 @@ const NAV_SECTIONS = [
     items: [
       { id: 'admin', label: 'Parametrización', sym: 'X' },
       { id: 'usuarios', label: 'Usuarios', sym: 'V' },
+      { id: 'manual', label: 'Manual de Usuario', sym: '?' },
     ],
   },
 ];
@@ -443,6 +445,7 @@ function App() {
           {currentPage === 'body3d-test'         && <Body3DTestPage />}
           {currentPage === 'usuarios'            && <UsuariosPage />}
           {currentPage === 'admin'               && <AdminPage />}
+          {currentPage === 'manual'              && <ManualPage />}
         </div>
         </div>
       </main>
