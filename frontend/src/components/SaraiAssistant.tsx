@@ -890,14 +890,64 @@ export default function SaraiAssistant({ onCamposDetectados, token, contexto, on
     }
   }, [minimizado]);
 
-  // ── Handlers para drag + click en ícono contraído ───────────────────────────
+  // ── Refs para closures estables ─────────────────────────────────────
   const dragMovedRef  = useRef(false);
   const dragStartRef  = useRef({ x: 0, y: 0 });
-  // Ref para que los closures de touch siempre lean el valor actual de minimizado
   const minimizadoRef = useRef(minimizado);
+  const posicionRef   = useRef(posicion);
   useEffect(() => { minimizadoRef.current = minimizado; }, [minimizado]);
+  useEffect(() => { posicionRef.current   = posicion;   }, [posicion]);
 
-  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+  // ── Touch drag nativo: listener directo en el DOM con passive:false ────────
+  // IMPORTANTE: React delega onTouchStart como pasivo (no puede preventDefault);
+  //             por eso registramos aquí el listener nativo para bloquear el scroll.
+  useEffect(() => {
+    const el = widgetRef.current;
+    if (!el) return;
+
+    const onTouchStart = (e: TouchEvent) => {
+      const target = e.target as HTMLElement;
+      if (!minimizadoRef.current && target.closest('button, textarea, input, [role="button"]')) return;
+
+      e.preventDefault(); // bloquea scroll/zoom del navegador desde el inicio
+
+      const touch   = e.touches[0];
+      const offsetX = touch.clientX - posicionRef.current.x;
+      const offsetY = touch.clientY - posicionRef.current.y;
+      dragMovedRef.current = false;
+      dragStartRef.current = { x: touch.clientX, y: touch.clientY };
+
+      const onMove = (ev: TouchEvent) => {
+        ev.preventDefault();
+        const t  = ev.touches[0];
+        const dx = t.clientX - dragStartRef.current.x;
+        const dy = t.clientY - dragStartRef.current.y;
+        if (Math.sqrt(dx * dx + dy * dy) > 5) dragMovedRef.current = true;
+        const expandedW = Math.min(Math.round(window.innerWidth * 0.92), 300);
+        const maxX = window.innerWidth  - (minimizadoRef.current ? 64 : expandedW);
+        const maxY = window.innerHeight - 80;
+        setPosicion({
+          x: Math.max(0, Math.min(t.clientX - offsetX, maxX)),
+          y: Math.max(0, Math.min(t.clientY - offsetY, maxY)),
+        });
+      };
+
+      const onEnd = () => {
+        document.removeEventListener('touchmove', onMove);
+        document.removeEventListener('touchend',  onEnd);
+        if (!dragMovedRef.current && minimizadoRef.current) setMinimizado(false);
+      };
+
+      document.addEventListener('touchmove', onMove, { passive: false });
+      document.addEventListener('touchend',  onEnd);
+    };
+
+    el.addEventListener('touchstart', onTouchStart, { passive: false });
+    return () => el.removeEventListener('touchstart', onTouchStart);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // una sola vez: refs mantienen valores actualizados
+
+  // ── Handlers para drag con mouse ─────────────────────────────────────
     // En expandido: no draggear sobre botones/inputs
     if (!minimizado && (e.target as HTMLElement).closest('button, textarea, input, [role="button"]')) return;
     if (!widgetRef.current) return;
@@ -907,45 +957,6 @@ export default function SaraiAssistant({ onCamposDetectados, token, contexto, on
     dragStartRef.current = { x: e.clientX, y: e.clientY };
     setDragging(true);
     setDragOffset({ x: e.clientX - posicion.x, y: e.clientY - posicion.y });
-  };
-
-  // Touch: listeners registrados de forma síncrona (sin pasar por useEffect)
-  // para no perder touchmove que llega antes del re-render.
-  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
-    if (!minimizadoRef.current && (e.target as HTMLElement).closest('button, textarea, input, [role="button"]')) return;
-    if (!widgetRef.current) return;
-
-    const touch = e.touches[0];
-    dragMovedRef.current = false;
-    dragStartRef.current = { x: touch.clientX, y: touch.clientY };
-
-    // Capturar offset en el inicio del toque (valor estable durante todo el arrastre)
-    const offsetX = touch.clientX - posicion.x;
-    const offsetY = touch.clientY - posicion.y;
-
-    const onTouchMove = (ev: TouchEvent) => {
-      ev.preventDefault();
-      const t = ev.touches[0];
-      const dx = t.clientX - dragStartRef.current.x;
-      const dy = t.clientY - dragStartRef.current.y;
-      if (Math.sqrt(dx * dx + dy * dy) > 5) dragMovedRef.current = true;
-      const expandedW = Math.min(Math.round(window.innerWidth * 0.92), 300);
-      const maxX = window.innerWidth  - (minimizadoRef.current ? 64 : expandedW);
-      const maxY = window.innerHeight - 80;
-      setPosicion({
-        x: Math.max(0, Math.min(t.clientX - offsetX, maxX)),
-        y: Math.max(0, Math.min(t.clientY - offsetY, maxY)),
-      });
-    };
-
-    const onTouchEnd = () => {
-      document.removeEventListener('touchmove', onTouchMove);
-      document.removeEventListener('touchend',  onTouchEnd);
-      if (!dragMovedRef.current && minimizadoRef.current) setMinimizado(false);
-    };
-
-    document.addEventListener('touchmove', onTouchMove, { passive: false });
-    document.addEventListener('touchend',  onTouchEnd);
   };
 
   useEffect(() => {
@@ -985,7 +996,6 @@ export default function SaraiAssistant({ onCamposDetectados, token, contexto, on
     <div
       ref={widgetRef}
       onMouseDown={handleMouseDown}
-      onTouchStart={handleTouchStart}
       style={{
         position: 'fixed',
         top: `${posicion.y}px`,
