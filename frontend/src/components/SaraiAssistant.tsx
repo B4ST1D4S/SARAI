@@ -126,9 +126,9 @@ export default function SaraiAssistant({ onCamposDetectados, token, contexto, on
         y: 80,
       };
     }
-    // móvil/tablet: esquina superior derecha
+    // móvil/tablet: esquina superior derecha — 80px icono + 16px margen
     return {
-      x: Math.max(0, w - 110),
+      x: Math.max(8, w - 96),
       y: 72,
     };
   };
@@ -879,6 +879,17 @@ export default function SaraiAssistant({ onCamposDetectados, token, contexto, on
   const nivelLabel      = nivelMax > 50 ? '● VOZ DETECTADA'  : nivelMax > 20 ? '◐ señal débil'   : '○ sin señal';
   const barraGlobalColor = nivelMax > 50 ? 'bg-emerald-400'  : nivelMax > 20 ? 'bg-yellow-400'   : 'bg-red-500';
 
+  // ── Clamp posición al expandir para que el panel no desborde la pantalla ─────
+  useEffect(() => {
+    if (!minimizado) {
+      const expandedW = Math.min(Math.round(window.innerWidth * 0.92), 300);
+      setPosicion(prev => ({
+        x: Math.max(8, Math.min(prev.x, window.innerWidth - expandedW - 8)),
+        y: Math.max(8, Math.min(prev.y, window.innerHeight - 420)),
+      }));
+    }
+  }, [minimizado]);
+
   // ── Handlers para drag + click en ícono contraído ───────────────────────────
   const dragMovedRef = useRef(false);
   const dragStartRef = useRef({ x: 0, y: 0 });
@@ -895,39 +906,70 @@ export default function SaraiAssistant({ onCamposDetectados, token, contexto, on
     setDragOffset({ x: e.clientX - posicion.x, y: e.clientY - posicion.y });
   };
 
+  // Touch: inicio de arrastre en móvil
+  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (!minimizado && (e.target as HTMLElement).closest('button, textarea, input, [role="button"]')) return;
+    if (!widgetRef.current) return;
+    const touch = e.touches[0];
+    dragMovedRef.current = false;
+    dragStartRef.current = { x: touch.clientX, y: touch.clientY };
+    setDragging(true);
+    setDragOffset({ x: touch.clientX - posicion.x, y: touch.clientY - posicion.y });
+  };
+
   useEffect(() => {
     if (!dragging) return;
+
+    const calcMax = () => ({
+      maxX: window.innerWidth  - (minimizado ? 64 : Math.min(Math.round(window.innerWidth * 0.92), 300)),
+      maxY: window.innerHeight - 80,
+    });
 
     const handleMouseMove = (e: MouseEvent) => {
       e.preventDefault();
       const dx = e.clientX - dragStartRef.current.x;
       const dy = e.clientY - dragStartRef.current.y;
-      // Marcar como arrastre real si se movió >5px
       if (Math.sqrt(dx * dx + dy * dy) > 5) dragMovedRef.current = true;
-
-      const newX = e.clientX - dragOffset.x;
-      const newY = e.clientY - dragOffset.y;
-      const maxX = window.innerWidth - (minimizado ? 64 : 320);
-      const maxY = window.innerHeight - 80;
+      const { maxX, maxY } = calcMax();
       setPosicion({
-        x: Math.max(0, Math.min(newX, maxX)),
-        y: Math.max(0, Math.min(newY, maxY)),
+        x: Math.max(0, Math.min(e.clientX - dragOffset.x, maxX)),
+        y: Math.max(0, Math.min(e.clientY - dragOffset.y, maxY)),
       });
     };
 
     const handleMouseUp = () => {
       setDragging(false);
-      // Si fue clic (sin arrastre) sobre el ícono contraído → expandir
-      if (!dragMovedRef.current && minimizado) {
-        setMinimizado(false);
-      }
+      if (!dragMovedRef.current && minimizado) setMinimizado(false);
+    };
+
+    // Touch move/end — arrastre táctil en móvil
+    const handleTouchMove = (e: TouchEvent) => {
+      e.preventDefault();
+      const touch = e.touches[0];
+      const dx = touch.clientX - dragStartRef.current.x;
+      const dy = touch.clientY - dragStartRef.current.y;
+      if (Math.sqrt(dx * dx + dy * dy) > 5) dragMovedRef.current = true;
+      const { maxX, maxY } = calcMax();
+      setPosicion({
+        x: Math.max(0, Math.min(touch.clientX - dragOffset.x, maxX)),
+        y: Math.max(0, Math.min(touch.clientY - dragOffset.y, maxY)),
+      });
+    };
+
+    const handleTouchEnd = () => {
+      setDragging(false);
+      if (!dragMovedRef.current && minimizado) setMinimizado(false);
     };
 
     document.addEventListener('mousemove', handleMouseMove, { passive: false });
     document.addEventListener('mouseup', handleMouseUp);
+    document.addEventListener('touchmove', handleTouchMove, { passive: false });
+    document.addEventListener('touchend', handleTouchEnd);
     return () => {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('touchmove', handleTouchMove);
+      document.removeEventListener('touchend', handleTouchEnd);
     };
   }, [dragging, dragOffset, minimizado]);
 
@@ -935,6 +977,7 @@ export default function SaraiAssistant({ onCamposDetectados, token, contexto, on
     <div
       ref={widgetRef}
       onMouseDown={handleMouseDown}
+      onTouchStart={handleTouchStart}
       style={{
         position: 'fixed',
         top: `${posicion.y}px`,
