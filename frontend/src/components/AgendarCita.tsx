@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { X, Calendar, Clock, User, FileText, Check, AlertCircle, RefreshCw } from 'lucide-react';
+import { API_BASE_URL } from '../config';
 
 interface AgendarCitaProps {
   pacienteId?: string;
@@ -57,7 +58,7 @@ export default function AgendarCita({
     const mId = getEfectiveMedicoId();
     if (!mId) return;
     setLoadingTipos(true);
-    fetch(`/api/disponibilidad/tipos-consulta/${mId}`, {
+    fetch(`${API_BASE_URL}/disponibilidad/tipos-consulta/${mId}`, {
       headers: { Authorization: `Bearer ${getToken()}` },
     })
       .then(r => r.json())
@@ -192,7 +193,7 @@ export default function AgendarCita({
 
       const fechaHora = new Date(`${formData.fecha}T${formData.hora}:00`);
 
-      const response = await fetch('/api/citas', {
+      const response = await fetch(`${API_BASE_URL}/citas', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -439,3 +440,5 @@ export default function AgendarCita({
     </div>
   );
 }
+
+

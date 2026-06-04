@@ -1,10 +1,11 @@
-/**
+﻿/**
  * CU-01: Configuración de Agenda del Profesional — v3
  * + Calendario integrado Mes / Semana / Día (estilo AgendaPage)
  * + Filtro profesional dinámico: nombre, especialidad, cédula/documento
  */
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { API_BASE_URL } from '../config';
 import {
   Settings, Plus, Trash2, Clock,
   AlertCircle, Check, X, User, ChevronDown, Search,
@@ -534,7 +535,7 @@ export default function ConfigAgendaPage() {
     (async () => {
       setLoadingMedicos(true);
       try {
-        const r = await fetch('/api/disponibilidad/medicos-list', { headers: { Authorization: `Bearer ${token()}` } });
+        const r = await fetch(`${API_BASE_URL}/disponibilidad/medicos-list`, { headers: { Authorization: `Bearer ${token()}` } });
         const d = await r.json();
         const lista: Medico[] = d.medicos || [];
         setMedicos(lista);
@@ -556,9 +557,9 @@ export default function ConfigAgendaPage() {
     setLoadingDatos(true); setPanelActivo(null);
     try {
       const [rT, rD, rB] = await Promise.all([
-        fetch(`/api/disponibilidad/tipos-consulta/${m.id}`, { headers: { Authorization: `Bearer ${token()}` } }),
-        fetch(`/api/disponibilidad/medico/${m.id}`,         { headers: { Authorization: `Bearer ${token()}` } }),
-        fetch(`/api/disponibilidad/bloqueos/medico/${m.id}`,{ headers: { Authorization: `Bearer ${token()}` } }),
+        fetch(`${API_BASE_URL}/disponibilidad/tipos-consulta/${m.id}`, { headers: { Authorization: `Bearer ${token()}` } }),
+        fetch(`${API_BASE_URL}/disponibilidad/medico/${m.id}`,         { headers: { Authorization: `Bearer ${token()}` } }),
+        fetch(`${API_BASE_URL}/disponibilidad/bloqueos/medico/${m.id}`,{ headers: { Authorization: `Bearer ${token()}` } }),
       ]);
       const [dT, dD, dB] = await Promise.all([rT.json(), rD.json(), rB.json()]);
       setTiposConsulta(dT.tiposConsulta || []);
@@ -575,8 +576,8 @@ export default function ConfigAgendaPage() {
     setLoadingDatos(true);
     try {
       const [rD, rB] = await Promise.all([
-        fetch(`/api/disponibilidad/medico/${medicoSel.id}`,         { headers: { Authorization: `Bearer ${token()}` } }),
-        fetch(`/api/disponibilidad/bloqueos/medico/${medicoSel.id}`,{ headers: { Authorization: `Bearer ${token()}` } }),
+        fetch(`${API_BASE_URL}/disponibilidad/medico/${medicoSel.id}`,         { headers: { Authorization: `Bearer ${token()}` } }),
+        fetch(`${API_BASE_URL}/disponibilidad/bloqueos/medico/${medicoSel.id}`,{ headers: { Authorization: `Bearer ${token()}` } }),
       ]);
       const [dD, dB] = await Promise.all([rD.json(), rB.json()]);
       setDisponibilidades(dD.disponibilidades || []);
@@ -628,7 +629,7 @@ export default function ConfigAgendaPage() {
             ...rango,
           };
           for (const dia of franja.diasSeleccionados) {
-            const res = await fetch('/api/disponibilidad', {
+            const res = await fetch(`${API_BASE_URL}/disponibilidad`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
               body: JSON.stringify({ ...base, diaSemana: dia }),
@@ -654,7 +655,7 @@ export default function ConfigAgendaPage() {
     if (!bloqueoForm.fechaInicio || !bloqueoForm.fechaFin) { setError('Completa las fechas del bloqueo'); return; }
     setGuardando(true); setError('');
     try {
-      const res = await fetch('/api/disponibilidad/bloqueos', {
+      const res = await fetch(`${API_BASE_URL}/disponibilidad/bloqueos`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
         body: JSON.stringify({ ...bloqueoForm, medicoId: medicoSel.id }),
@@ -670,18 +671,18 @@ export default function ConfigAgendaPage() {
   };
 
   const eliminarDisp    = async (id: string) => {
-    const res = await fetch(`/api/disponibilidad/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token()}` } });
+    const res = await fetch(`${API_BASE_URL}/disponibilidad/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token()}` } });
     if (!res.ok) { const d = await res.json(); setError(d.error || 'Error al eliminar la franja'); return; }
     await recargar();
   };
-  const eliminarBloqueo = async (id: string) => { await fetch(`/api/disponibilidad/bloqueos/${id}`,{ method: 'DELETE', headers: { Authorization: `Bearer ${token()}` } }); await recargar(); };
+  const eliminarBloqueo = async (id: string) => { await fetch(`${API_BASE_URL}/disponibilidad/bloqueos/${id}`,{ method: 'DELETE', headers: { Authorization: `Bearer ${token()}` } }); await recargar(); };
 
   // ── Eliminar franjas en lote ───────────────────────────────────────────────
   const cargarEliminar = async () => {
     if (!medicoSel) return;
     setElimCargando(true); setElimCargado(false);
     try {
-      const r = await fetch(`/api/disponibilidad/con-citas/${medicoSel.id}`, { headers: { Authorization: `Bearer ${token()}` } });
+      const r = await fetch(`${API_BASE_URL}/disponibilidad/con-citas/${medicoSel.id}`, { headers: { Authorization: `Bearer ${token()}` } });
       const d = await r.json();
       let lista: FranjaConCitas[] = d.disponibilidades || [];
       if (elimFiltroDias.length > 0) lista = lista.filter(f => elimFiltroDias.includes(f.diaSemana));
@@ -712,7 +713,7 @@ export default function ConfigAgendaPage() {
     setElimEliminando(true);
     let ok = 0; let fail = 0;
     for (const id of elimSel) {
-      const r = await fetch(`/api/disponibilidad/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token()}` } });
+      const r = await fetch(`${API_BASE_URL}/disponibilidad/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token()}` } });
       if (r.ok) ok++; else fail++;
     }
     setElimFranjas([]); setElimSel([]); setElimCargado(false);
@@ -1507,3 +1508,6 @@ export default function ConfigAgendaPage() {
     </div>
   );
 }
+
+
+

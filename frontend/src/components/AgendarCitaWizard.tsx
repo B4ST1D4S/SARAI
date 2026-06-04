@@ -5,6 +5,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Check, AlertCircle, Stethoscope, Clock, User, FileText, Zap, RefreshCw, ChevronLeft, ChevronRight } from "lucide-react";
+import { API_BASE_URL } from '../config';
 
 interface TipoConsulta { id: string; nombre: string; duracionMinutos: number; clasificacion: string }
 interface Medico { id: string; nombre: string; apellido: string; especialidad?: string; registroMedico?: string }
@@ -96,7 +97,7 @@ export default function AgendarCitaWizard({
   useEffect(() => {
     if (!tipoSel) return;
     setLoadMedicos(true); setMedicos([]); setMedicoSel(null); setDiaSel(null); setSlots([]); setHoraSel("");
-    fetch(`/api/disponibilidad/medicos-por-tipo?tipoConsultaNombre=${encodeURIComponent(tipoSel.nombre)}`,
+    fetch(`${API_BASE_URL}/disponibilidad/medicos-por-tipo?tipoConsultaNombre=${encodeURIComponent(tipoSel.nombre)}`,
       { headers: { Authorization: `Bearer ${getToken()}` } })
       .then(r => r.json())
       .then(d => {
@@ -113,7 +114,7 @@ export default function AgendarCitaWizard({
   const cargarDias = useCallback(() => {
     if (!medicoSel || !tipoSel) return;
     setLoadDias(true); setDiasDisp([]); setDiaSel(null); setSlots([]); setHoraSel("");
-    fetch(`/api/disponibilidad/dias-disponibles?medicoId=${medicoSel.id}&mes=${calMes}&anio=${calAnio}&duracion=${tipoSel.duracionMinutos}`,
+    fetch(`${API_BASE_URL}/disponibilidad/dias-disponibles?medicoId=${medicoSel.id}&mes=${calMes}&anio=${calAnio}&duracion=${tipoSel.duracionMinutos}`,
       { headers: { Authorization: `Bearer ${getToken()}` } })
       .then(r => r.json())
       .then(d => { setDiasDisp(d.dias || []); scrollToBottom(); })
@@ -128,7 +129,7 @@ export default function AgendarCitaWizard({
     if (!diaSel || !medicoSel || !tipoSel) return;
     setLoadSlots(true); setSlots([]); setHoraSel("");
     const fecha = `${calAnio}-${String(calMes).padStart(2,"0")}-${String(diaSel).padStart(2,"0")}`;
-    fetch(`/api/disponibilidad/slots?medicoId=${medicoSel.id}&fecha=${fecha}&duracion=${tipoSel.duracionMinutos}`,
+    fetch(`${API_BASE_URL}/disponibilidad/slots?medicoId=${medicoSel.id}&fecha=${fecha}&duracion=${tipoSel.duracionMinutos}`,
       { headers: { Authorization: `Bearer ${getToken()}` } })
       .then(r => r.json())
       .then(d => {
@@ -491,3 +492,5 @@ export default function AgendarCitaWizard({
     </div>
   );
 }
+
+

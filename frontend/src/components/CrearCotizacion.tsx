@@ -1,6 +1,7 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { X, Plus, Trash2, DollarSign, Send, AlertCircle, Check } from 'lucide-react';
+import { API_BASE_URL } from '../config';
 
 interface LineaItemCotizacion {
   id: string;
@@ -126,7 +127,7 @@ export default function CrearCotizacion({
         vigenciaDias: formData.vigenciaDias,
       };
 
-      const response = await fetch('/api/cotizaciones', {
+      const response = await fetch(`${API_BASE_URL}/cotizaciones', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -401,3 +402,5 @@ export default function CrearCotizacion({
     </div>
   );
 }
+
+

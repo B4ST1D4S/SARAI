@@ -1,4 +1,4 @@
-/**
+﻿/**
  * CU-03: Admisión / Llegada del Paciente
  * Recepción registra la llegada: CONFIRMADA → EN_SALA
  * Muestra cola de espera ordenada por hora.
@@ -6,6 +6,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Users, UserCheck, Clock, RefreshCw, Bell, CheckCircle, AlertCircle, Search, X } from 'lucide-react';
+import { API_BASE_URL } from '../config';
 
 
 interface Cita {
@@ -75,7 +76,7 @@ export default function AdmisionPage() {
   const registrarLlegada = async (citaId: string, nombre: string) => {
     const token = getToken();
     try {
-      const res = await fetch(`/api/citas/${citaId}/admision`, {
+      const res = await fetch(`${API_BASE_URL}/citas/${citaId}/admision`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       });
@@ -308,3 +309,5 @@ export default function AdmisionPage() {
     </div>
   );
 }
+
+
