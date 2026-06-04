@@ -161,7 +161,7 @@ export default function AgendarCitaWizard({
     setError(""); setSubmitting(true);
     try {
       const fecha = `${calAnio}-${String(calMes).padStart(2,"0")}-${String(diaSel).padStart(2,"0")}`;
-      const res = await fetch("/api/citas", {
+      const res = await fetch(`${API_BASE_URL}/citas`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${getToken()}` },
         body: JSON.stringify({ pacienteId, medicoId: medicoSel.id, tipoCita: tipoSel.nombre, entidadSalud: entidad || undefined,
