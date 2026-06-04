@@ -636,11 +636,8 @@ export default function HistoriaClinicaPage({
           {/* ── Paneles: nav izquierda + formulario derecha ── */}
           <div className="flex flex-1 overflow-hidden">
 
-            {/* ══ PANEL IZQUIERDO ══ */}
-            <div className="w-48 flex-shrink-0 flex flex-col border-r border-white/[0.08] bg-[#0b0d14]">
-
-              {/* barra de progreso */}
-              <div className="px-4 pt-4 pb-2">
+            {/* ══ PANEL IZQUIERDO (oculto en móvil) ══ */}
+            <div className="hidden md:flex w-48 flex-shrink-0 flex-col border-r border-white/[0.08] bg-[#0b0d14]">
                 <div className="flex justify-between items-center mb-1">
                   <span className="text-[9px] text-gray-600 font-bold uppercase tracking-widest">Progreso</span>
                   <span className="text-[10px] text-yellow-400 font-bold">{porcentaje}%</span>

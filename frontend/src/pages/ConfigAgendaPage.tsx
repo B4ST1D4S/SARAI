@@ -859,8 +859,8 @@ export default function ConfigAgendaPage() {
       {/* ── LAYOUT ──────────────────────────────────────────────────────── */}
       <div className="flex flex-1 overflow-hidden">
 
-        {/* ━━ Columna izquierda: profesionales ━━ */}
-        <div className="w-64 flex-shrink-0 border-r border-white/[0.06] flex flex-col bg-[#0a0c13]">
+        {/* ━━ Columna izquierda: profesionales (oculta en móvil) ━━ */}
+        <div className="hidden md:flex w-64 flex-shrink-0 flex-col border-r border-white/[0.06] bg-[#0a0c13]">
           {/* Buscador dinámico: nombre + especialidad + cédula */}
           <div className="px-3 py-3 border-b border-white/[0.06]">
             <div className="flex items-center gap-2 bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-2">
@@ -1017,7 +1017,7 @@ export default function ConfigAgendaPage() {
               animate={{ x: 0, opacity: 1 }}
               exit={{ x: 340, opacity: 0 }}
               transition={{ type: 'spring', stiffness: 380, damping: 35 }}
-              className={`w-80 flex-shrink-0 flex flex-col border-l overflow-hidden
+              className={`w-full md:w-80 flex-shrink-0 flex flex-col border-l overflow-hidden
                 ${panelActivo === 'bloqueo' ? 'border-orange-500/20 bg-[#0d0a08]' : panelActivo === 'eliminar' ? 'border-rose-500/20 bg-[#0d0809]' : 'border-yellow-500/20 bg-[#0d0c08]'}`}
             >
               {/* ── Panel Franja ── */}

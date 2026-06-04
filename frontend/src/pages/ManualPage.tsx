@@ -553,7 +553,8 @@ const MODULOS: Modulo[] = [
     pasos: [
       { numero: 1, titulo: 'Haz clic en el micrófono', descripcion: 'Haz clic en el ícono de micrófono (esquina inferior derecha). La primera vez, el navegador muestra una ventana pidiendo permiso para usar el micrófono — debes hacer clic en "Permitir". Este paso siempre es manual: el navegador no puede conceder permisos de micrófono por voz (política de privacidad del navegador).', tipo: 'warning' },
       { numero: 2, titulo: 'Di "activar comandos"', descripcion: 'Una vez el navegador haya dado permiso al micrófono, di en voz alta: "Sarai activar comandos". El ícono parpadea en verde: el modo voz está activo. A partir de aquí todo lo demás se controla por voz.', tipo: 'normal' },
-      { numero: 3, titulo: 'Navegar a cualquier módulo', descripcion: 'Di "Sarai" + el nombre del módulo. Ejemplos: "Sarai pacientes", "Sarai agenda", "Sarai cotizaciones", "Sarai quirofano", "Sarai manual". El sistema navega de inmediato.', tipo: 'tip' },
+      { numero: 3, titulo: 'Entiende los colores del ícono', descripcion: '🔴 ROJO: servicio Whisper no disponible (dictado desactivado). 🔵 AZUL: Whisper activo y listo para dictar. 🟣 MORADO/ÍNDIGO: modo comandos de voz activo (escuchando). 🔴 ROJO parpadeando con "REC": grabando audio para transcripción. El badge pequeño (esquina inferior derecha del ícono) también indica: ✓ azul = Whisper online · ✕ rojo = Whisper offline.', tipo: 'tip' },
+      { numero: 4, titulo: 'Navegar a cualquier módulo', descripcion: 'Di "Sarai" + el nombre del módulo. Ejemplos: "Sarai pacientes", "Sarai agenda", "Sarai cotizaciones", "Sarai quirofano", "Sarai manual". El sistema navega de inmediato.', tipo: 'tip' },
       { numero: 4, titulo: 'Prefijos opcionales', descripcion: 'Antes del módulo puedes decir: "ir a", "abrir", "mostrar", "ve a". Ejemplo: "Sarai ir a pacientes" o "Sarai abrir la agenda" — funcionan igual que sin prefijo.', tipo: 'normal' },
       { numero: 5, titulo: 'Grabar dictado (Whisper)', descripcion: 'Di "Sarai grabar" para iniciar la grabación de audio. Habla con normalidad. Di "Sarai parar" cuando termines. El texto aparece automáticamente en el campo activo.', tipo: 'normal' },
       { numero: 6, titulo: 'Navegar secciones de Historia Clínica', descripcion: 'Dentro del formulario de HC di el nombre de la sección: "Sarai motivo de consulta", "Sarai signos vitales", "Sarai diagnóstico y plan", "Sarai antecedentes". El formulario va a esa sección.', tipo: 'normal' },
@@ -734,7 +735,7 @@ function ModuloPanel({ modulo }: { modulo: Modulo }) {
 export default function ManualPage() {
   const [moduloActivo, setModuloActivo] = useState<string>('dashboard');
   const [busqueda, setBusqueda] = useState('');
-  const [menuAbierto, setMenuAbierto] = useState(true);
+  const [menuAbierto, setMenuAbierto] = useState(() => typeof window !== 'undefined' ? window.innerWidth >= 768 : true);
   const contenidoRef = useRef<HTMLDivElement>(null);
 
   const modulosFiltrados = MODULOS.filter(m =>
@@ -758,13 +759,19 @@ export default function ManualPage() {
       {/* ── Sidebar ─────────────────────────────────────────────────── */}
       <AnimatePresence>
         {menuAbierto && (
-          <motion.aside
-            initial={{ x: -280, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: -280, opacity: 0 }}
-            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-            className="w-72 flex-shrink-0 border-r border-slate-800 bg-slate-900/80 backdrop-blur flex flex-col"
-          >
+          <>
+            {/* Backdrop oscuro en móvil */}
+            <div
+              className="fixed inset-0 bg-black/60 z-40 md:hidden"
+              onClick={() => setMenuAbierto(false)}
+            />
+            <motion.aside
+              initial={{ x: -280, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: -280, opacity: 0 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className="fixed md:relative inset-y-0 left-0 z-50 md:z-auto w-72 flex-shrink-0 border-r border-slate-800 bg-slate-900 md:bg-slate-900/80 backdrop-blur flex flex-col"
+            >
             {/* Header sidebar */}
             <div className="p-4 border-b border-slate-800">
               <div className="flex items-center gap-3 mb-4">
@@ -832,6 +839,7 @@ export default function ManualPage() {
               </div>
             </div>
           </motion.aside>
+          </>
         )}
       </AnimatePresence>
 
