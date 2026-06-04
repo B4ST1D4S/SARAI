@@ -150,8 +150,9 @@ Hay DOS canales de entrada:
   │  plantillas / plantilla                → Plantillas                    │
   ├─────────────────────────────────────────────────────────────────────────┤
   │  central de impresion ★NEW             → Central Impresión             │
-  │  central impresion / impresion                                          │
-  │  impresiones / imprimir                                                 │
+  │  central impresion / impresion / impresiones                            │
+  │  ir a impresion                                                         │
+  │  ⚠️ 'imprimir' → ACCIÓN de imprimir (no navega a esta página)           │
   ├─────────────────────────────────────────────────────────────────────────┤
   │  ADMINISTRACIÓN                                                         │
   ├─────────────────────────────────────────────────────────────────────────┤
@@ -235,7 +236,7 @@ Hay DOS canales de entrada:
   1   Dashboard               dashboard           dashboard / inicio / panel
   2   Pacientes               pacientes           pacientes / lista pacientes
   3   Historia Clínica        historia            historia / historial / historia clinica
-  4   Visual Clínico          fotos               visual clinico / fotos / galeria
+  4   Visual Clínico          fotos               visual clinico / fotos / foto / galeria
   5   Mapa Corporal           mapa-corporal       mapa corporal / mapa
   6   Agenda Paciente         agenda              agenda / citas
   7   Admisión                admision            admision / admitir
@@ -244,11 +245,12 @@ Hay DOS canales de entrada:
   10  Quirófano               vista-cirujano      quirofano / cirujano / vista cirujano
   11  Follow-up               followup            seguimiento / follow up / control
   12  Consentimiento          consentimiento      consentimiento / consentimientos
-  13  Cotizaciones ★NEW       cotizaciones        cotizaciones / presupuesto
+  13  Cotizaciones ★NEW       cotizaciones        cotizaciones / cotizacion / presupuesto / cotizar
   14  CRM                     crm                 crm / gestion de relaciones
   15  Facturación             facturacion         facturacion / facturas
   16  Plantillas              plantillas          plantillas / plantilla
-  17  Central Impresión ★NEW  impresion           impresion / central impresion / imprimir
+  17  Central Impresión ★NEW  impresion           impresion / central impresion / ir a impresion
+      ⚠️ 'imprimir' → acción imprimir (PASO 7), no navega aquí
   18  Parametrización         admin               admin / administracion / sistema
   19  Usuarios ★NEW           usuarios            usuarios / usuario
   20  Manual Usuario ★NEW     manual              manual / ayuda / documentacion
