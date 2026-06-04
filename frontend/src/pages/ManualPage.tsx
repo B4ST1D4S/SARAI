@@ -15,7 +15,7 @@ import {
   LayoutGrid, Building2, BookMarked, HelpCircle, ArrowRight,
   Play, Pause, SkipForward, MousePointer, Keyboard,
   Eye, Edit2, Plus, Trash2, Download, Upload, Save,
-  Mic, Volume2,
+  Mic, Volume2, X,
 } from 'lucide-react';
 
 // ─── Tipos ─────────────────────────────────────────────────────────────────
@@ -770,18 +770,26 @@ export default function ManualPage() {
               animate={{ x: 0, opacity: 1 }}
               exit={{ x: -280, opacity: 0 }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="fixed md:relative inset-y-0 left-0 z-50 md:z-auto w-72 flex-shrink-0 border-r border-slate-800 bg-slate-900 md:bg-slate-900/80 backdrop-blur flex flex-col"
+              className="fixed md:relative inset-y-0 left-0 z-50 md:z-auto w-[85vw] max-w-[300px] md:w-72 flex-shrink-0 border-r border-slate-800 bg-slate-900 md:bg-slate-900/80 backdrop-blur flex flex-col"
             >
             {/* Header sidebar */}
             <div className="p-4 border-b border-slate-800">
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-8 h-8 rounded-lg bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center">
+                <div className="w-8 h-8 rounded-lg bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center flex-shrink-0">
                   <BookOpen size={16} className="text-cyan-400" />
                 </div>
-                <div>
+                <div className="flex-1 min-w-0">
                   <h1 className="text-sm font-bold text-white">Manual de Usuario</h1>
                   <p className="text-xs text-slate-500">SARAI EstetIA v2.0</p>
                 </div>
+                {/* Botón cerrar — solo móvil */}
+                <button
+                  onClick={() => setMenuAbierto(false)}
+                  className="md:hidden flex-shrink-0 p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+                  aria-label="Cerrar menú"
+                >
+                  <X size={16} />
+                </button>
               </div>
               {/* Buscador */}
               <div className="relative">
@@ -805,7 +813,7 @@ export default function ManualPage() {
                   <button
                     key={m.id}
                     onClick={() => handleSeleccionar(m.id)}
-                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-all group
+                    className={`w-full flex items-center gap-3 px-3 py-3 md:py-2.5 rounded-lg text-left transition-all group
                       ${moduloActivo === m.id
                         ? `${m.colorBg} border ${m.colorBorder} ${m.color}`
                         : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
@@ -827,7 +835,11 @@ export default function ManualPage() {
             </div>
 
             {/* Footer del sidebar */}
-            <div className="p-3 border-t border-slate-800">
+            <div className="p-3 border-t border-slate-800 space-y-2">
+              {/* Hint cerrar — solo móvil */}
+              <p className="md:hidden text-center text-[10px] text-slate-600">
+                Toca fuera o ✕ para cerrar
+              </p>
               <div className="p-3 rounded-lg bg-cyan-500/5 border border-cyan-500/20">
                 <div className="flex items-center gap-2 mb-1">
                   <HelpCircle size={12} className="text-cyan-400" />
