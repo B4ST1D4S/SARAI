@@ -134,7 +134,7 @@ export default function SaraiAssistant({ onCamposDetectados, token, contexto, on
   };
   const [posicion, setPosicion] = useState(calcPosInicial);
   const [dragging, setDragging] = useState(false);
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const dragOffsetRef = useRef({ x: 0, y: 0 });
   const widgetRef = useRef<HTMLDivElement>(null);
 
   // Limpiar posición guardada de sesiones anteriores para que siempre
@@ -890,7 +890,7 @@ export default function SaraiAssistant({ onCamposDetectados, token, contexto, on
     }
   }, [minimizado]);
 
-  // ── Refs para closures estables ─────────────────────────────────────
+  // ── Refs estables para los handlers de puntero ──────────────────────────
   const dragMovedRef  = useRef(false);
   const dragStartRef  = useRef({ x: 0, y: 0 });
   const minimizadoRef = useRef(minimizado);
@@ -898,103 +898,48 @@ export default function SaraiAssistant({ onCamposDetectados, token, contexto, on
   useEffect(() => { minimizadoRef.current = minimizado; }, [minimizado]);
   useEffect(() => { posicionRef.current   = posicion;   }, [posicion]);
 
-  // ── Touch drag nativo: listener directo en el DOM con passive:false ────────
-  // SIN e.preventDefault() en touchstart: touch-action:none en el CSS ya bloquea
-  // el scroll/zoom nativo, y así los eventos click de botones/header siguen funcionando.
-  useEffect(() => {
-    const el = widgetRef.current;
-    if (!el) return;
-
-    const onTouchStart = (e: TouchEvent) => {
-      const target = e.target as HTMLElement;
-      // Botones, inputs y textareas manejan sus propios eventos — no interceptar
-      if (target.closest('button, textarea, input, [role="button"]')) return;
-
-      const touch   = e.touches[0];
-      const offsetX = touch.clientX - posicionRef.current.x;
-      const offsetY = touch.clientY - posicionRef.current.y;
-      dragMovedRef.current = false;
-      dragStartRef.current = { x: touch.clientX, y: touch.clientY };
-
-      const onMove = (ev: TouchEvent) => {
-        ev.preventDefault();
-        const t  = ev.touches[0];
-        const dx = t.clientX - dragStartRef.current.x;
-        const dy = t.clientY - dragStartRef.current.y;
-        if (Math.sqrt(dx * dx + dy * dy) > 5) dragMovedRef.current = true;
-        const expandedW = Math.min(Math.round(window.innerWidth * 0.92), 300);
-        const maxX = window.innerWidth  - (minimizadoRef.current ? 64 : expandedW);
-        const maxY = window.innerHeight - 80;
-        setPosicion({
-          x: Math.max(0, Math.min(t.clientX - offsetX, maxX)),
-          y: Math.max(0, Math.min(t.clientY - offsetY, maxY)),
-        });
-      };
-
-      const onEnd = () => {
-        document.removeEventListener('touchmove', onMove);
-        document.removeEventListener('touchend',  onEnd);
-        if (!dragMovedRef.current && minimizadoRef.current) setMinimizado(false);
-      };
-
-      document.addEventListener('touchmove', onMove, { passive: false });
-      document.addEventListener('touchend',  onEnd);
-    };
-
-    el.addEventListener('touchstart', onTouchStart, { passive: false });
-    return () => el.removeEventListener('touchstart', onTouchStart);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // una sola vez: refs mantienen valores actualizados
-
-  // ── Handlers para drag con mouse ─────────────────────────────────────
-    // En expandido: no draggear sobre botones/inputs
-    if (!minimizado && (e.target as HTMLElement).closest('button, textarea, input, [role="button"]')) return;
-    if (!widgetRef.current) return;
-
-    e.preventDefault();
-    dragMovedRef.current = false;
-    dragStartRef.current = { x: e.clientX, y: e.clientY };
+  // ── Drag con Pointer Events API (mouse + táctil en un solo handler) ──────
+  // setPointerCapture le dice al navegador que este elemento captura el puntero:
+  // no hay scroll, no hay interferencia, funciona igual en mouse y touch.
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    // No interceptar botones, inputs ni textareas
+    if ((e.target as HTMLElement).closest('button, textarea, input, [role="button"]')) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    dragMovedRef.current  = false;
+    dragStartRef.current  = { x: e.clientX, y: e.clientY };
+    dragOffsetRef.current = { x: e.clientX - posicionRef.current.x, y: e.clientY - posicionRef.current.y };
     setDragging(true);
-    setDragOffset({ x: e.clientX - posicion.x, y: e.clientY - posicion.y });
   };
 
-  useEffect(() => {
-    if (!dragging) return;
-
-    const calcMax = () => ({
-      maxX: window.innerWidth  - (minimizado ? 64 : Math.min(Math.round(window.innerWidth * 0.92), 300)),
-      maxY: window.innerHeight - 80,
+  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!e.currentTarget.hasPointerCapture(e.pointerId)) return;
+    const dx = e.clientX - dragStartRef.current.x;
+    const dy = e.clientY - dragStartRef.current.y;
+    if (Math.sqrt(dx * dx + dy * dy) > 5) dragMovedRef.current = true;
+    const expandedW = Math.min(Math.round(window.innerWidth * 0.92), 300);
+    const maxX = window.innerWidth  - (minimizadoRef.current ? 64 : expandedW);
+    const maxY = window.innerHeight - 80;
+    setPosicion({
+      x: Math.max(0, Math.min(e.clientX - dragOffsetRef.current.x, maxX)),
+      y: Math.max(0, Math.min(e.clientY - dragOffsetRef.current.y, maxY)),
     });
+  };
 
-    const handleMouseMove = (e: MouseEvent) => {
-      e.preventDefault();
-      const dx = e.clientX - dragStartRef.current.x;
-      const dy = e.clientY - dragStartRef.current.y;
-      if (Math.sqrt(dx * dx + dy * dy) > 5) dragMovedRef.current = true;
-      const { maxX, maxY } = calcMax();
-      setPosicion({
-        x: Math.max(0, Math.min(e.clientX - dragOffset.x, maxX)),
-        y: Math.max(0, Math.min(e.clientY - dragOffset.y, maxY)),
-      });
-    };
-
-    const handleMouseUp = () => {
-      setDragging(false);
-      if (!dragMovedRef.current && minimizado) setMinimizado(false);
-    };
-
-    document.addEventListener('mousemove', handleMouseMove, { passive: false });
-    document.addEventListener('mouseup',   handleMouseUp);
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup',   handleMouseUp);
-    };
-  }, [dragging, dragOffset, minimizado]);
+  const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!e.currentTarget.hasPointerCapture(e.pointerId)) return;
+    e.currentTarget.releasePointerCapture(e.pointerId);
+    setDragging(false);
+    // Tap sin arrastre sobre el ícono minimizado → expandir
+    if (!dragMovedRef.current && minimizadoRef.current) setMinimizado(false);
+  };
 
   return (
     <div
       ref={widgetRef}
-      onMouseDown={handleMouseDown}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
       style={{
         position: 'fixed',
         top: `${posicion.y}px`,
@@ -1004,7 +949,7 @@ export default function SaraiAssistant({ onCamposDetectados, token, contexto, on
         filter: minimizado
           ? 'none'
           : 'drop-shadow(0 0 8px rgba(212,175,55,0.35))',
-        touchAction: 'none',   // evita que el navegador intercepte el toque para scroll/zoom
+        touchAction: 'none',
         WebkitUserSelect: 'none',
       }}
       className="select-none"
