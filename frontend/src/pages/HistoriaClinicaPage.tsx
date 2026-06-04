@@ -240,22 +240,22 @@ export default function HistoriaClinicaPage({
       const r = await getHistoriasPaciente(pacId, token);
       const lista: any[] = Array.isArray(r.data) ? (r.data as any[]) : ((r.data as any)?.historias || []);
       if (lista.length > 0) {
-        const h = lista[lista.length - 1];
-        const d = h.datosExtendidos || {};
-        const sv  = d.signosVitales            || {};
-        const ap  = d.antecedentesPersonales   || {};
-        const af  = d.antecedentesFamiliares   || {};
-        const ag  = d.antecedentesGineco        || {};
-        const ecx = d.evolucionCx               || {};
-        const diag = d.diagnostico              || {};
-        const pt  = d.planTerapeutico           || {};
-        const om  = d.ordenesMedicas            || {};
+        const h = lista[0]; // más reciente (backend ordena desc)
+        const c = (h.contenido as any) || {};
+        const sv  = c.signosVitales            || {};
+        const ap  = c.antecedentesPersonales   || {};
+        const af  = c.antecedentesFamiliares   || {};
+        const ag  = c.antecedentesGineco        || {};
+        const ecx = c.evolucionCx               || {};
+        const diag = (typeof c.diagnostico === 'object' && c.diagnostico) ? c.diagnostico : {};
+        const pt  = c.planTerapeutico           || {};
+        const om  = c.ordenesMedicas            || {};
         setForm({
           pacienteId:             pacId,
-          tipoConsulta:           h.tipoConsulta   || 'INICIAL',
+          tipoConsulta:           c.tipoConsulta   || 'INICIAL',
           tipoHistoria:           h.tipoHistoria   || 'ANAMNESIS',
-          motivoConsulta:         h.quejaPrincipal || '',
-          historiaEnfermedad:     h.historiaEnfermedad || '',
+          motivoConsulta:         c.quejaPrincipal || '',
+          historiaEnfermedad:     c.historiaEnfermedad || '',
           peso:                   sv.peso  || '',
           talla:                  sv.talla || '',
           imc:                    sv.imc   || '',
@@ -289,17 +289,17 @@ export default function HistoriaClinicaPage({
           complicacionesCx:       ecx.complicaciones         || '',
           recomendacionesCx:      ecx.recomendaciones        || '',
           evolucionPostop:        ecx.evolucionPostop        || '',
-          finalidadAtencion:      d.finalidadAtencion || 'D',
-          origenAtencion:         d.origenAtencion    || 'CE',
-          diagnosticoPrincipal:       diag.principal   || h.diagnostico || '',
+          finalidadAtencion:      c.finalidadAtencion || 'D',
+          origenAtencion:         c.origenAtencion    || 'CE',
+          diagnosticoPrincipal:       diag.principal   || '',
           codigoCie10:                diag.codigoCie10 || '',
           diagnosticosRelacionados:   diag.relacionados || '',
           tipoDiagnostico:            diag.tipo        || 'CONFIRMADO',
-          conducta:                   pt.conducta          || h.tratamientoRecomendado || '',
+          conducta:                   pt.conducta          || c.tratamientoRecomendado || '',
           incapacidadDias:            pt.incapacidadDias   || '',
           procedimientosPlan:         pt.procedimientos    || '',
           seguimiento:                pt.seguimiento       || '',
-          recomendacionesMed:         d.recomendaciones    || '',
+          recomendacionesMed:         c.recomendaciones    || '',
           apoyosDiag:        om.apoyosDiagnosticos || [],
           procedimientosQx:  om.procedimientosQx  || [],
           medicamentos:      om.medicamentos       || [],
