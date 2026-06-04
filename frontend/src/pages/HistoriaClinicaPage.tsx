@@ -10,7 +10,7 @@ import {
   CheckCircle, Plus, Trash2, Save, Printer,
 } from 'lucide-react';
 import {
-  createHistoriaClinica, getAllPacientes, getHistoriasMedico, updateHistoriaClinica,
+  createHistoriaClinica, getAllPacientes, getHistoriasMedico, updateHistoriaClinica, getHistoriasPaciente,
 } from '../services/api';
 import { API_BASE_URL } from '../config';
 
@@ -234,14 +234,94 @@ export default function HistoriaClinicaPage({
       setTimeout(() => scrollTo(seccionExterna), 120);
     }
   }, [seccionExterna]);
+  // Cargar la última historia guardada de un paciente y poblar el formulario
+  const cargarHistoriaPorPaciente = useCallback(async (pacId: string) => {
+    try {
+      const r = await getHistoriasPaciente(pacId, token);
+      const lista: any[] = (r.data as any)?.historias || [];
+      if (lista.length > 0) {
+        const h = lista[lista.length - 1];
+        const d = h.datosExtendidos || {};
+        const sv  = d.signosVitales            || {};
+        const ap  = d.antecedentesPersonales   || {};
+        const af  = d.antecedentesFamiliares   || {};
+        const ag  = d.antecedentesGineco        || {};
+        const ecx = d.evolucionCx               || {};
+        const diag = d.diagnostico              || {};
+        const pt  = d.planTerapeutico           || {};
+        const om  = d.ordenesMedicas            || {};
+        setForm({
+          pacienteId:             pacId,
+          tipoConsulta:           h.tipoConsulta   || 'INICIAL',
+          tipoHistoria:           h.tipoHistoria   || 'ANAMNESIS',
+          motivoConsulta:         h.quejaPrincipal || '',
+          historiaEnfermedad:     h.historiaEnfermedad || '',
+          peso:                   sv.peso  || '',
+          talla:                  sv.talla || '',
+          imc:                    sv.imc   || '',
+          temperatura:            sv.temperatura            || '',
+          frecuenciaCardiaca:     sv.frecuenciaCardiaca     || '',
+          frecuenciaRespiratoria: sv.frecuenciaRespiratoria || '',
+          taSistolica:            sv.taSistolica            || '',
+          taDiastolica:           sv.taDiastolica           || '',
+          saturacionO2:           sv.saturacionO2           || '',
+          glicemia:               sv.glicemia               || '',
+          antPatologicos:         ap.patologicos    || '',
+          antFarmacologicos:      ap.farmacologicos || '',
+          antQuirurgicos:         ap.quirurgicos    || '',
+          antAlergicos:           ap.alergicos      || '',
+          antToxicos:             ap.toxicos        || '',
+          antHospitalarios:       ap.hospitalarios  || '',
+          antFamHTA:              !!af.hta,
+          antFamDiabetes:         !!af.diabetes,
+          antFamCancer:           !!af.cancer,
+          antFamCardiopatias:     !!af.cardiopatias,
+          antFamOtros:            af.otros          || '',
+          fum:                    ag.fum            || '',
+          gestaciones:            ag.gestaciones    || '',
+          partos:                 ag.partos         || '',
+          cesareas:               ag.cesareas       || '',
+          abortos:                ag.abortos        || '',
+          planificacion:          ag.planificacion  || '',
+          menopausia:             !!ag.menopausia,
+          procedimientoRealizado: ecx.procedimientoRealizado || '',
+          evolucionCx:            ecx.evolucion              || '',
+          complicacionesCx:       ecx.complicaciones         || '',
+          recomendacionesCx:      ecx.recomendaciones        || '',
+          evolucionPostop:        ecx.evolucionPostop        || '',
+          finalidadAtencion:      d.finalidadAtencion || 'D',
+          origenAtencion:         d.origenAtencion    || 'CE',
+          diagnosticoPrincipal:       diag.principal   || h.diagnostico || '',
+          codigoCie10:                diag.codigoCie10 || '',
+          diagnosticosRelacionados:   diag.relacionados || '',
+          tipoDiagnostico:            diag.tipo        || 'CONFIRMADO',
+          conducta:                   pt.conducta          || h.tratamientoRecomendado || '',
+          incapacidadDias:            pt.incapacidadDias   || '',
+          procedimientosPlan:         pt.procedimientos    || '',
+          seguimiento:                pt.seguimiento       || '',
+          recomendacionesMed:         d.recomendaciones    || '',
+          apoyosDiag:        om.apoyosDiagnosticos || [],
+          procedimientosQx:  om.procedimientosQx  || [],
+          medicamentos:      om.medicamentos       || [],
+          interconsultas:    om.interconsultas     || [],
+        });
+        savedIdRef.current = h.id;
+      } else {
+        setForm({ ...BLANK, pacienteId: pacId });
+        savedIdRef.current = null;
+      }
+    } catch {
+      setForm({ ...BLANK, pacienteId: pacId });
+      savedIdRef.current = null;
+    }
+    setGuardado(false);
+  }, [token]);
+
   useEffect(() => {
     if (pacienteIdExterno) {
-      setForm({ ...BLANK, pacienteId: pacienteIdExterno });
-      savedIdRef.current = null;
-      setGuardado(false);
-      setShowForm(true);
+      cargarHistoriaPorPaciente(pacienteIdExterno).then(() => setShowForm(true));
     }
-  }, [pacienteIdExterno]);
+  }, [pacienteIdExterno, cargarHistoriaPorPaciente]);
 
   // Build payload
   const buildPayload = useCallback(() => ({
@@ -521,7 +601,11 @@ export default function HistoriaClinicaPage({
           {/* Barra de datos del paciente */}
           <div className="flex-shrink-0 grid grid-cols-2 lg:grid-cols-4 gap-3 px-5 py-3 border-b border-white/[0.06] bg-white/[0.01]">
             <F label="Paciente *">
-              <select value={form.pacienteId} onChange={e => s('pacienteId', e.target.value)} required className={ic}>
+              <select value={form.pacienteId} onChange={e => {
+                const id = e.target.value;
+                if (id) cargarHistoriaPorPaciente(id);
+                else { setForm({ ...BLANK }); savedIdRef.current = null; }
+              }} required className={ic}>
                 <option value="">Seleccionar paciente...</option>
                 {pacientes.map((p: any) => (
                   <option key={p.id} value={p.id}>{p.nombreCompleto} — {p.numeroDocumento}</option>
