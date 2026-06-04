@@ -891,8 +891,9 @@ export default function SaraiAssistant({ onCamposDetectados, token, contexto, on
   }, [minimizado]);
 
   // ── Refs estables para los handlers de puntero ──────────────────────────
-  const dragMovedRef  = useRef(false);
-  const dragStartRef  = useRef({ x: 0, y: 0 });
+  const dragMovedRef           = useRef(false);
+  const dragStartRef           = useRef({ x: 0, y: 0 });
+  const pointerDownOnHeaderRef = useRef(false);  // ¿el tap inició en el header?
   const minimizadoRef = useRef(minimizado);
   const posicionRef   = useRef(posicion);
   useEffect(() => { minimizadoRef.current = minimizado; }, [minimizado]);
@@ -904,6 +905,8 @@ export default function SaraiAssistant({ onCamposDetectados, token, contexto, on
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     // No interceptar botones, inputs ni textareas
     if ((e.target as HTMLElement).closest('button, textarea, input, [role="button"]')) return;
+    // Guardar si el tap empezó en el header (para colapsar en handlePointerUp)
+    pointerDownOnHeaderRef.current = !!(e.target as HTMLElement).closest('[data-sarai-header]');
     e.currentTarget.setPointerCapture(e.pointerId);
     dragMovedRef.current  = false;
     dragStartRef.current  = { x: e.clientX, y: e.clientY };
@@ -929,8 +932,15 @@ export default function SaraiAssistant({ onCamposDetectados, token, contexto, on
     if (!e.currentTarget.hasPointerCapture(e.pointerId)) return;
     e.currentTarget.releasePointerCapture(e.pointerId);
     setDragging(false);
-    // Tap sin arrastre sobre el ícono minimizado → expandir
-    if (!dragMovedRef.current && minimizadoRef.current) setMinimizado(false);
+    if (!dragMovedRef.current) {
+      if (minimizadoRef.current) {
+        // Tap sin arrastre sobre ícono minimizado → expandir
+        setMinimizado(false);
+      } else if (pointerDownOnHeaderRef.current) {
+        // Tap sin arrastre sobre el header cuando expandido → contraer
+        setMinimizado(true);
+      }
+    }
   };
 
   return (
@@ -1198,15 +1208,10 @@ export default function SaraiAssistant({ onCamposDetectados, token, contexto, on
           'border-yellow-600/50 shadow-[0_0_12px_rgba(212,175,55,0.25)]'
         } ${fondo} backdrop-blur-md transition-all duration-300`}
       >
-      {/* ── Header — clic en zona de drag colapsa, sin botón flecha separado ─ */}
+      {/* ── Header — tap/clic aquí colapsa (gestionado por handlePointerUp vía data-sarai-header) ─ */}
       <div
+        data-sarai-header
         className="flex items-center justify-between px-3 py-3 cursor-pointer select-none rounded-t-2xl hover:bg-white/[0.03] transition-colors"
-        onClick={(e) => {
-          // Colapsar si el clic NO fue sobre un botón/input interno
-          if (!(e.target as HTMLElement).closest('button, input, textarea')) {
-            setMinimizado(true);
-          }
-        }}
       >
         <div className="flex items-center gap-2">
           <motion.div
