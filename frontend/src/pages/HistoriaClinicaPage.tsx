@@ -235,7 +235,12 @@ export default function HistoriaClinicaPage({
     }
   }, [seccionExterna]);
   useEffect(() => {
-    if (pacienteIdExterno) { s('pacienteId', pacienteIdExterno); setShowForm(true); }
+    if (pacienteIdExterno) {
+      setForm({ ...BLANK, pacienteId: pacienteIdExterno });
+      savedIdRef.current = null;
+      setGuardado(false);
+      setShowForm(true);
+    }
   }, [pacienteIdExterno]);
 
   // Build payload
@@ -490,7 +495,14 @@ export default function HistoriaClinicaPage({
         <div className="flex items-center gap-2">
 
           <button
-            onClick={() => setShowForm(!showForm)}
+            onClick={() => {
+              if (!showForm) {
+                setForm(BLANK);
+                savedIdRef.current = null;
+                setGuardado(false);
+              }
+              setShowForm(!showForm);
+            }}
             className={`px-4 py-2 rounded-xl font-bold text-xs transition-all ${
               showForm
                 ? 'bg-white/5 border border-white/10 text-gray-400 hover:text-white'
