@@ -995,6 +995,8 @@ export default function SaraiAssistant({ onCamposDetectados, token, contexto, on
         filter: minimizado
           ? 'none'
           : 'drop-shadow(0 0 8px rgba(212,175,55,0.35))',
+        touchAction: 'none',   // evita que el navegador intercepte el toque para scroll/zoom
+        WebkitUserSelect: 'none',
       }}
       className="select-none"
     >
