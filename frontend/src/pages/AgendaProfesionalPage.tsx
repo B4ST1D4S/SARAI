@@ -407,9 +407,24 @@ export default function AgendaProfesionalPage({ onNavegar, onAbrirHistoriaPacien
                           )}
 
                           {(cita.estado === 'ATENDIDA' || cita.estado === 'COMPLETADA') && (
-                            <div className="flex-1 py-2 bg-slate-700/50 text-gray-500 text-sm font-semibold rounded-xl flex items-center justify-center gap-2 border border-slate-600/50">
-                              ✅ Atendida
-                            </div>
+                            cita.fecha === hoy && (onAbrirHistoriaPaciente || onNavegar) ? (
+                              <button
+                                onClick={() => {
+                                  if (cita.pacienteId && onAbrirHistoriaPaciente) {
+                                    onAbrirHistoriaPaciente(cita.pacienteId, cita.pacienteNombre);
+                                  } else {
+                                    onNavegar?.('historia');
+                                  }
+                                }}
+                                className="flex-1 py-2 bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-500 hover:to-violet-500 text-white text-sm font-semibold rounded-xl transition shadow-lg shadow-purple-500/20 flex items-center justify-center gap-2"
+                              >
+                                <Stethoscope size={14} /> Ver Historia Clínica
+                              </button>
+                            ) : (
+                              <div className="flex-1 py-2 bg-slate-700/50 text-gray-500 text-sm font-semibold rounded-xl flex items-center justify-center gap-2 border border-slate-600/50">
+                                ✅ Atendida
+                              </div>
+                            )
                           )}
 
                           <button
