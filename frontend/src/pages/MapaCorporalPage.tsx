@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Trash2, RotateCw, Download, TrendingDown, Calendar, Plus, Save, ChevronDown, ChevronUp, AlertTriangle, ClipboardList, FileText, Activity, Eye, Box, Share2 } from 'lucide-react';
 import { Body3D } from '../components/Body3D';
 import { saveMapaCorporal, getMapaCorporalPorPaciente, searchPacientes } from '../services/api';
+import { API_BASE_URL } from '../config';
 import bodyFrontImg from './images/body-front-3d.png';
 import bodyBackImg from './images/body-back-3d.png';
 import bodyLeftImg from './images/body-left-3d.png';
@@ -265,7 +266,7 @@ export default function MapaCorporalPage() {
       const pid = pacienteIdRef.current;
       if (!token || !pid) return;
       const { evolucion, recomendaciones } = evolucionDataRef.current;
-      const BASE_URL = (import.meta.env.VITE_API_URL as string) || 'http://localhost:3001/api';
+      const BASE_URL = API_BASE_URL;
       fetch(`${BASE_URL}/mapa-corporal`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },

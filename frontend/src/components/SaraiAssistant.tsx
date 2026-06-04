@@ -3,8 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import SaraiECGIcon from './SaraiECGIcon';
 
 // ─── Constantes de endpoints ──────────────────────────────────────────────────
-const _API_BASE   = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
-const _WHISPER    = import.meta.env.VITE_WHISPER_URL || 'http://localhost:8000';
+import { API_BASE_URL as _API_BASE, WHISPER_BASE_URL as _WHISPER } from '../config';
 const WHISPER_URL = `${_WHISPER}/transcribir`;
 const GEMMA_URL   = `${_API_BASE}/sarai/procesar-voz`;
 

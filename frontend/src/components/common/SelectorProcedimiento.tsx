@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { API_BASE_URL } from '../../config';
 import { ProcedimientoCUPS } from '../../types/index';
 
 interface SelectorProcedimientoProps {
@@ -31,7 +32,7 @@ export const SelectorProcedimiento: React.FC<SelectorProcedimientoProps> = ({
       setCargando(true);
       setError(null);
 
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/cups/procedimientos`);
+      const response = await fetch(`${API_BASE_URL}/cups/procedimientos`);
 
       if (!response.ok) {
         throw new Error('Error al cargar procedimientos');

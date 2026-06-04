@@ -6,6 +6,7 @@
 import { useState } from 'react';
 import { Search, Printer, FileText, ClipboardList, User, Loader2, AlertCircle } from 'lucide-react';
 import { searchPacientes, getHistoriasPaciente, getHistoriaClinica } from '../services/api';
+import { API_BASE_URL } from '../config';
 
 // ─────────────────────────────────────────────────────────
 // Generador HTML para Historia Clínica (secciones 1-11)
@@ -262,7 +263,7 @@ export default function CentralImpresionPage() {
   };
 
   // ── Descargar PDF desde el backend (sin diálogo de impresión) ──
-  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+  const API_BASE = API_BASE_URL;
 
   const handlePrint = async (historiaId: string, tipo: 'hc' | 'ordenes') => {
     const key = historiaId + tipo;

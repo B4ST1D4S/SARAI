@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { API_BASE_URL } from '../../config';
 import { PlantillaTemplate } from '../../types/index';
 import { motion } from 'framer-motion';
 
@@ -49,7 +50,7 @@ export const RendererPlantilla: React.FC<RendererPlantillaProps> = ({
       setCargando(true);
       setError(null);
 
-      const url = new URL(`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/cups/plantillas`);
+      const url = new URL(`${API_BASE_URL}/cups/plantillas`);
       url.searchParams.append('cups', codigoCUPS);
       url.searchParams.append('tipo', tipo);
 

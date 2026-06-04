@@ -12,6 +12,7 @@ import {
 import {
   createHistoriaClinica, getAllPacientes, getHistoriasMedico, updateHistoriaClinica,
 } from '../services/api';
+import { API_BASE_URL } from '../config';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tipos
@@ -401,7 +402,7 @@ export default function HistoriaClinicaPage({
   }, [onRegisterCampos, handleCamposSarai]);
 
   // Descarga de PDF desde el backend (sin diálogo de impresión)
-  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+  const API_BASE = API_BASE_URL;
 
   const descargarPDF = async (tipo: 'hc' | 'ordenes') => {
     const id = savedIdRef.current;
