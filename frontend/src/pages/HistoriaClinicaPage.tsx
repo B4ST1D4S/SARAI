@@ -482,7 +482,7 @@ export default function HistoriaClinicaPage({
 
   // ─────────────────────────────────────────────────────────────────────────
   return (
-    <div className="h-screen overflow-hidden flex flex-col bg-[#080a0f]">
+    <div className="h-[calc(100vh-80px)] overflow-hidden flex flex-col bg-[#080a0f]">
 
       {/* ══ TOP BAR ══ */}
       <div className="flex-shrink-0 flex items-center justify-between px-5 py-3 border-b border-white/[0.06] bg-white/[0.015]">
@@ -636,7 +636,7 @@ export default function HistoriaClinicaPage({
 
             {/* ══ PANEL DERECHO: todas las secciones ══ */}
             <div id="hc-scroll-panel" className="flex-1 overflow-y-auto bg-[#080a0f]">
-              <div className="p-6 max-w-4xl">
+              <div className="p-6 w-full">
               <div id="hc-secciones" className="space-y-6">
 
                 {/* 1 */}
