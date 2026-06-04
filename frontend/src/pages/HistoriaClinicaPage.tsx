@@ -238,7 +238,7 @@ export default function HistoriaClinicaPage({
   const cargarHistoriaPorPaciente = useCallback(async (pacId: string) => {
     try {
       const r = await getHistoriasPaciente(pacId, token);
-      const lista: any[] = (r.data as any)?.historias || [];
+      const lista: any[] = Array.isArray(r.data) ? (r.data as any[]) : ((r.data as any)?.historias || []);
       if (lista.length > 0) {
         const h = lista[lista.length - 1];
         const d = h.datosExtendidos || {};
