@@ -32,12 +32,16 @@ const COMANDOS_NAV = [
   { palabras: ['quirófano', 'quirofano', 'cirujano', 'vista cirujano', 'sala de cirugía', 'sala cirugia'],   pagina: 'vista-cirujano',     label: 'Quirófano' },
   { palabras: ['seguimiento', 'follow up', 'followup', 'control'],                                            pagina: 'followup',           label: 'Seguimiento' },
   { palabras: ['consentimiento', 'consentimientos', 'consentimiento informado'],                              pagina: 'consentimiento',     label: 'Consentimiento' },
+  { palabras: ['cotizaciones', 'cotizacion', 'cotización', 'presupuesto', 'presupuestos'],                   pagina: 'cotizaciones',       label: 'Cotizaciones' },
   { palabras: ['crm', 'gestión de relaciones', 'gestion de relaciones'],                                     pagina: 'crm',                label: 'CRM' },
   { palabras: ['facturación', 'facturacion', 'facturas', 'factura'],                                         pagina: 'facturacion',        label: 'Facturación' },
   { palabras: ['plantillas', 'plantilla'],                                                                    pagina: 'plantillas',         label: 'Plantillas' },
-  { palabras: ['fotos', 'fotografías', 'fotografias', 'galería', 'galeria'],                                 pagina: 'fotos',              label: 'Fotos' },
+  { palabras: ['central de impresion', 'central impresion', 'impresion', 'impresiones', 'imprimir'],         pagina: 'impresion',          label: 'Central Impresión' },
+  { palabras: ['visual clinico', 'visual clínico', 'fotos', 'fotografías', 'fotografias', 'galería', 'galeria'], pagina: 'fotos',          label: 'Visual Clínico' },
   { palabras: ['mapa corporal', 'mapa del cuerpo', 'mapa'],                                                   pagina: 'mapa-corporal',      label: 'Mapa Corporal' },
-  { palabras: ['admin', 'administración', 'administracion', 'parametrización', 'parametrizacion', 'sistema'], pagina: 'admin',              label: 'Administración' },
+  { palabras: ['usuarios', 'usuario', 'gestion usuarios', 'gestión usuarios'],                               pagina: 'usuarios',           label: 'Usuarios' },
+  { palabras: ['manual', 'manual de usuario', 'ayuda', 'documentacion', 'documentación'],                   pagina: 'manual',             label: 'Manual de Usuario' },
+  { palabras: ['admin', 'administración', 'administracion', 'parametrización', 'parametrizacion', 'sistema'], pagina: 'admin',            label: 'Administración' },
 ];
 
 // Mapa de secciones de Historia Clínica → IDs del DOM

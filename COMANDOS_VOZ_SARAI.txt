@@ -1,7 +1,7 @@
 ================================================================================
    SARAI - LISTADO COMPLETO DE COMANDOS DE VOZ RECONOCIDOS
    EstetIA · Sistema de Cirugía Estética
-   Actualizado: 1 de mayo de 2026
+   Actualizado: 4 de junio de 2026
 ================================================================================
 
 IMPORTANTE — PALABRA DE ACTIVACIÓN
@@ -89,44 +89,83 @@ Hay DOS canales de entrada:
   Ej: "Sarai ir a pacientes"  /  "Sarai abrir agenda"  /  "Sarai pacientes"
 
   ┌─────────────────────────────────────────────────────────────────────────┐
-  │  COMANDO(S)                          → DESTINO                         │
+  │  CLINICA                                                                │
   ├─────────────────────────────────────────────────────────────────────────┤
-  │  dashboard / inicio / panel          → Dashboard Principal             │
-  │  principal / panel                                                      │
+  │  COMANDO(S)                            → DESTINO                       │
   ├─────────────────────────────────────────────────────────────────────────┤
-  │  pacientes / lista pacientes         → Módulo Pacientes                │
+  │  dashboard / inicio / panel principal  → Dashboard Principal           │
+  │  panel                                                                  │
   ├─────────────────────────────────────────────────────────────────────────┤
-  │  historia clínica / historia clinica → Historia Clínica                │
+  │  pacientes / lista pacientes           → Módulo Pacientes              │
+  │  lista de pacientes                                                     │
+  ├─────────────────────────────────────────────────────────────────────────┤
+  │  historia clínica / historia clinica   → Historia Clínica              │
   │  historial / historia                                                   │
   ├─────────────────────────────────────────────────────────────────────────┤
-  │  nueva historia / crear historia     → Nueva Historia Clínica          │
-  │  historia nueva / nuevo historia     (abre formulario directamente)    │
+  │  nueva historia / crear historia       → Nueva Historia Clínica        │
+  │  historia nueva / nuevo historia       (abre formulario directamente)  │
   ├─────────────────────────────────────────────────────────────────────────┤
-  │  agenda profesional                  → Agenda Profesional              │
-  │  agenda del médico / agenda del medico                                  │
-  │  agenda medico                                                          │
+  │  visual clinico / visual clínico       → Visual Clínico (Fotos)        │
+  │  fotos / fotografías / fotografias                                      │
+  │  galería / galeria                                                      │
+  ├─────────────────────────────────────────────────────────────────────────┤
+  │  mapa corporal / mapa del cuerpo       → Mapa Corporal                 │
+  │  mapa                                                                   │
+  ├─────────────────────────────────────────────────────────────────────────┤
+  │  AGENDA                                                                 │
   ├─────────────────────────────────────────────────────────────────────────┤
   │  agenda paciente / agenda del paciente → Agenda Paciente               │
   │  agenda / citas                                                         │
   ├─────────────────────────────────────────────────────────────────────────┤
-  │  quirófano / quirofano               → Vista Cirujano / Quirófano      │
+  │  admisión / admision / admitir         → Admisión                      │
+  ├─────────────────────────────────────────────────────────────────────────┤
+  │  agenda profesional                    → Agenda Profesional            │
+  │  agenda del médico / agenda del medico                                  │
+  │  agenda medico                                                          │
+  ├─────────────────────────────────────────────────────────────────────────┤
+  │  configurar agenda / config agenda     → Configuración de Agenda       │
+  │  configuracion agenda                                                   │
+  ├─────────────────────────────────────────────────────────────────────────┤
+  │  quirófano / quirofano                 → Vista Cirujano / Quirófano    │
   │  cirujano / vista cirujano                                              │
+  │  sala de cirugía / sala cirugia                                         │
   ├─────────────────────────────────────────────────────────────────────────┤
-  │  seguimiento / follow up / followup  → Seguimiento / Follow-up         │
+  │  seguimiento / follow up / followup    → Seguimiento / Follow-up       │
+  │  control                                                                │
   ├─────────────────────────────────────────────────────────────────────────┤
-  │  consentimiento / consentimientos    → Consentimiento                  │
+  │  GESTIÓN                                                                │
   ├─────────────────────────────────────────────────────────────────────────┤
-  │  crm / gestión / gestion             → CRM                             │
+  │  consentimiento / consentimientos      → Consentimiento Informado      │
+  │  consentimiento informado                                               │
   ├─────────────────────────────────────────────────────────────────────────┤
-  │  facturación / facturacion           → Facturación                     │
+  │  cotizaciones / cotizacion ★NEW        → Cotizaciones                  │
+  │  cotización / presupuesto / presupuestos                                │
+  ├─────────────────────────────────────────────────────────────────────────┤
+  │  crm / gestión de relaciones           → CRM                           │
+  │  gestion de relaciones                                                  │
+  ├─────────────────────────────────────────────────────────────────────────┤
+  │  facturación / facturacion             → Facturación                   │
   │  facturas / factura                                                     │
   ├─────────────────────────────────────────────────────────────────────────┤
-  │  plantillas / plantilla              → Plantillas                      │
+  │  plantillas / plantilla                → Plantillas                    │
   ├─────────────────────────────────────────────────────────────────────────┤
-  │  fotos / fotografías / fotografias   → Fotos                           │
+  │  central de impresion ★NEW             → Central Impresión             │
+  │  central impresion / impresion                                          │
+  │  impresiones / imprimir                                                 │
   ├─────────────────────────────────────────────────────────────────────────┤
-  │  mapa corporal / mapa / cuerpo       → Mapa Corporal                   │
+  │  ADMINISTRACIÓN                                                         │
+  ├─────────────────────────────────────────────────────────────────────────┤
+  │  admin / administración / administracion → Parametrización             │
+  │  parametrización / parametrizacion / sistema                            │
+  ├─────────────────────────────────────────────────────────────────────────┤
+  │  usuarios / usuario ★NEW               → Gestión de Usuarios           │
+  │  gestion usuarios / gestión usuarios                                    │
+  ├─────────────────────────────────────────────────────────────────────────┤
+  │  manual / manual de usuario ★NEW       → Manual de Usuario             │
+  │  ayuda / documentacion / documentación                                  │
   └─────────────────────────────────────────────────────────────────────────┘
+
+  ★NEW = módulos nuevos (cotizaciones, central impresión, usuarios, manual)
 
 
 ================================================================================
@@ -156,15 +195,19 @@ Hay DOS canales de entrada:
   PASO 3 → A partir de aquí, todo por voz:
 
     "Sarai ir a pacientes"          → navega a Pacientes
+    "Sarai abrir cotizaciones"      → navega a Cotizaciones
+    "Sarai central impresion"       → navega a Central Impresión
+    "Sarai usuarios"                → navega a Gestión de Usuarios
+    "Sarai manual"                  → abre Manual de Usuario
     "Sarai grabar"                  → inicia grabación Whisper
     "Sarai parar"                   → detiene grabación y transcribe
     "Sarai nueva historia"          → abre formulario HC
-    "Sarai datos generales"         → va a sección 1 del formulario
+    "Sarai motivo de consulta"      → va a esa sección del formulario
     "Sarai desactivar comandos"     → apaga SpeechRecognition
 
 
 ================================================================================
-7. NOTAS TÉCNICAS
+8. NOTAS TÉCNICAS
 ================================================================================
 
   • El sistema normaliza el texto: elimina tildes, convierte a minúsculas.
@@ -184,5 +227,35 @@ Hay DOS canales de entrada:
     esté deshabilitado.
 
 ================================================================================
-   FIN DEL LISTADO
+7. LISTADO COMPLETO DE MÓDULOS ACTIVOS (20 módulos)
+================================================================================
+
+  #   MÓDULO                  ID INTERNO          ACCESO VOCAL
+  ─────────────────────────────────────────────────────────────────────────────
+  1   Dashboard               dashboard           dashboard / inicio / panel
+  2   Pacientes               pacientes           pacientes / lista pacientes
+  3   Historia Clínica        historia            historia / historial / historia clinica
+  4   Visual Clínico          fotos               visual clinico / fotos / galeria
+  5   Mapa Corporal           mapa-corporal       mapa corporal / mapa
+  6   Agenda Paciente         agenda              agenda / citas
+  7   Admisión                admision            admision / admitir
+  8   Agenda Profesional      agendaProfesional   agenda profesional / agenda medico
+  9   Config Agenda           config-agenda       configurar agenda / config agenda
+  10  Quirófano               vista-cirujano      quirofano / cirujano / vista cirujano
+  11  Follow-up               followup            seguimiento / follow up / control
+  12  Consentimiento          consentimiento      consentimiento / consentimientos
+  13  Cotizaciones ★NEW       cotizaciones        cotizaciones / presupuesto
+  14  CRM                     crm                 crm / gestion de relaciones
+  15  Facturación             facturacion         facturacion / facturas
+  16  Plantillas              plantillas          plantillas / plantilla
+  17  Central Impresión ★NEW  impresion           impresion / central impresion / imprimir
+  18  Parametrización         admin               admin / administracion / sistema
+  19  Usuarios ★NEW           usuarios            usuarios / usuario
+  20  Manual Usuario ★NEW     manual              manual / ayuda / documentacion
+
+  ★NEW = módulos nuevos agregados en esta actualización (junio 2026)
+
+
+================================================================================
+   FIN DEL LISTADO · Actualizado: 4 jun 2026
 ================================================================================
