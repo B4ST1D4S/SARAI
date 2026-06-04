@@ -21,27 +21,34 @@ interface SaraiAssistantProps {
 // ⚠️ ORDEN IMPORTA: entradas más específicas (con más palabras) deben ir ANTES
 //    que las genéricas para evitar que 'agenda' capture 'agenda profesional'.
 const COMANDOS_NAV = [
-  { palabras: ['dashboard', 'inicio', 'panel principal', 'panel'],                                             pagina: 'dashboard',          label: 'Dashboard' },
-  { palabras: ['pacientes', 'lista pacientes', 'lista de pacientes'],                                          pagina: 'pacientes',          label: 'Pacientes' },
-  { palabras: ['historia clínica', 'historia clinica', 'historial', 'historia'],                              pagina: 'historia',           label: 'Historia Clínica' },
-  // Agenda Profesional ANTES de Agenda para evitar colisión
-  { palabras: ['agenda profesional', 'agenda del médico', 'agenda del medico', 'agenda medico'],              pagina: 'agendaProfesional',  label: 'Agenda Profesional' },
-  { palabras: ['configurar agenda', 'config agenda', 'configuracion agenda', 'configuración agenda'],         pagina: 'config-agenda',      label: 'Config Agenda' },
-  { palabras: ['agenda paciente', 'agenda del paciente', 'agenda', 'citas'],                                  pagina: 'agenda',             label: 'Agenda Paciente' },
-  { palabras: ['admisión', 'admision', 'admitir'],                                                            pagina: 'admision',           label: 'Admisión' },
-  { palabras: ['quirófano', 'quirofano', 'cirujano', 'vista cirujano', 'sala de cirugía', 'sala cirugia'],   pagina: 'vista-cirujano',     label: 'Quirófano' },
-  { palabras: ['seguimiento', 'follow up', 'followup', 'control'],                                            pagina: 'followup',           label: 'Seguimiento' },
-  { palabras: ['consentimiento', 'consentimientos', 'consentimiento informado'],                              pagina: 'consentimiento',     label: 'Consentimiento' },
-  { palabras: ['cotizaciones', 'cotizacion', 'cotización', 'presupuesto', 'presupuestos'],                   pagina: 'cotizaciones',       label: 'Cotizaciones' },
-  { palabras: ['crm', 'gestión de relaciones', 'gestion de relaciones'],                                     pagina: 'crm',                label: 'CRM' },
-  { palabras: ['facturación', 'facturacion', 'facturas', 'factura'],                                         pagina: 'facturacion',        label: 'Facturación' },
-  { palabras: ['plantillas', 'plantilla'],                                                                    pagina: 'plantillas',         label: 'Plantillas' },
-  { palabras: ['central de impresion', 'central impresion', 'impresion', 'impresiones', 'imprimir'],         pagina: 'impresion',          label: 'Central Impresión' },
-  { palabras: ['visual clinico', 'visual clínico', 'fotos', 'fotografías', 'fotografias', 'galería', 'galeria'], pagina: 'fotos',          label: 'Visual Clínico' },
-  { palabras: ['mapa corporal', 'mapa del cuerpo', 'mapa'],                                                   pagina: 'mapa-corporal',      label: 'Mapa Corporal' },
-  { palabras: ['usuarios', 'usuario', 'gestion usuarios', 'gestión usuarios'],                               pagina: 'usuarios',           label: 'Usuarios' },
-  { palabras: ['manual', 'manual de usuario', 'ayuda', 'documentacion', 'documentación'],                   pagina: 'manual',             label: 'Manual de Usuario' },
-  { palabras: ['admin', 'administración', 'administracion', 'parametrización', 'parametrizacion', 'sistema'], pagina: 'admin',            label: 'Administración' },
+  // ── CLINICA ──────────────────────────────────────────────────────────────
+  { palabras: ['dashboard', 'inicio', 'panel principal', 'panel'],                                                    pagina: 'dashboard',         label: 'Dashboard' },
+  { palabras: ['pacientes', 'lista pacientes', 'lista de pacientes'],                                                  pagina: 'pacientes',         label: 'Pacientes' },
+  { palabras: ['historia clínica', 'historia clinica', 'historial', 'historia'],                                      pagina: 'historia',          label: 'Historia Clínica' },
+  // ⚠️ Visual Clínico subido aquí para que 'fotos'/'visual clinico' no queden al fondo del array
+  { palabras: ['visual clinico', 'visual clínico', 'fotos', 'fotografías', 'fotografias', 'foto', 'galería', 'galeria'], pagina: 'fotos',           label: 'Visual Clínico' },
+  { palabras: ['mapa corporal', 'mapa del cuerpo', 'mapa'],                                                            pagina: 'mapa-corporal',     label: 'Mapa Corporal' },
+  // ── AGENDA ───────────────────────────────────────────────────────────────
+  // ⚠️ Agenda Profesional ANTES que Agenda Paciente para evitar colisión
+  { palabras: ['agenda profesional', 'agenda del médico', 'agenda del medico', 'agenda medico'],                      pagina: 'agendaProfesional', label: 'Agenda Profesional' },
+  { palabras: ['configurar agenda', 'config agenda', 'configuracion agenda', 'configuración agenda'],                 pagina: 'config-agenda',     label: 'Config Agenda' },
+  { palabras: ['agenda paciente', 'agenda del paciente', 'agenda', 'citas'],                                          pagina: 'agenda',            label: 'Agenda Paciente' },
+  { palabras: ['admisión', 'admision', 'admitir'],                                                                    pagina: 'admision',          label: 'Admisión' },
+  { palabras: ['quirófano', 'quirofano', 'cirujano', 'vista cirujano', 'sala de cirugía', 'sala cirugia'],            pagina: 'vista-cirujano',    label: 'Quirófano' },
+  { palabras: ['seguimiento', 'follow up', 'followup', 'control'],                                                    pagina: 'followup',          label: 'Seguimiento' },
+  // ── GESTIÓN ──────────────────────────────────────────────────────────────
+  { palabras: ['consentimiento', 'consentimientos', 'consentimiento informado'],                                      pagina: 'consentimiento',    label: 'Consentimiento' },
+  // ⚠️ Cotizaciones: palabras distintas de otras entradas, sin colisión
+  { palabras: ['cotizaciones', 'cotizacion', 'cotización', 'presupuesto', 'presupuestos', 'cotizar'],                 pagina: 'cotizaciones',      label: 'Cotizaciones' },
+  { palabras: ['crm', 'gestión de relaciones', 'gestion de relaciones'],                                             pagina: 'crm',               label: 'CRM' },
+  { palabras: ['facturación', 'facturacion', 'facturas', 'factura'],                                                  pagina: 'facturacion',       label: 'Facturación' },
+  { palabras: ['plantillas', 'plantilla'],                                                                            pagina: 'plantillas',        label: 'Plantillas' },
+  // ⚠️ 'imprimir' se eliminó aquí: lo maneja PASO 7 (onImprimir) para no colisionar
+  { palabras: ['central de impresion', 'central impresion', 'impresion', 'impresiones', 'ir a impresion'],            pagina: 'impresion',         label: 'Central Impresión' },
+  // ── ADMINISTRACIÓN ───────────────────────────────────────────────────────
+  { palabras: ['admin', 'administración', 'administracion', 'parametrización', 'parametrizacion', 'sistema'],        pagina: 'admin',             label: 'Administración' },
+  { palabras: ['usuarios', 'usuario', 'gestion usuarios', 'gestión usuarios'],                                       pagina: 'usuarios',          label: 'Usuarios' },
+  { palabras: ['manual', 'manual de usuario', 'ayuda', 'documentacion', 'documentación'],                           pagina: 'manual',            label: 'Manual de Usuario' },
 ];
 
 // Mapa de secciones de Historia Clínica → IDs del DOM
