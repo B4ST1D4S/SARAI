@@ -49,7 +49,7 @@ export const RendererPlantilla: React.FC<RendererPlantillaProps> = ({
       setCargando(true);
       setError(null);
 
-      const url = new URL('http://localhost:3001/api/cups/plantillas');
+      const url = new URL(`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/cups/plantillas`);
       url.searchParams.append('cups', codigoCUPS);
       url.searchParams.append('tipo', tipo);
 
