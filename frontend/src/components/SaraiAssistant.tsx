@@ -899,17 +899,16 @@ export default function SaraiAssistant({ onCamposDetectados, token, contexto, on
   useEffect(() => { posicionRef.current   = posicion;   }, [posicion]);
 
   // ── Touch drag nativo: listener directo en el DOM con passive:false ────────
-  // IMPORTANTE: React delega onTouchStart como pasivo (no puede preventDefault);
-  //             por eso registramos aquí el listener nativo para bloquear el scroll.
+  // SIN e.preventDefault() en touchstart: touch-action:none en el CSS ya bloquea
+  // el scroll/zoom nativo, y así los eventos click de botones/header siguen funcionando.
   useEffect(() => {
     const el = widgetRef.current;
     if (!el) return;
 
     const onTouchStart = (e: TouchEvent) => {
       const target = e.target as HTMLElement;
-      if (!minimizadoRef.current && target.closest('button, textarea, input, [role="button"]')) return;
-
-      e.preventDefault(); // bloquea scroll/zoom del navegador desde el inicio
+      // Botones, inputs y textareas manejan sus propios eventos — no interceptar
+      if (target.closest('button, textarea, input, [role="button"]')) return;
 
       const touch   = e.touches[0];
       const offsetX = touch.clientX - posicionRef.current.x;
