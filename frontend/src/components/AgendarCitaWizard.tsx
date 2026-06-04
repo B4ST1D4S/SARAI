@@ -86,7 +86,7 @@ export default function AgendarCitaWizard({
   useEffect(() => {
     setLoadTipos(true);
     const mId = medicoIdPre || getUser().id || getUser().userId || "";
-    const url = mId ? `/api/disponibilidad/tipos-consulta/${mId}` : "/api/admin/tipos-consulta";
+    const url = mId ? `${API_BASE_URL}/disponibilidad/tipos-consulta/${mId}` : `${API_BASE_URL}/admin/tipos-consulta`;
     fetch(url, { headers: { Authorization: `Bearer ${getToken()}` } })
       .then(r => r.json())
       .then(d => { const t = d.tiposConsulta || d.tipos || []; setTipos(t.length > 0 ? t : TIPOS_FALLBACK); })

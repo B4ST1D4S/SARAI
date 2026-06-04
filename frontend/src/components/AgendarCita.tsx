@@ -129,8 +129,8 @@ export default function AgendarCita({
         const token = getToken();
         const duracion = duracionTipoActual();
         const url = duracion
-          ? `/api/disponibilidad/slots?medicoId=${medicoId}&fecha=${formData.fecha}&duracion=${duracion}`
-          : `/api/disponibilidad/slots?medicoId=${medicoId}&fecha=${formData.fecha}`;
+          ? `${API_BASE_URL}/disponibilidad/slots?medicoId=${medicoId}&fecha=${formData.fecha}&duracion=${duracion}`
+          : `${API_BASE_URL}/disponibilidad/slots?medicoId=${medicoId}&fecha=${formData.fecha}`;
 
         const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
 
