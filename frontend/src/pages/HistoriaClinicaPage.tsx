@@ -646,7 +646,6 @@ export default function HistoriaClinicaPage({
                   <motion.div animate={{ width: `${porcentaje}%` }} transition={{ duration: 0.4 }}
                     className="h-full bg-gradient-to-r from-yellow-400 to-amber-500 rounded-full" />
                 </div>
-              </div>
 
               {/* nav secciones */}
               <div className="flex-1 overflow-y-auto px-2 pb-4">
