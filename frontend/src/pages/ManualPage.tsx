@@ -846,18 +846,18 @@ export default function ManualPage() {
       {/* ── Contenido principal ────────────────────────────────────── */}
       <main className="flex-1 flex flex-col overflow-hidden">
         {/* Topbar */}
-        <div className="flex items-center gap-3 px-5 py-3 border-b border-slate-800 bg-slate-900/60 backdrop-blur">
+        <div className="flex items-center gap-3 px-3 sm:px-5 py-3 border-b border-slate-800 bg-slate-900/60 backdrop-blur">
           <button
             onClick={() => setMenuAbierto(!menuAbierto)}
-            className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
+            className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors flex-shrink-0"
           >
             <LayoutGrid size={16} />
           </button>
-          <div className="flex items-center gap-2 text-sm text-slate-400">
-            <BookMarked size={14} />
-            <span>Manual</span>
-            <ChevronRight size={12} />
-            <span className={`font-medium ${moduloActual.color}`}>{moduloActual.titulo}</span>
+          <div className="flex items-center gap-2 text-sm text-slate-400 min-w-0">
+            <BookMarked size={14} className="flex-shrink-0" />
+            <span className="hidden sm:inline">Manual</span>
+            <ChevronRight size={12} className="hidden sm:inline" />
+            <span className={`font-medium truncate ${moduloActual.color}`}>{moduloActual.titulo}</span>
           </div>
 
           {/* Navegación rápida */}
@@ -886,7 +886,7 @@ export default function ManualPage() {
         </div>
 
         {/* Contenido scrollable */}
-        <div ref={contenidoRef} className="flex-1 overflow-y-auto p-6">
+        <div ref={contenidoRef} className="flex-1 overflow-y-auto p-3 sm:p-6">
           <AnimatePresence mode="wait">
             <motion.div
               key={moduloActivo}
