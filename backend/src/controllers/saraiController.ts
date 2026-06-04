@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import type { File as MulterFile } from 'multer';
 
 // -----------------------------------------------------------------------------
 // Extractor local con patrones (sin API, siempre disponible como fallback)
@@ -159,6 +160,73 @@ Ejemplo: {"quejaPrincipal":"Flacidez abdominal post embarazo","peso":"68","presi
   } catch (err: any) {
     console.error('[SARAI] geminiTextoACampos error:', err?.message || err);
     return null;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Gemini: audio ? solo transcripción (para el endpoint /transcribir)
+// -----------------------------------------------------------------------------
+async function geminiTranscribir(audioBase64: string, mimeType: string): Promise<string> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey || apiKey.includes('pon-tu') || apiKey.includes('aqui')) return '';
+  const mimeNorm = mimeType.split(';')[0].trim() || 'audio/webm';
+  const prompt = `Transcribe exactamente lo que dice el médico en este audio de consulta médica en español colombiano.
+Responde ÚNICAMENTE con el texto transcrito, sin explicaciones, sin formato, sin comillas.
+Si no hay voz clara o el audio está vacío, responde solo con la palabra: SILENCIO`;
+  try {
+    const resp = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [
+            { text: prompt },
+            { inlineData: { mimeType: mimeNorm, data: audioBase64 } },
+          ]}],
+          generationConfig: { temperature: 0.0, maxOutputTokens: 500 },
+        }),
+      }
+    );
+    if (!resp.ok) return '';
+    const data = await resp.json() as any;
+    const raw = (data?.candidates?.[0]?.content?.parts?.[0]?.text || '').trim();
+    return raw.toUpperCase() === 'SILENCIO' ? '' : raw;
+  } catch {
+    return '';
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Endpoint público: POST /transcribir  (compatible con el servicio Python Whisper)
+// Acepta multipart/form-data con campo 'audio'
+// Devuelve { texto, idioma, confianza, nivel_pct }
+// -----------------------------------------------------------------------------
+export async function transcribirAudio(req: Request, res: Response): Promise<void> {
+  try {
+    const file = (req as any).file as MulterFile | undefined;
+    if (!file || file.buffer.length < 500) {
+      res.status(400).json({ error: 'Archivo de audio vacío o muy pequeño' });
+      return;
+    }
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey || apiKey.includes('pon-tu') || apiKey.includes('aqui')) {
+      res.status(503).json({ error: 'Transcripción no disponible. Configura GEMINI_API_KEY en el servidor.' });
+      return;
+    }
+    const mimeType = file.mimetype || 'audio/webm';
+    const audioBase64 = file.buffer.toString('base64');
+    const texto = await geminiTranscribir(audioBase64, mimeType);
+    res.json({
+      texto,
+      idioma: 'es',
+      confianza: texto.length > 0 ? 0.90 : 0.0,
+      nivel_pct: texto.length > 0 ? 50 : 0,
+      motor: 'gemini',
+    });
+  } catch (err) {
+    console.error('transcribirAudio error:', err);
+    res.status(500).json({ error: 'Error transcribiendo audio' });
   }
 }
 

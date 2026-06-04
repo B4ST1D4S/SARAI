@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
+import multer from 'multer';
 import prisma from './lib/prisma.js';
 import authRoutes from './routes/auth.js';
 import pacientesRoutes from './routes/pacientes.js';
@@ -10,6 +11,7 @@ import cupsRoutes from './routes/cups.js';
 import citasRoutes from './routes/citas.js';
 import cotizacionesRoutes from './routes/cotizaciones.js';
 import saraiRoutes from './routes/sarai.js';
+import { transcribirAudio } from './controllers/saraiController.js';
 import disponibilidadRoutes from './routes/disponibilidad.js';
 import usuariosRoutes from './routes/usuarios.js';
 import especialidadesRoutes from './routes/especialidades.js';
@@ -70,6 +72,11 @@ app.use('/api/cups', cupsRoutes);
 app.use('/api/citas', citasRoutes);
 app.use('/api/cotizaciones', cotizacionesRoutes);
 app.use('/api/sarai', saraiRoutes);
+
+// ── Endpoint de transcripción de audio (compatible con servicio Whisper local) ──
+// Acepta multipart/form-data con campo 'audio', devuelve { texto, idioma, confianza }
+const _upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
+app.post('/transcribir', _upload.single('audio'), transcribirAudio);
 app.use('/api/disponibilidad', disponibilidadRoutes);
 app.use('/api/usuarios', usuariosRoutes);
 app.use('/api/especialidades', especialidadesRoutes);
