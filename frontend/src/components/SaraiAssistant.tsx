@@ -891,8 +891,11 @@ export default function SaraiAssistant({ onCamposDetectados, token, contexto, on
   }, [minimizado]);
 
   // ── Handlers para drag + click en ícono contraído ───────────────────────────
-  const dragMovedRef = useRef(false);
-  const dragStartRef = useRef({ x: 0, y: 0 });
+  const dragMovedRef  = useRef(false);
+  const dragStartRef  = useRef({ x: 0, y: 0 });
+  // Ref para que los closures de touch siempre lean el valor actual de minimizado
+  const minimizadoRef = useRef(minimizado);
+  useEffect(() => { minimizadoRef.current = minimizado; }, [minimizado]);
 
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     // En expandido: no draggear sobre botones/inputs
@@ -906,15 +909,43 @@ export default function SaraiAssistant({ onCamposDetectados, token, contexto, on
     setDragOffset({ x: e.clientX - posicion.x, y: e.clientY - posicion.y });
   };
 
-  // Touch: inicio de arrastre en móvil
+  // Touch: listeners registrados de forma síncrona (sin pasar por useEffect)
+  // para no perder touchmove que llega antes del re-render.
   const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
-    if (!minimizado && (e.target as HTMLElement).closest('button, textarea, input, [role="button"]')) return;
+    if (!minimizadoRef.current && (e.target as HTMLElement).closest('button, textarea, input, [role="button"]')) return;
     if (!widgetRef.current) return;
+
     const touch = e.touches[0];
     dragMovedRef.current = false;
     dragStartRef.current = { x: touch.clientX, y: touch.clientY };
-    setDragging(true);
-    setDragOffset({ x: touch.clientX - posicion.x, y: touch.clientY - posicion.y });
+
+    // Capturar offset en el inicio del toque (valor estable durante todo el arrastre)
+    const offsetX = touch.clientX - posicion.x;
+    const offsetY = touch.clientY - posicion.y;
+
+    const onTouchMove = (ev: TouchEvent) => {
+      ev.preventDefault();
+      const t = ev.touches[0];
+      const dx = t.clientX - dragStartRef.current.x;
+      const dy = t.clientY - dragStartRef.current.y;
+      if (Math.sqrt(dx * dx + dy * dy) > 5) dragMovedRef.current = true;
+      const expandedW = Math.min(Math.round(window.innerWidth * 0.92), 300);
+      const maxX = window.innerWidth  - (minimizadoRef.current ? 64 : expandedW);
+      const maxY = window.innerHeight - 80;
+      setPosicion({
+        x: Math.max(0, Math.min(t.clientX - offsetX, maxX)),
+        y: Math.max(0, Math.min(t.clientY - offsetY, maxY)),
+      });
+    };
+
+    const onTouchEnd = () => {
+      document.removeEventListener('touchmove', onTouchMove);
+      document.removeEventListener('touchend',  onTouchEnd);
+      if (!dragMovedRef.current && minimizadoRef.current) setMinimizado(false);
+    };
+
+    document.addEventListener('touchmove', onTouchMove, { passive: false });
+    document.addEventListener('touchend',  onTouchEnd);
   };
 
   useEffect(() => {
@@ -942,34 +973,11 @@ export default function SaraiAssistant({ onCamposDetectados, token, contexto, on
       if (!dragMovedRef.current && minimizado) setMinimizado(false);
     };
 
-    // Touch move/end — arrastre táctil en móvil
-    const handleTouchMove = (e: TouchEvent) => {
-      e.preventDefault();
-      const touch = e.touches[0];
-      const dx = touch.clientX - dragStartRef.current.x;
-      const dy = touch.clientY - dragStartRef.current.y;
-      if (Math.sqrt(dx * dx + dy * dy) > 5) dragMovedRef.current = true;
-      const { maxX, maxY } = calcMax();
-      setPosicion({
-        x: Math.max(0, Math.min(touch.clientX - dragOffset.x, maxX)),
-        y: Math.max(0, Math.min(touch.clientY - dragOffset.y, maxY)),
-      });
-    };
-
-    const handleTouchEnd = () => {
-      setDragging(false);
-      if (!dragMovedRef.current && minimizado) setMinimizado(false);
-    };
-
     document.addEventListener('mousemove', handleMouseMove, { passive: false });
-    document.addEventListener('mouseup', handleMouseUp);
-    document.addEventListener('touchmove', handleTouchMove, { passive: false });
-    document.addEventListener('touchend', handleTouchEnd);
+    document.addEventListener('mouseup',   handleMouseUp);
     return () => {
       document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-      document.removeEventListener('touchmove', handleTouchMove);
-      document.removeEventListener('touchend', handleTouchEnd);
+      document.removeEventListener('mouseup',   handleMouseUp);
     };
   }, [dragging, dragOffset, minimizado]);
 
