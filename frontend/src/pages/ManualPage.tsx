@@ -357,7 +357,7 @@ const MODULOS: Modulo[] = [
       { numero: 1, titulo: 'Abrir el asistente', descripcion: 'Haz clic en el ícono de onda ECG en la esquina inferior derecha. Se abre el panel flotante del asistente desde cualquier pantalla del sistema.', tipo: 'normal' },
       { numero: 2, titulo: 'Escribir una consulta', descripcion: 'Escribe tu pregunta en el campo de texto. Ejemplos: "¿Cuál es la dosis de tramadol en adultos?", "Diagnóstico diferencial para dolor en epigastrio", "Resume los síntomas de este paciente".', tipo: 'normal' },
       { numero: 3, titulo: 'Hablar con SARAI', descripcion: 'Con el modo comandos activo, di "Sarai grabar", habla tu consulta y di "Sarai parar". SARAI transcribe con Whisper y procesa la respuesta con IA.', tipo: 'tip' },
-      { numero: 4, titulo: 'Activar comandos de voz', descripcion: 'Haz clic en el micrófono y di "activar comandos". Desde ese momento puedes navegar todo el sistema por voz. Ver sección "Comandos de Voz" para la lista completa.', tipo: 'normal' },
+      { numero: 4, titulo: 'Activar comandos de voz', descripcion: 'Haz clic en el micrófono. La primera vez el navegador pedirá permiso para acceder al micrófono — haz clic en "Permitir" (esto siempre requiere clic manual, no se puede hacer por voz). Luego di "activar comandos" y el sistema queda en modo voz completo.', tipo: 'warning' },
       { numero: 5, titulo: 'Contexto del paciente activo', descripcion: 'Si tienes una Historia Clínica abierta, SARAI puede referirse a los datos de ese paciente. Ej: "¿Qué analgésico recomiendas dado el diagnóstico actual?"', tipo: 'normal' },
     ],
     tips: [
@@ -551,8 +551,8 @@ const MODULOS: Modulo[] = [
       '"Sarai desactivar" — apaga el modo voz',
     ],
     pasos: [
-      { numero: 1, titulo: 'Solo un clic para empezar', descripcion: 'Haz clic en el ícono de micrófono (esquina inferior derecha de la pantalla). Ese es el ÚNICO clic obligatorio. A partir de aquí controlas todo con la voz.', tipo: 'normal' },
-      { numero: 2, titulo: 'Di "activar comandos"', descripcion: 'Luego del clic, di en voz alta: "Sarai activar comandos" (o solo "activar comandos"). El ícono parpadea en verde: el modo voz está activo y escuchando.', tipo: 'normal' },
+      { numero: 1, titulo: 'Haz clic en el micrófono', descripcion: 'Haz clic en el ícono de micrófono (esquina inferior derecha). La primera vez, el navegador muestra una ventana pidiendo permiso para usar el micrófono — debes hacer clic en "Permitir". Este paso siempre es manual: el navegador no puede conceder permisos de micrófono por voz (política de privacidad del navegador).', tipo: 'warning' },
+      { numero: 2, titulo: 'Di "activar comandos"', descripcion: 'Una vez el navegador haya dado permiso al micrófono, di en voz alta: "Sarai activar comandos". El ícono parpadea en verde: el modo voz está activo. A partir de aquí todo lo demás se controla por voz.', tipo: 'normal' },
       { numero: 3, titulo: 'Navegar a cualquier módulo', descripcion: 'Di "Sarai" + el nombre del módulo. Ejemplos: "Sarai pacientes", "Sarai agenda", "Sarai cotizaciones", "Sarai quirofano", "Sarai manual". El sistema navega de inmediato.', tipo: 'tip' },
       { numero: 4, titulo: 'Prefijos opcionales', descripcion: 'Antes del módulo puedes decir: "ir a", "abrir", "mostrar", "ve a". Ejemplo: "Sarai ir a pacientes" o "Sarai abrir la agenda" — funcionan igual que sin prefijo.', tipo: 'normal' },
       { numero: 5, titulo: 'Grabar dictado (Whisper)', descripcion: 'Di "Sarai grabar" para iniciar la grabación de audio. Habla con normalidad. Di "Sarai parar" cuando termines. El texto aparece automáticamente en el campo activo.', tipo: 'normal' },
