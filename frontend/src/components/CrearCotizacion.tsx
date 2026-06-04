@@ -127,7 +127,7 @@ export default function CrearCotizacion({
         vigenciaDias: formData.vigenciaDias,
       };
 
-      const response = await fetch(`${API_BASE_URL}/cotizaciones', {
+      const response = await fetch(`${API_BASE_URL}/cotizaciones`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

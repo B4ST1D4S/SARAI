@@ -193,7 +193,7 @@ export default function AgendarCita({
 
       const fechaHora = new Date(`${formData.fecha}T${formData.hora}:00`);
 
-      const response = await fetch(`${API_BASE_URL}/citas', {
+      const response = await fetch(`${API_BASE_URL}/citas`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

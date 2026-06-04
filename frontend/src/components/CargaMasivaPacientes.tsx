@@ -55,7 +55,7 @@ CC,5555555555,Pedro,Luis,Sánchez,González,1988-03-10,Cali,Calle 10 # 5-20,San 
       formData.append('archivo', archivo);
 
       const token = localStorage.getItem('accessToken') || '';
-      const response = await fetch(`${API_BASE_URL}/pacientes/carga-masiva', {
+      const response = await fetch(`${API_BASE_URL}/pacientes/carga-masiva`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
