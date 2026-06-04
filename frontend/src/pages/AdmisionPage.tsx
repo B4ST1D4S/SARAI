@@ -41,7 +41,7 @@ export default function AdmisionPage() {
     const inicioLocal = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 0, 0, 0, 0);
     const finLocal    = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 23, 59, 59, 999);
     const res = await fetch(
-      `/api/citas/medico/agenda?fechaInicio=${inicioLocal.toISOString()}&fechaFin=${finLocal.toISOString()}`,
+      `${API_BASE_URL}/citas/medico/agenda?fechaInicio=${inicioLocal.toISOString()}&fechaFin=${finLocal.toISOString()}`,
       { headers: { Authorization: `Bearer ${token}` } }
     );
     if (res.ok) {
