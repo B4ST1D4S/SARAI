@@ -28,7 +28,16 @@ const PORT = process.env.PORT || 3001;
 // ============================================
 
 app.use(helmet());
-app.use(cors());
+app.use(cors({
+  origin: [
+    'https://app-sarai.vercel.app',
+    'http://localhost:5173',
+    'http://localhost:3000',
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+}));
 // 20 MB para soportar audio base64
 app.use(express.json({ limit: 20 * 1024 * 1024 }));
 app.use(express.urlencoded({ extended: true, limit: 20 * 1024 * 1024 }));
@@ -82,61 +91,25 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 });
 
 // ============================================
-// CONEXIÓN A BASE DE DATOS
+// INICIO DEL SERVIDOR (solo local)
 // ============================================
 
-async function connectDatabase() {
-  try {
-    await prisma.$connect();
-    console.log('✅ Database connected successfully');
-    return true;
-  } catch (error) {
-    console.error('❌ Database connection failed:', error);
-    return false;
-  }
-}
-
-// ============================================
-// INICIO DEL SERVIDOR
-// ============================================
-
-async function startServer() {
-  const dbConnected = await connectDatabase();
-  
-  if (!dbConnected) {
-    console.error('Cannot start server without database connection');
-    process.exit(1);
-  }
-
-  // En Vercel no se llama app.listen — Vercel inyecta el handler directamente
-  if (process.env.VERCEL) {
-    console.log('Running on Vercel serverless');
-    return;
-  }
-
-  const server = app.listen(PORT, () => {
-    console.log(`\n🚀 Server running on http://localhost:${PORT}`);
-    console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
-    console.log(`🗄️  Database: PostgreSQL`);
-    console.log(`📚 API Docs: http://localhost:${PORT}/api/auth/login\n`);
-  });
-
-  // Graceful shutdown
-  process.on('SIGINT', async () => {
-    console.log('\n🛑 Shutting down gracefully...');
-    await prisma.$disconnect();
-    server.close(() => {
-      console.log('Server closed');
-      process.exit(0);
+// En Vercel se exporta directamente sin listen ni process.exit
+if (!process.env.VERCEL) {
+  prisma.$connect()
+    .then(() => {
+      console.log('✅ Database connected successfully');
+      app.listen(PORT, () => {
+        console.log(`\n🚀 Server running on http://localhost:${PORT}`);
+        console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
+        console.log(`🗄️  Database: PostgreSQL`);
+        console.log(`📚 API Docs: http://localhost:${PORT}/api/auth/login\n`);
+      });
+    })
+    .catch((error: unknown) => {
+      console.error('❌ Database connection failed:', error);
     });
-  });
 }
-
-// Iniciar servidor (local y Vercel)
-startServer().catch((error) => {
-  console.error('Fatal error:', error);
-  process.exit(1);
-});
 
 // Exportar app para Vercel serverless
 export default app;

@@ -3,12 +3,16 @@
  * Genera PDFs de Historia Clínica y Órdenes Médicas usando Puppeteer
  */
 import { Request, Response } from 'express';
-import puppeteer from 'puppeteer-core';
-import chromium from '@sparticuz/chromium';
 import prisma from '../lib/prisma.js';
 import { buildHCHtml, buildOrdenesHtml } from '../utils/htmlTemplates.js';
 
 async function htmlToPdf(html: string): Promise<Buffer> {
+  // Import dinámico para no cargar chromium en cada invocación serverless
+  const [{ default: puppeteer }, { default: chromium }] = await Promise.all([
+    import('puppeteer-core'),
+    import('@sparticuz/chromium'),
+  ]);
+
   const executablePath = process.env.VERCEL
     ? await chromium.executablePath()
     : undefined;
