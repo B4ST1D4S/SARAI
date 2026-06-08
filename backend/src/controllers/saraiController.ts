@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import type { File as MulterFile } from 'multer';
+type MulterFile = { buffer: Buffer; mimetype: string };
 
 // -----------------------------------------------------------------------------
 // Extractor local con patrones (sin API, siempre disponible como fallback)
@@ -59,10 +59,8 @@ function extraerCamposLocalmente(texto: string): Record<string, string> {
 // -----------------------------------------------------------------------------
 // Lista de modelos en orden de prioridad (fallback automático)
 const MODELOS_TEXTO = [
-  'gemini-2.0-flash',
-  'gemini-2.0-flash-lite',
-  'gemma-3-27b-it',
-  'gemma-3-12b-it',
+  'gemini-2.5-flash',
+  'gemini-2.5-flash-lite',
 ];
 
 async function llamarModeloTexto(apiKey: string, prompt: string): Promise<string | null> {
@@ -175,7 +173,7 @@ Responde ÚNICAMENTE con el texto transcrito, sin explicaciones, sin formato, sin
 Si no hay voz clara o el audio está vacío, responde solo con la palabra: SILENCIO`;
   try {
     const resp = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -274,7 +272,7 @@ Contexto: ${contexto || 'historia clínica de cirugía estética colombiana'}`;
 
   try {
     const resp = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
