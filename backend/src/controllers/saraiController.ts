@@ -1,8 +1,9 @@
-﻿import { Request, Response } from 'express';
+import { Request, Response } from 'express';
+type MulterFile = { buffer: Buffer; mimetype: string };
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // Extractor local con patrones (sin API, siempre disponible como fallback)
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 function extraerCamposLocalmente(texto: string): Record<string, string> {
   const campos: Record<string, string> = {};
 
@@ -15,7 +16,7 @@ function extraerCamposLocalmente(texto: string): Record<string, string> {
   const frMatch = texto.match(/\b(\d{2})\s*(?:rpm|respiraciones)/i);
   if (frMatch) campos['frecuenciaRespiratoria'] = frMatch[1];
 
-  const tempMatch = texto.match(/\b(3[5-9](?:[.,]\d)?|4[0-2](?:[.,]\d)?)\s*(?:grados?|°|celsius|°c)/i);
+  const tempMatch = texto.match(/\b(3[5-9](?:[.,]\d)?|4[0-2](?:[.,]\d)?)\s*(?:grados?|�|celsius|�c)/i);
   if (tempMatch) campos['temperatura'] = tempMatch[1].replace(',', '.');
 
   const pesoMatch = texto.match(/(?:pesa|peso\s+de)\s+(\d{2,3}(?:[.,]\d)?)\s*(?:kg|kilos?)/i)
@@ -29,19 +30,19 @@ function extraerCamposLocalmente(texto: string): Record<string, string> {
     campos['talla'] = parseFloat(val) < 3 ? String(Math.round(parseFloat(val) * 100)) : val;
   }
 
-  const alergiaMatch = texto.match(/(?:alerg[ií]a|al[eé]rgico)[^.;]{0,80}/i);
+  const alergiaMatch = texto.match(/(?:alerg[i�]a|al[e�]rgico)[^.;]{0,80}/i);
   if (alergiaMatch) campos['alergias'] = alergiaMatch[0].trim();
 
-  const medMatch = texto.match(/(?:toma|tomo|medicamento|medicaci[oó]n)[^.;]{0,120}/i);
+  const medMatch = texto.match(/(?:toma|tomo|medicamento|medicaci[o�]n)[^.;]{0,120}/i);
   if (medMatch) campos['medicamentosActuales'] = medMatch[0].trim();
 
-  const antQuirMatch = texto.match(/(?:cirug[ií]a|operaci[oó]n|intervencion)[^.;]{0,100}/i);
+  const antQuirMatch = texto.match(/(?:cirug[i�]a|operaci[o�]n|intervencion)[^.;]{0,100}/i);
   if (antQuirMatch) campos['antecedentesQuirurgicos'] = antQuirMatch[0].trim();
 
-  const dxMatch = texto.match(/(?:diagn[oó]stico|impresion)\s*[:es]?\s*([^.;\n]{5,100})/i);
+  const dxMatch = texto.match(/(?:diagn[o�]stico|impresion)\s*[:es]?\s*([^.;\n]{5,100})/i);
   if (dxMatch) campos['diagnostico'] = dxMatch[1].trim();
 
-  const procMatch = texto.match(/(?:procedimiento|se\s+(?:har[aá]|propone|recomienda))\s*([^.;\n]{5,80})/i);
+  const procMatch = texto.match(/(?:procedimiento|se\s+(?:har[a�]|propone|recomienda))\s*([^.;\n]{5,80})/i);
   if (procMatch) campos['procedimientoPropuesto'] = procMatch[1].trim();
 
   if (Object.keys(campos).length <= 1) {
@@ -53,15 +54,13 @@ function extraerCamposLocalmente(texto: string): Record<string, string> {
   return campos;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Gemini: texto → campos estructurados
-// ─────────────────────────────────────────────────────────────────────────────
-// Lista de modelos en orden de prioridad (fallback automático)
+// -----------------------------------------------------------------------------
+// Gemini: texto ? campos estructurados
+// -----------------------------------------------------------------------------
+// Lista de modelos en orden de prioridad (fallback autom�tico)
 const MODELOS_TEXTO = [
-  'gemini-2.0-flash',
-  'gemini-2.0-flash-lite',
-  'gemma-3-27b-it',
-  'gemma-3-12b-it',
+  'gemini-2.5-flash',
+  'gemini-2.5-flash-lite',
 ];
 
 async function llamarModeloTexto(apiKey: string, prompt: string): Promise<string | null> {
@@ -86,7 +85,7 @@ async function llamarModeloTexto(apiKey: string, prompt: string): Promise<string
           return text;
         }
       } else if (resp.status === 429 || resp.status === 404) {
-        // Cuota agotada o modelo no disponible → intentar siguiente
+        // Cuota agotada o modelo no disponible ? intentar siguiente
         continue;
       } else {
         console.error(`[SARAI] ${modelo} error:`, resp.status);
@@ -104,45 +103,45 @@ async function geminiTextoACampos(texto: string, contexto: string): Promise<Reco
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey || apiKey.includes('pon-tu') || apiKey.includes('aqui')) return null;
 
-  const prompt = `Eres SARAI, asistente clínica de EstetIA (medicina estética colombiana, Res. 1995/1999 - Ley 2015/2020).
-El profesional dictó: "${texto}"
-Contexto: ${contexto || 'historia clínica de medicina estética'}
+  const prompt = `Eres SARAI, asistente cl�nica de EstetIA (medicina est�tica colombiana, Res. 1995/1999 - Ley 2015/2020).
+El profesional dict�: "${texto}"
+Contexto: ${contexto || 'historia cl�nica de medicina est�tica'}
 
-Extrae SOLO los campos mencionados explícitamente. Omite los no mencionados.
-Usa lenguaje médico formal. No inventes datos.
+Extrae SOLO los campos mencionados expl�citamente. Omite los no mencionados.
+Usa lenguaje m�dico formal. No inventes datos.
 
 CAMPOS DISPONIBLES:
 - quejaPrincipal: motivo principal de consulta
-- historiaEnfermedad: descripción cronológica del padecimiento actual
-- antecedentesPersonales: antecedentes médicos personales
+- historiaEnfermedad: descripci�n cronol�gica del padecimiento actual
+- antecedentesPersonales: antecedentes m�dicos personales
 - antecedentesFamiliares: antecedentes familiares relevantes
-- antecedentesQuirurgicos: cirugías o procedimientos previos
-- antecedentesEsteticos: procedimientos estéticos previos
+- antecedentesQuirurgicos: cirug�as o procedimientos previos
+- antecedentesEsteticos: procedimientos est�ticos previos
 - medicamentosActuales: medicamentos que toma actualmente
 - alergias: alergias conocidas (medicamentos, materiales, sustancias)
 - habitosToxicos: tabaco, alcohol, sustancias psicoactivas
-- revisionSistemas: revisión por sistemas (cardiovascular, respiratorio, etc.)
-- examenFisico: hallazgos del examen físico general
-- presionArterial: valor numérico ej "120/80"
-- frecuenciaCardiaca: valor numérico en lpm ej "72"
-- frecuenciaRespiratoria: valor numérico en rpm ej "16"
-- temperatura: valor numérico en °C ej "36.5"
-- peso: valor numérico en kg ej "68"
-- talla: valor numérico en cm ej "162"
-- imc: índice de masa corporal si se menciona
+- revisionSistemas: revisi�n por sistemas (cardiovascular, respiratorio, etc.)
+- examenFisico: hallazgos del examen f�sico general
+- presionArterial: valor num�rico ej "120/80"
+- frecuenciaCardiaca: valor num�rico en lpm ej "72"
+- frecuenciaRespiratoria: valor num�rico en rpm ej "16"
+- temperatura: valor num�rico en �C ej "36.5"
+- peso: valor num�rico en kg ej "68"
+- talla: valor num�rico en cm ej "162"
+- imc: �ndice de masa corporal si se menciona
 - tipoPiel: tipo de piel (seca, grasa, mixta, sensible, normal)
 - fototipo: fototipo Fitzpatrick (I al VI)
-- zonasTratar: zonas anatómicas a tratar
-- analisisFacial: descripción del análisis facial
+- zonasTratar: zonas anat�micas a tratar
+- analisisFacial: descripci�n del an�lisis facial
 - expectativasPaciente: expectativas y objetivos del paciente
-- diagnostico: diagnóstico médico o estético
+- diagnostico: diagn�stico m�dico o est�tico
 - planTratamiento: plan de tratamiento propuesto
 - procedimientoPropuesto: procedimiento(s) a realizar
 - recomendaciones: recomendaciones post procedimiento
-- consentimientoExplicacion: explicación dada al paciente sobre riesgos
-- observaciones: observaciones adicionales del médico
+- consentimientoExplicacion: explicaci�n dada al paciente sobre riesgos
+- observaciones: observaciones adicionales del m�dico
 
-Responde ÚNICAMENTE con JSON válido, sin markdown, sin explicaciones.
+Responde �NICAMENTE con JSON v�lido, sin markdown, sin explicaciones.
 Ejemplo: {"quejaPrincipal":"Flacidez abdominal post embarazo","peso":"68","presionArterial":"120/80","tipoPiel":"mixta","diagnostico":"Lipedema grado II"}`;
 
   try {
@@ -162,9 +161,76 @@ Ejemplo: {"quejaPrincipal":"Flacidez abdominal post embarazo","peso":"68","presi
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Gemini: audio → transcripcion + campos estructurados
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
+// Gemini: audio ? solo transcripci�n (para el endpoint /transcribir)
+// -----------------------------------------------------------------------------
+async function geminiTranscribir(audioBase64: string, mimeType: string): Promise<string> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey || apiKey.includes('pon-tu') || apiKey.includes('aqui')) return '';
+  const mimeNorm = mimeType.split(';')[0].trim() || 'audio/webm';
+  const prompt = `Transcribe exactamente lo que dice el m�dico en este audio de consulta m�dica en espa�ol colombiano.
+Responde �NICAMENTE con el texto transcrito, sin explicaciones, sin formato, sin comillas.
+Si no hay voz clara o el audio est� vac�o, responde solo con la palabra: SILENCIO`;
+  try {
+    const resp = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [
+            { text: prompt },
+            { inlineData: { mimeType: mimeNorm, data: audioBase64 } },
+          ]}],
+          generationConfig: { temperature: 0.0, maxOutputTokens: 500 },
+        }),
+      }
+    );
+    if (!resp.ok) return '';
+    const data = await resp.json() as any;
+    const raw = (data?.candidates?.[0]?.content?.parts?.[0]?.text || '').trim();
+    return raw.toUpperCase() === 'SILENCIO' ? '' : raw;
+  } catch {
+    return '';
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Endpoint p�blico: POST /transcribir  (compatible con el servicio Python Whisper)
+// Acepta multipart/form-data con campo 'audio'
+// Devuelve { texto, idioma, confianza, nivel_pct }
+// -----------------------------------------------------------------------------
+export async function transcribirAudio(req: Request, res: Response): Promise<void> {
+  try {
+    const file = (req as any).file as MulterFile | undefined;
+    if (!file || file.buffer.length < 500) {
+      res.status(400).json({ error: 'Archivo de audio vac�o o muy peque�o' });
+      return;
+    }
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey || apiKey.includes('pon-tu') || apiKey.includes('aqui')) {
+      res.status(503).json({ error: 'Transcripci�n no disponible. Configura GEMINI_API_KEY en el servidor.' });
+      return;
+    }
+    const mimeType = file.mimetype || 'audio/webm';
+    const audioBase64 = file.buffer.toString('base64');
+    const texto = await geminiTranscribir(audioBase64, mimeType);
+    res.json({
+      texto,
+      idioma: 'es',
+      confianza: texto.length > 0 ? 0.90 : 0.0,
+      nivel_pct: texto.length > 0 ? 50 : 0,
+      motor: 'gemini',
+    });
+  } catch (err) {
+    console.error('transcribirAudio error:', err);
+    res.status(500).json({ error: 'Error transcribiendo audio' });
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Gemini: audio ? transcripcion + campos estructurados
+// -----------------------------------------------------------------------------
 async function geminiAudioACampos(
   audioBase64: string,
   mimeType: string,
@@ -176,12 +242,12 @@ async function geminiAudioACampos(
   // Normalizar mimeType a lo que Gemini acepta
   const mimeNorm = mimeType.split(';')[0].trim() || 'audio/webm';
 
-  const prompt = `Eres SARAI, asistente médica de EstetIA (clínica de cirugía estética colombiana).
-Transcribe el audio del médico y extrae los campos de historia clínica.
+  const prompt = `Eres SARAI, asistente m�dica de EstetIA (cl�nica de cirug�a est�tica colombiana).
+Transcribe el audio del m�dico y extrae los campos de historia cl�nica.
 
 Responde SOLO con este JSON (sin markdown, sin explicaciones):
 {
-  "transcripcion": "texto completo de lo que dijo el médico",
+  "transcripcion": "texto completo de lo que dijo el m�dico",
   "quejaPrincipal": null,
   "historiaEnfermedad": null,
   "antecedentesFamiliares": null,
@@ -202,11 +268,11 @@ Responde SOLO con este JSON (sin markdown, sin explicaciones):
   "procedimientoPropuesto": null,
   "observaciones": null
 }
-Contexto: ${contexto || 'historia clínica de cirugía estética colombiana'}`;
+Contexto: ${contexto || 'historia cl�nica de cirug�a est�tica colombiana'}`;
 
   try {
     const resp = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -248,14 +314,14 @@ Contexto: ${contexto || 'historia clínica de cirugía estética colombiana'}`;
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // Endpoint: POST /api/sarai/procesar-voz  (texto)
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 export async function procesarVoz(req: Request, res: Response): Promise<void> {
   try {
     const { texto, contexto } = req.body;
     if (!texto || String(texto).trim().length < 3) {
-      res.status(400).json({ error: 'Texto vacío' });
+      res.status(400).json({ error: 'Texto vac�o' });
       return;
     }
     const gemini = await geminiTextoACampos(String(texto), String(contexto || ''));
@@ -270,14 +336,14 @@ export async function procesarVoz(req: Request, res: Response): Promise<void> {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // Endpoint: POST /api/sarai/procesar-audio  (audio base64)
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 export async function procesarAudio(req: Request, res: Response): Promise<void> {
   try {
     const { audio, mimeType, contexto } = req.body;
     if (!audio || audio.length < 100) {
-      res.status(400).json({ error: 'Audio vacío o muy corto' });
+      res.status(400).json({ error: 'Audio vac�o o muy corto' });
       return;
     }
 
@@ -294,7 +360,7 @@ export async function procesarAudio(req: Request, res: Response): Promise<void> 
         res.json({ campos, transcripcion, motor: 'gemini-audio' });
         return;
       }
-      // Gemini transcribio pero no extrajo campos → intentar con texto
+      // Gemini transcribio pero no extrajo campos ? intentar con texto
       if (transcripcion && transcripcion.length > 5) {
         const camposDeTexto = await geminiTextoACampos(transcripcion, String(contexto || ''))
           || extraerCamposLocalmente(transcripcion);
@@ -303,7 +369,7 @@ export async function procesarAudio(req: Request, res: Response): Promise<void> 
       }
     }
 
-    // 2. Sin Gemini (no hay key) → informar al usuario
+    // 2. Sin Gemini (no hay key) ? informar al usuario
     res.json({
       campos: {},
       transcripcion: '',

@@ -5,6 +5,7 @@ import { FormularioPaciente } from '../components/FormularioPaciente';
 import { BuscadorPaciente } from '../components/BuscadorPaciente';
 import AgendarCitaWizard from '../components/AgendarCitaWizard';
 import { createPaciente } from '../services/api';
+import { API_BASE_URL } from '../config';
 
 export default function AgendaPage() {
   const hoy = new Date();
@@ -33,7 +34,7 @@ export default function AgendaPage() {
       const fechaInicio = inicioLocal.toISOString();
       const fechaFin    = finLocal.toISOString();
       const res = await fetch(
-        `/api/citas/medico/agenda?fechaInicio=${fechaInicio}&fechaFin=${fechaFin}`,
+        `${API_BASE_URL}/citas/medico/agenda?fechaInicio=${fechaInicio}&fechaFin=${fechaFin}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       if (!res.ok) throw new Error('Error al obtener citas');

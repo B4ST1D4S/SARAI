@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+﻿import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { Calendar, Clock, User, CheckCircle, Plus, Trash2, Stethoscope, Bell, RefreshCw, Zap } from 'lucide-react';
 import { completarCita } from '../services/api';
+import { API_BASE_URL } from '../config';
 
 interface Cita {
   id: string;
@@ -39,7 +40,7 @@ export default function AgendaProfesionalPage({ onNavegar, onAbrirHistoriaPacien
       const inicioLocal = new Date(year, month - 1, day, 0, 0, 0, 0);
       const finLocal    = new Date(year, month - 1, day, 23, 59, 59, 999);
       const res = await fetch(
-        `/api/citas/medico/agenda?fechaInicio=${inicioLocal.toISOString()}&fechaFin=${finLocal.toISOString()}`,
+        `${API_BASE_URL}/citas/medico/agenda?fechaInicio=${inicioLocal.toISOString()}&fechaFin=${finLocal.toISOString()}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       if (!res.ok) throw new Error('Error al obtener citas');
@@ -95,7 +96,7 @@ export default function AgendaProfesionalPage({ onNavegar, onAbrirHistoriaPacien
     }
     if (nuevoEstado === 'CONFIRMADA') {
       const token = getToken();
-      await fetch(`/api/citas/${id}`, {
+      await fetch(`${API_BASE_URL}/citas/${id}`, {
         method: 'PUT',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ estado: 'CONFIRMADA' }),
@@ -109,7 +110,7 @@ export default function AgendaProfesionalPage({ onNavegar, onAbrirHistoriaPacien
   // Eliminar / cancelar cita
   const handleEliminarCita = async (id: string) => {
     const token = getToken();
-    await fetch(`/api/citas/${id}`, {
+    await fetch(`${API_BASE_URL}/citas/${id}`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -384,7 +385,7 @@ export default function AgendaProfesionalPage({ onNavegar, onAbrirHistoriaPacien
                             <button
                               onClick={async () => {
                                 const token = getToken();
-                                const res = await fetch(`/api/citas/${cita.id}/admision`, {
+                                const res = await fetch(`${API_BASE_URL}/citas/${cita.id}/admision`, {
                                   method: 'POST',
                                   headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
                                 });
@@ -406,9 +407,24 @@ export default function AgendaProfesionalPage({ onNavegar, onAbrirHistoriaPacien
                           )}
 
                           {(cita.estado === 'ATENDIDA' || cita.estado === 'COMPLETADA') && (
-                            <div className="flex-1 py-2 bg-slate-700/50 text-gray-500 text-sm font-semibold rounded-xl flex items-center justify-center gap-2 border border-slate-600/50">
-                              ✅ Atendida
-                            </div>
+                            cita.fecha === hoy && (onAbrirHistoriaPaciente || onNavegar) ? (
+                              <button
+                                onClick={() => {
+                                  if (cita.pacienteId && onAbrirHistoriaPaciente) {
+                                    onAbrirHistoriaPaciente(cita.pacienteId, cita.pacienteNombre);
+                                  } else {
+                                    onNavegar?.('historia');
+                                  }
+                                }}
+                                className="flex-1 py-2 bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-500 hover:to-violet-500 text-white text-sm font-semibold rounded-xl transition shadow-lg shadow-purple-500/20 flex items-center justify-center gap-2"
+                              >
+                                <Stethoscope size={14} /> Ver Historia Clínica
+                              </button>
+                            ) : (
+                              <div className="flex-1 py-2 bg-slate-700/50 text-gray-500 text-sm font-semibold rounded-xl flex items-center justify-center gap-2 border border-slate-600/50">
+                                ✅ Atendida
+                              </div>
+                            )
                           )}
 
                           <button
@@ -463,4 +479,6 @@ export default function AgendaProfesionalPage({ onNavegar, onAbrirHistoriaPacien
     </div>
   );
 }
+
+
 

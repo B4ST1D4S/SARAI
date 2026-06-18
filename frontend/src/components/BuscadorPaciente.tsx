@@ -1,6 +1,7 @@
 ﻿import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Search, User, AlertCircle, CheckCircle } from 'lucide-react';
+import { API_BASE_URL } from '../config';
 
 interface BuscadorPacienteProps {
   onPacienteEncontrado: (paciente: any) => void;
@@ -31,7 +32,7 @@ export function BuscadorPaciente({ onPacienteEncontrado, onNuevoPaciente, onConf
     try {
       // Buscar por documento
       const response = await fetch(
-        `/api/pacientes/search?documento=${numeroDocumento}&tipo=${tipoDocumento}`,
+        `${API_BASE_URL}/pacientes/search?documento=${numeroDocumento}&tipo=${tipoDocumento}`,
         {
           headers: { Authorization: `Bearer ${getToken()}` },
         }
