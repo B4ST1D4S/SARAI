@@ -33,7 +33,7 @@ model User {
   pacientesCreados         Paciente[]
   procedimientosRealizados Procedimiento[]
   cotizaciones             Cotizacion[]
-  crmLeads                 CrmLead[]   @relation("CrmLeadCreador")
+  crmLeads                 CrmLead[]              @relation("CrmLeadCreador")
 
   @@index([rol])
   @@index([email])
@@ -510,14 +510,14 @@ model ChecklistCompletado {
 }
 
 model DisponibilidadMedico {
-  id           String   @id @default(cuid())
+  id           String    @id @default(cuid())
   medicoId     String
   diaSemana    Int
   horaInicio   String
   horaFin      String
-  duracionSlot Int      @default(60)
-  sede         String?  @default("Principal")
-  tipoAtencion String?  @default("CONSULTA")
+  duracionSlot Int       @default(60)
+  sede         String?   @default("Principal")
+  tipoAtencion String?   @default("CONSULTA")
   consultorio  String?
   activo       Boolean   @default(true)
   fechaDesde   DateTime?
@@ -590,19 +590,19 @@ model Cargo {
 }
 
 model ConfigServicioConsulta {
-  id                 String             @id
-  tipoConsultaId     String
-  servicioId         String
-  esPrincipal        Boolean            @default(false)
-  generaAutomatico   Boolean            @default(false)
-  requiereOrden      Boolean            @default(false)
-  centroOperacionId  String?
-  cuentaContable     String?
-  hcModuloId         String?
-  usuarioCreacion    String?
-  createdAt          DateTime           @default(now())
-  servicio           ServicioFacturable @relation(fields: [servicioId], references: [id])
-  tipoConsulta       TipoConsulta       @relation(fields: [tipoConsultaId], references: [id], onDelete: Cascade)
+  id                String             @id
+  tipoConsultaId    String
+  servicioId        String
+  esPrincipal       Boolean            @default(false)
+  generaAutomatico  Boolean            @default(false)
+  requiereOrden     Boolean            @default(false)
+  centroOperacionId String?
+  cuentaContable    String?
+  hcModuloId        String?
+  usuarioCreacion   String?
+  createdAt         DateTime           @default(now())
+  servicio          ServicioFacturable @relation(fields: [servicioId], references: [id])
+  tipoConsulta      TipoConsulta       @relation(fields: [tipoConsultaId], references: [id], onDelete: Cascade)
 
   @@unique([tipoConsultaId, servicioId])
   @@index([servicioId])
@@ -872,11 +872,76 @@ model CrmLead {
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
-  paciente          Paciente? @relation(fields: [pacienteId], references: [id])
-  creador           User?     @relation("CrmLeadCreador", fields: [creadoPor], references: [id])
+  paciente Paciente? @relation(fields: [pacienteId], references: [id])
+  creador  User?     @relation("CrmLeadCreador", fields: [creadoPor], references: [id])
 
   @@index([etapa])
   @@index([calificacion])
   @@index([pacienteId])
   @@index([creadoPor])
+}
+
+// ============================================
+// CUPS - CLASIFICACIÓN ÚNICA DE PROCEDIMIENTOS EN SALUD
+// Catálogo oficial según Resolución 2706 de 2025 (Min. Salud Colombia)
+// Anexo Técnico 2 "Lista Tabular".
+//
+// Estructura jerárquica del código (máx. 6 caracteres) — formato XX.X.X.XX:
+//   GRUPO        = 2 primeros caracteres (corresponde al capítulo)
+//   SUBGRUPO     = 3er carácter
+//   CATEGORÍA    = 4to carácter
+//   SUBCATEGORÍA = 2 últimos caracteres (procedimiento específico/facturable)
+// ============================================
+
+enum CupsNivel {
+  GRUPO
+  SUBGRUPO
+  CATEGORIA
+  SUBCATEGORIA
+}
+
+model CupsCodigo {
+  id String @id @default(cuid())
+
+  // Código sin separadores, normalizado (ej. "010101")
+  codigo        String    @unique
+  // Código con separadores tal como aparece en la lista tabular (ej. "01.0.1.01")
+  codigoFormato String
+  nivel         CupsNivel
+  descripcion   String
+
+  // Desglose jerárquico de la codificación
+  seccion      String // "00" quirúrgicos | "01" no quirúrgicos
+  capitulo     String // "01".."24"
+  grupo        String // 2 caracteres (= capítulo)
+  subgrupo     String? // 1 carácter
+  categoria    String? // 1 carácter
+  subcategoria String? // 2 caracteres
+
+  // Árbol jerárquico (auto-relación)
+  parentId String?
+  parent   CupsCodigo?  @relation("CupsJerarquia", fields: [parentId], references: [id], onDelete: Cascade)
+  hijos    CupsCodigo[] @relation("CupsJerarquia")
+
+  // Anotaciones de la lista tabular
+  incluye String?
+  excluye String?
+  nota    String?
+
+  // Solo las SUBCATEGORÍA son procedimientos reportables/facturables
+  esFacturable Boolean @default(false)
+  activo       Boolean @default(true)
+  // Resolución/versión de origen del registro
+  version      String  @default("Resolucion 2706 de 2025")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([nivel])
+  @@index([seccion])
+  @@index([capitulo])
+  @@index([grupo])
+  @@index([parentId])
+  @@index([esFacturable])
+  @@index([activo])
 }

@@ -2405,6 +2405,291 @@ function TabTemasistema() {
 
 // ════════════════════════════════════════════════
 
+// ════════════════════════════════════════════════
+// TAB: CATÁLOGO CUPS (Resolución 2706 de 2025)
+// ════════════════════════════════════════════════
+
+const NIVELES_CUPS = [
+  { value: 'GRUPO',        label: 'Grupo',        cls: 'bg-purple-500/20 text-purple-300' },
+  { value: 'SUBGRUPO',     label: 'Subgrupo',     cls: 'bg-blue-500/20 text-blue-300' },
+  { value: 'CATEGORIA',    label: 'Categoría',    cls: 'bg-cyan-500/20 text-cyan-300' },
+  { value: 'SUBCATEGORIA', label: 'Subcategoría', cls: 'bg-emerald-500/20 text-emerald-300' },
+];
+
+function nivelBadge(nivel: string) {
+  const n = NIVELES_CUPS.find(x => x.value === nivel);
+  return (
+    <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap ${n?.cls || 'bg-slate-700 text-gray-300'}`}>
+      {n?.label || nivel}
+    </span>
+  );
+}
+
+function TabCatalogoCUPS() {
+  const [items,    setItems]    = useState<any[]>([]);
+  const [total,    setTotal]    = useState(0);
+  const [page,     setPage]     = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loading,  setLoading]  = useState(true);
+  const [loadErr,  setLoadErr]  = useState('');
+  const [search,   setSearch]   = useState('');
+  const [debounced, setDebounced] = useState('');
+  const [nivel,    setNivel]    = useState('');
+  const [stats,    setStats]    = useState<any>(null);
+  const [modal,    setModal]    = useState<null|'create'|'edit'|'bulk'>(null);
+  const [form,     setForm]     = useState<any>({});
+  const [err,      setErr]      = useState('');
+  const [saving,   setSaving]   = useState(false);
+  const savingRef = useRef(false);
+  const pageSize = 50;
+
+  // Debounce de la búsqueda
+  useEffect(() => {
+    const t = setTimeout(() => { setDebounced(search.trim()); setPage(1); }, 350);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  const loadStats = useCallback(async () => {
+    try { setStats(await svc.getCupsCodigosStats()); } catch { /* noop */ }
+  }, []);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setLoadErr('');
+    try {
+      const qs = new URLSearchParams();
+      qs.set('page', String(page));
+      qs.set('pageSize', String(pageSize));
+      if (debounced) qs.set('search', debounced);
+      if (nivel) qs.set('nivel', nivel);
+      const res = await svc.getCupsCodigos(qs.toString()) as any;
+      setItems(res.items || []);
+      setTotal(res.total || 0);
+      setTotalPages(res.totalPages || 1);
+    } catch (e: any) {
+      setLoadErr(e?.message || 'Error al cargar el catálogo');
+    } finally {
+      setLoading(false);
+    }
+  }, [page, debounced, nivel]);
+
+  useEffect(() => { load(); }, [load]);
+  useEffect(() => { loadStats(); }, [loadStats]);
+
+  const f = (k: string) => (v: any) => setForm((p: any) => ({ ...p, [k]: v }));
+
+  const openCreate = () => { setForm({}); setErr(''); setModal('create'); };
+  const openEdit   = (row: any) => { setForm({ ...row }); setErr(''); setModal('edit'); };
+
+  const toggleActivo = async (row: any) => {
+    try { await svc.updateCupsCodigo(row.id, { activo: !row.activo }); load(); loadStats(); } catch { /* noop */ }
+  };
+
+  const save = async () => {
+    if (savingRef.current) return;
+    savingRef.current = true; setSaving(true); setErr('');
+    try {
+      if (modal === 'create') {
+        if (!form.codigo?.trim())      throw new Error('El código es requerido');
+        if (!form.descripcion?.trim()) throw new Error('La descripción es requerida');
+        await svc.createCupsCodigo({
+          codigo: form.codigo, descripcion: form.descripcion,
+          seccion: form.seccion, capitulo: form.capitulo,
+          incluye: form.incluye, excluye: form.excluye, nota: form.nota,
+        });
+      } else {
+        await svc.updateCupsCodigo(form.id, {
+          descripcion: form.descripcion, seccion: form.seccion, capitulo: form.capitulo,
+          incluye: form.incluye, excluye: form.excluye, nota: form.nota,
+          esFacturable: form.esFacturable,
+        });
+      }
+      setModal(null); load(); loadStats();
+    } catch (e: any) { setErr(e.message || 'Error al guardar'); }
+    finally { savingRef.current = false; setSaving(false); }
+  };
+
+  const del = async (row: any) => {
+    if (!confirm(`¿Desactivar el código ${row.codigoFormato}?`)) return;
+    try { await svc.deleteCupsCodigo(row.id); load(); loadStats(); } catch { /* noop */ }
+  };
+
+  return (
+    <>
+      {/* Estadísticas */}
+      {stats && (
+        <div className="flex flex-wrap gap-2 mb-4">
+          <div className="px-3 py-1.5 rounded-lg bg-slate-800/70 border border-white/5 text-xs">
+            <span className="text-gray-400">Total: </span>
+            <span className="text-white font-bold">{stats.total?.toLocaleString('es-CO')}</span>
+          </div>
+          {NIVELES_CUPS.map(n => (
+            <div key={n.value} className="px-3 py-1.5 rounded-lg bg-slate-800/70 border border-white/5 text-xs">
+              <span className="text-gray-400">{n.label}: </span>
+              <span className="text-white font-semibold">{(stats.niveles?.[n.value] || 0).toLocaleString('es-CO')}</span>
+            </div>
+          ))}
+          <div className="px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-xs">
+            <span className="text-emerald-400/80">Facturables: </span>
+            <span className="text-emerald-300 font-semibold">{(stats.facturables || 0).toLocaleString('es-CO')}</span>
+          </div>
+        </div>
+      )}
+
+      <SecHeader title="Catálogo CUPS — Resolución 2706 de 2025" onNew={openCreate} onBulk={() => setModal('bulk')} />
+
+      {/* Búsqueda y filtros */}
+      <div className="flex flex-col sm:flex-row gap-2 mb-4">
+        <div className="relative flex-1">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+          <input
+            value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="Buscar por código sin puntos (ej. 010101) o descripción…"
+            className="w-full pl-9 pr-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white focus:border-yellow-500 focus:outline-none"
+          />
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          <button onClick={() => { setNivel(''); setPage(1); }}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${nivel === '' ? 'bg-yellow-600 text-white' : 'bg-slate-800 text-gray-400 hover:text-white border border-white/5'}`}>
+            Todos
+          </button>
+          {NIVELES_CUPS.map(n => (
+            <button key={n.value} onClick={() => { setNivel(n.value); setPage(1); }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${nivel === n.value ? 'bg-yellow-600 text-white' : 'bg-slate-800 text-gray-400 hover:text-white border border-white/5'}`}>
+              {n.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {loadErr && <ErrBanner msg={loadErr} onRetry={load} />}
+
+      {/* Tabla */}
+      {loading && !items.length
+        ? <TableSkeleton cols={4} />
+        : !items.length
+        ? <p className="text-center text-gray-500 py-14 text-sm">Sin resultados. Ajusta la búsqueda o usa <span className="text-yellow-500">Cargue Masivo</span>.</p>
+        : (
+          <div className="overflow-x-auto rounded-xl border border-white/5">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-slate-800/70">
+                  <th className="text-left px-4 py-2.5 font-semibold text-gray-400 uppercase tracking-wider">Código</th>
+                  <th className="text-left px-3 py-2.5 font-semibold text-gray-400 uppercase tracking-wider">Nivel</th>
+                  <th className="text-left px-4 py-2.5 font-semibold text-gray-400 uppercase tracking-wider">Descripción</th>
+                  <th className="text-center px-3 py-2.5 font-semibold text-gray-400 uppercase tracking-wider">Fact.</th>
+                  <th className="text-center px-3 py-2.5 font-semibold text-gray-400 uppercase tracking-wider">Activo</th>
+                  <th className="text-right px-4 py-2.5 font-semibold text-gray-400 uppercase tracking-wider">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {items.map((row: any) => (
+                  <tr key={row.id} className={`hover:bg-slate-800/30 transition ${!row.activo ? 'opacity-40' : ''}`}>
+                    <td className="px-4 py-2.5">
+                      <code className="text-[11px] text-yellow-300 bg-slate-800/80 px-2 py-0.5 rounded border border-white/5 whitespace-nowrap">{row.codigo}</code>
+                      <div className="text-[10px] text-gray-500 mt-0.5">{row.codigoFormato}</div>
+                    </td>
+                    <td className="px-3 py-2.5">{nivelBadge(row.nivel)}</td>
+                    <td className="px-4 py-2.5 text-gray-200">{row.descripcion}</td>
+                    <td className="px-3 py-2.5 text-center">
+                      {row.esFacturable ? <CheckCircle size={14} className="text-emerald-400 inline" /> : <span className="text-gray-600">—</span>}
+                    </td>
+                    <td className="px-3 py-2.5 text-center">
+                      <button onClick={() => toggleActivo(row)}
+                        className={`p-1 rounded-lg transition ${row.activo ? 'text-emerald-400 hover:bg-emerald-500/10' : 'text-gray-600 hover:bg-gray-500/10'}`}>
+                        {row.activo ? <ToggleRight size={16} /> : <ToggleLeft size={16} />}
+                      </button>
+                    </td>
+                    <td className="px-4 py-2.5 text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <button onClick={() => openEdit(row)}
+                          className="p-1.5 rounded-lg text-gray-400 hover:text-yellow-400 hover:bg-yellow-500/10 transition">
+                          <Edit2 size={13} />
+                        </button>
+                        <button onClick={() => del(row)}
+                          className="p-1.5 rounded-lg text-gray-400 hover:text-red-400 hover:bg-red-500/10 transition">
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )
+      }
+
+      {/* Paginación */}
+      {total > pageSize && (
+        <div className="flex items-center justify-between gap-3 mt-3 text-xs text-gray-400">
+          <span>{total.toLocaleString('es-CO')} registros · página {page} de {totalPages}</span>
+          <div className="flex gap-2">
+            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}
+              className="px-3 py-1.5 rounded-lg bg-slate-800 border border-white/5 text-gray-300 hover:text-white disabled:opacity-40 disabled:pointer-events-none transition">
+              Anterior
+            </button>
+            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages}
+              className="px-3 py-1.5 rounded-lg bg-slate-800 border border-white/5 text-gray-300 hover:text-white disabled:opacity-40 disabled:pointer-events-none transition">
+              Siguiente
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal crear/editar */}
+      <AnimatePresence>
+        {(modal === 'create' || modal === 'edit') && (
+          <Modal title={modal === 'create' ? 'Nuevo código CUPS' : `Editar código ${form.codigoFormato || ''}`} onClose={() => setModal(null)}>
+            <div className="space-y-4">
+              {modal === 'create'
+                ? (
+                  <>
+                    <Field label="Código (solo dígitos: 2, 3, 4 o 6)" value={form.codigo || ''} onChange={f('codigo')} required placeholder="Ej: 01 · 010 · 0101 · 010101" />
+                    <p className="text-[11px] text-gray-500 -mt-2">El nivel (Grupo/Subgrupo/Categoría/Subcategoría) se deduce de la cantidad de dígitos.</p>
+                  </>
+                )
+                : (
+                  <div className="flex items-center gap-2 p-3 bg-slate-800/60 rounded-xl border border-white/5">
+                    <code className="text-xs text-yellow-400">{form.codigoFormato}</code>
+                    {nivelBadge(form.nivel)}
+                  </div>
+                )
+              }
+              <Field label="Descripción *" value={form.descripcion || ''} onChange={f('descripcion')} required type="textarea" placeholder="Nombre del procedimiento" />
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Sección" value={form.seccion || ''} onChange={f('seccion')} placeholder="Opcional" />
+                <Field label="Capítulo" value={form.capitulo || ''} onChange={f('capitulo')} placeholder="Opcional" />
+              </div>
+              <Field label="Incluye" value={form.incluye || ''} onChange={f('incluye')} type="textarea" placeholder="Notas de inclusión (opcional)" />
+              <Field label="Excluye" value={form.excluye || ''} onChange={f('excluye')} type="textarea" placeholder="Notas de exclusión (opcional)" />
+              <Field label="Nota" value={form.nota || ''} onChange={f('nota')} type="textarea" placeholder="Nota aclaratoria (opcional)" />
+              {modal === 'edit' && (
+                <Sw value={!!form.esFacturable} onChange={f('esFacturable')} label="Es facturable" />
+              )}
+              {err && <ErrBox msg={err} />}
+              <FormFooter onCancel={() => setModal(null)} onSave={save} saving={saving} />
+            </div>
+          </Modal>
+        )}
+      </AnimatePresence>
+
+      {/* Cargue masivo por archivo plano */}
+      <AnimatePresence>
+        {modal === 'bulk' && (
+          <BulkModal
+            title="Cargue masivo de códigos CUPS"
+            headers={['codigo', 'descripcion', 'seccion', 'capitulo', 'incluye', 'excluye', 'nota']}
+            filename="plantilla_cups.csv"
+            onUpload={async (rows) => { const r = await svc.bulkCupsCodigos(rows) as any; load(); loadStats(); return r; }}
+            onClose={() => setModal(null)}
+          />
+        )}
+      </AnimatePresence>
+    </>
+  );
+}
+
 const MODULOS = [
   {
     id: 'consulta-externa',
@@ -2426,6 +2711,14 @@ const MODULOS = [
     submodulos: [
       { id:'campos-paciente',   label:'Campos del Paciente', icon:ClipboardList, component:TabCamposPaciente      },
       { id:'listas-seleccion',  label:'Listas de Selección', icon:List,          component:TabListasSeleccion     },
+    ],
+  },
+  {
+    id: 'catalogo-cups',
+    label: 'Catálogo CUPS',
+    icon: BookOpen,
+    submodulos: [
+      { id:'cups-codigos',      label:'Códigos CUPS (Res. 2706/2025)', icon:Layers, component:TabCatalogoCUPS },
     ],
   },
   {

@@ -32,6 +32,9 @@ import {
   // Motivos de Cita
   getMotivosCita, createMotivoCita, updateMotivoCita, deleteMotivoCita,
 } from '../controllers/adminController.js';
+import {
+  getCupsCodigos, getCupsCodigosStats, createCupsCodigo, updateCupsCodigo, deleteCupsCodigo, bulkCreateCupsCodigos,
+} from '../controllers/cupsCatalogController.js';
 
 const router = Router();
 
@@ -165,5 +168,15 @@ router.get('/motivos-cita', getMotivosCita);
 router.post('/motivos-cita', onlyAdmin, createMotivoCita);
 router.put('/motivos-cita/:id', onlyAdmin, updateMotivoCita);
 router.delete('/motivos-cita/:id', onlyAdmin, deleteMotivoCita);
+
+// ─────────────────────────────────────────
+// CATÁLOGO CUPS (Resolución 2706 de 2025)
+// ─────────────────────────────────────────
+router.get('/cups-codigos', getCupsCodigos);
+router.get('/cups-codigos/stats', getCupsCodigosStats);
+router.post('/cups-codigos', onlyAdmin, createCupsCodigo);
+router.post('/cups-codigos/bulk', onlyAdmin, bulkCreateCupsCodigos);
+router.put('/cups-codigos/:id', onlyAdmin, updateCupsCodigo);
+router.delete('/cups-codigos/:id', onlyAdmin, deleteCupsCodigo);
 
 export default router;

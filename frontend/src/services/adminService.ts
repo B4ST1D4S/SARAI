@@ -158,3 +158,11 @@ export const getMotivosCita   = (tipo?: string) => req(`/motivos-cita${tipo ? '?
 export const createMotivoCita = (body: any)     => req('/motivos-cita', { method: 'POST', body: JSON.stringify(body) });
 export const updateMotivoCita = (id: string, body: any) => req(`/motivos-cita/${id}`, { method: 'PUT', body: JSON.stringify(body) });
 export const deleteMotivoCita = (id: string)    => req(`/motivos-cita/${id}`, { method: 'DELETE' });
+
+// ─── Catálogo CUPS (Resolución 2706 de 2025) ─────────────────────────────────
+export const getCupsCodigos = (params?: string) => req(`/cups-codigos${params ? '?' + params : ''}`);
+export const getCupsCodigosStats = () => req('/cups-codigos/stats');
+export const createCupsCodigo = (body: any) => req('/cups-codigos', { method: 'POST', body: JSON.stringify(body) });
+export const updateCupsCodigo = (id: string, body: any) => req(`/cups-codigos/${id}`, { method: 'PUT', body: JSON.stringify(body) });
+export const deleteCupsCodigo = (id: string) => req(`/cups-codigos/${id}`, { method: 'DELETE' });
+export const bulkCupsCodigos = (items: any[]) => req('/cups-codigos/bulk', { method: 'POST', body: JSON.stringify({ items }) });
