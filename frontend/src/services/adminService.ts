@@ -63,6 +63,8 @@ async function req<T>(url: string, options: RequestInit = {}): Promise<T> {
       cacheInvalidate('/tipos-consulta');
       cacheInvalidate('/preparaciones');
     }
+    // Los tipos van anidados dentro de la respuesta de grupos
+    if (base === '/tarifa-tipos') cacheInvalidate('/tarifa-grupos');
   }
 
   return data as T;
@@ -166,3 +168,34 @@ export const createCupsCodigo = (body: any) => req('/cups-codigos', { method: 'P
 export const updateCupsCodigo = (id: string, body: any) => req(`/cups-codigos/${id}`, { method: 'PUT', body: JSON.stringify(body) });
 export const deleteCupsCodigo = (id: string) => req(`/cups-codigos/${id}`, { method: 'DELETE' });
 export const bulkCupsCodigos = (items: any[]) => req('/cups-codigos/bulk', { method: 'POST', body: JSON.stringify({ items }) });
+
+// ─── Tarifas: Clasificación (grupos y tipos de cargo) ────────────────────────
+export const getTarifaGrupos    = () => req('/tarifa-grupos');
+export const createTarifaGrupo  = (body: any) => req('/tarifa-grupos', { method: 'POST', body: JSON.stringify(body) });
+export const updateTarifaGrupo  = (id: string, body: any) => req(`/tarifa-grupos/${id}`, { method: 'PUT', body: JSON.stringify(body) });
+export const deleteTarifaGrupo  = (id: string) => req(`/tarifa-grupos/${id}`, { method: 'DELETE' });
+export const createTarifaTipo   = (body: any) => req('/tarifa-tipos', { method: 'POST', body: JSON.stringify(body) });
+export const updateTarifaTipo   = (id: string, body: any) => req(`/tarifa-tipos/${id}`, { method: 'PUT', body: JSON.stringify(body) });
+export const deleteTarifaTipo   = (id: string) => req(`/tarifa-tipos/${id}`, { method: 'DELETE' });
+
+// ─── Tarifas: Cargos (catálogo interno con equivalencia CUPS) ────────────────
+export const getCargosTarifa      = (params?: string) => req(`/cargos-tarifa${params ? '?' + params : ''}`);
+export const getCargosTarifaStats = () => req('/cargos-tarifa/stats');
+export const createCargoTarifa    = (body: any) => req('/cargos-tarifa', { method: 'POST', body: JSON.stringify(body) });
+export const updateCargoTarifa    = (id: string, body: any) => req(`/cargos-tarifa/${id}`, { method: 'PUT', body: JSON.stringify(body) });
+export const deleteCargoTarifa    = (id: string) => req(`/cargos-tarifa/${id}`, { method: 'DELETE' });
+export const bulkCargosTarifa     = (items: any[]) => req('/cargos-tarifa/bulk', { method: 'POST', body: JSON.stringify({ items }) });
+
+// ─── Tarifas: Tarifarios (listas de precios) ─────────────────────────────────
+export const getTarifarios        = (params?: string) => req(`/tarifarios${params ? '?' + params : ''}`);
+export const getTarifario         = (id: string) => req(`/tarifarios/${id}`);
+export const createTarifario      = (body: any) => req('/tarifarios', { method: 'POST', body: JSON.stringify(body) });
+export const updateTarifario      = (id: string, body: any) => req(`/tarifarios/${id}`, { method: 'PUT', body: JSON.stringify(body) });
+export const deleteTarifario      = (id: string) => req(`/tarifarios/${id}`, { method: 'DELETE' });
+export const generarTarifarioBase = (id: string, body: any) => req(`/tarifarios/${id}/generar-base`, { method: 'POST', body: JSON.stringify(body) });
+
+// ─── Tarifas: Ítems del tarifario (precios por cargo) ────────────────────────
+export const getTarifarioItems    = (id: string, params?: string) => req(`/tarifarios/${id}/items${params ? '?' + params : ''}`);
+export const upsertTarifarioItem  = (id: string, body: any) => req(`/tarifarios/${id}/items`, { method: 'POST', body: JSON.stringify(body) });
+export const bulkTarifarioItems   = (id: string, items: any[]) => req(`/tarifarios/${id}/items/bulk`, { method: 'POST', body: JSON.stringify({ items }) });
+export const deleteTarifarioItem  = (id: string, itemId: string) => req(`/tarifarios/${id}/items/${itemId}`, { method: 'DELETE' });

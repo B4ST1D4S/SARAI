@@ -34,6 +34,7 @@ model User {
   procedimientosRealizados Procedimiento[]
   cotizaciones             Cotizacion[]
   crmLeads                 CrmLead[]              @relation("CrmLeadCreador")
+  ingresosFacturacion      Ingreso[]
 
   @@index([rol])
   @@index([email])
@@ -91,6 +92,8 @@ model Paciente {
   transacciones     Transaccion[]
   cotizaciones      Cotizacion[]
   crmLeads          CrmLead[]
+  ingresos          Ingreso[]
+  facturas          Factura[]
 
   @@unique([numeroDocumento, tipoDocumento])
   @@index([nombreCompleto])
@@ -349,6 +352,7 @@ model Cita {
   updatedAt            DateTime @updatedAt
   medico               User     @relation(fields: [medicoId], references: [id])
   paciente             Paciente @relation(fields: [pacienteId], references: [id])
+  ingresos             Ingreso[]
 
   @@index([pacienteId])
   @@index([medicoId])
@@ -944,4 +948,210 @@ model CupsCodigo {
   @@index([parentId])
   @@index([esFacturable])
   @@index([activo])
+  cargos TarifaCargo[]
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+//  MÓDULO DE TARIFAS / TARIFARIOS (Parametrización)
+//  Inspirado en el módulo Tarifario del SIIS, modernizado para SARAI.
+//  - Clasificación: TarifaGrupo → TarifaTipo
+//  - Cargo: servicio/ítem interno con equivalencia al catálogo CUPS (Res. 2706)
+//  - Tarifario: lista de precios; puede derivarse de otra aplicando un %
+//  - TarifaItem: precio de un cargo dentro de un tarifario
+// ──────────────────────────────────────────────────────────────────────────
+
+model TarifaGrupo {
+  id        String       @id @default(cuid())
+  codigo    String       @unique
+  nombre    String
+  activo    Boolean      @default(true)
+  tipos     TarifaTipo[]
+  cargos    TarifaCargo[]
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  @@index([activo])
+}
+
+model TarifaTipo {
+  id        String      @id @default(cuid())
+  codigo    String
+  nombre    String
+  activo    Boolean     @default(true)
+  grupoId   String
+  grupo     TarifaGrupo @relation(fields: [grupoId], references: [id], onDelete: Cascade)
+  cargos    TarifaCargo[]
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  @@unique([grupoId, codigo])
+  @@index([grupoId])
+  @@index([activo])
+}
+
+model TarifaCargo {
+  id          String  @id @default(cuid())
+  // Código interno propio de la clínica (único)
+  codigo      String  @unique
+  descripcion String
+
+  // Equivalencia con el catálogo CUPS oficial (Res. 2706/2025)
+  cupsCodigoId  String?
+  cupsCodigo    CupsCodigo? @relation(fields: [cupsCodigoId], references: [id])
+  cupsCodigoStr String? // código CUPS sin puntos (para búsqueda/importación)
+
+  // Clasificación
+  grupoId String?
+  grupo   TarifaGrupo? @relation(fields: [grupoId], references: [id])
+  tipoId  String?
+  tipo    TarifaTipo?  @relation(fields: [tipoId], references: [id])
+
+  // Atributos adicionales (compatibles con el legado)
+  nivel        String? // nivel de complejidad
+  tipoUnidad   String?
+  conceptoRips String?
+
+  activo    Boolean      @default(true)
+  items     TarifaItem[]
+  cuentaItems CuentaItem[]
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  @@index([cupsCodigoId])
+  @@index([grupoId])
+  @@index([tipoId])
+  @@index([activo])
+}
+
+model Tarifario {
+  id          String  @id @default(cuid())
+  codigo      String  @unique
+  nombre      String
+  descripcion String?
+  tipo        String? // PARTICULAR, EPS, SOAT, PREPAGADA, etc.
+
+  // Derivación por porcentaje sobre un tarifario base
+  baseId     String?
+  base       Tarifario?  @relation("TarifarioBase", fields: [baseId], references: [id])
+  derivados  Tarifario[] @relation("TarifarioBase")
+  porcentaje Float? // % aplicado sobre el tarifario base (ej. 110 = +10%)
+
+  vigenciaDesde DateTime?
+  vigenciaHasta DateTime?
+  activo        Boolean      @default(true)
+  items         TarifaItem[]
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@index([activo])
+  @@index([baseId])
+}
+
+model TarifaItem {
+  id          String    @id @default(cuid())
+  tarifarioId String
+  tarifario   Tarifario @relation(fields: [tarifarioId], references: [id], onDelete: Cascade)
+  cargoId     String
+  cargo       TarifaCargo @relation(fields: [cargoId], references: [id], onDelete: Cascade)
+  precio      Float
+  activo      Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([tarifarioId, cargoId])
+  @@index([tarifarioId])
+  @@index([cargoId])
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+//  MÓDULO DE FACTURACIÓN (demo funcional)
+//  Flujo: al COMPLETAR una cita se crea un Ingreso + Cuenta (ABIERTA).
+//  A la cuenta se le adicionan ítems/servicios (cargos). Luego se factura.
+//  - Ingreso: admisión del paciente (ambulatorio/hospitalario)
+//  - Cuenta: documento de cargos de un ingreso
+//  - CuentaItem: cada servicio/cargo con cantidad y precio
+//  - Factura: documento de venta generado a partir de una cuenta
+// ──────────────────────────────────────────────────────────────────────────
+
+model Ingreso {
+  id            String    @id @default(cuid())
+  numero        Int       @unique @default(autoincrement())
+  pacienteId    String
+  paciente      Paciente  @relation(fields: [pacienteId], references: [id])
+  citaId        String?
+  cita          Cita?     @relation(fields: [citaId], references: [id])
+  medicoId      String?
+  medico        User?     @relation(fields: [medicoId], references: [id])
+  tipoIngreso   String    @default("AMBULATORIO") // AMBULATORIO, HOSPITALARIO, URGENCIAS
+  entidad       String?   // responsable / EPS / aseguradora
+  plan          String?   // plan de la cuenta
+  estado        String    @default("ACTIVO") // ACTIVO, CERRADO, ANULADO
+  fechaIngreso  DateTime  @default(now())
+  fechaEgreso   DateTime?
+  observaciones String?
+  cuentas       Cuenta[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([pacienteId])
+  @@index([citaId])
+  @@index([estado])
+}
+
+model Cuenta {
+  id            String       @id @default(cuid())
+  numero        Int          @unique @default(autoincrement())
+  ingresoId     String
+  ingreso       Ingreso      @relation(fields: [ingresoId], references: [id], onDelete: Cascade)
+  estado        String       @default("ABIERTA") // ABIERTA, FACTURADA, ANULADA
+  observaciones String?
+  items         CuentaItem[]
+  factura       Factura?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@index([ingresoId])
+  @@index([estado])
+}
+
+model CuentaItem {
+  id             String       @id @default(cuid())
+  cuentaId       String
+  cuenta         Cuenta       @relation(fields: [cuentaId], references: [id], onDelete: Cascade)
+  cargoId        String?
+  cargo          TarifaCargo? @relation(fields: [cargoId], references: [id])
+  codigo         String?      // snapshot del código del cargo/CUPS
+  descripcion    String
+  departamento   String?      // ASISTENCIAL, LABORATORIO, IMAGENOLOGIA, etc.
+  cantidad       Float        @default(1)
+  precioUnitario Float        @default(0)
+  valorTotal     Float        @default(0)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([cuentaId])
+  @@index([cargoId])
+}
+
+model Factura {
+  id            String   @id @default(cuid())
+  numero        Int      @unique @default(autoincrement())
+  prefijo       String   @default("FE")
+  cuentaId      String   @unique
+  cuenta        Cuenta   @relation(fields: [cuentaId], references: [id])
+  pacienteId    String
+  paciente      Paciente @relation(fields: [pacienteId], references: [id])
+  entidad       String?
+  plan          String?
+  subtotal      Float    @default(0)
+  total         Float    @default(0)
+  estado        String   @default("EMITIDA") // EMITIDA, ANULADA, PAGADA
+  observaciones String?
+  fecha         DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([pacienteId])
+  @@index([estado])
+  @@index([fecha])
 }

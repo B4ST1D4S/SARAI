@@ -35,6 +35,17 @@ import {
 import {
   getCupsCodigos, getCupsCodigosStats, createCupsCodigo, updateCupsCodigo, deleteCupsCodigo, bulkCreateCupsCodigos,
 } from '../controllers/cupsCatalogController.js';
+import {
+  // Clasificación
+  getTarifaGrupos, createTarifaGrupo, updateTarifaGrupo, deleteTarifaGrupo,
+  createTarifaTipo, updateTarifaTipo, deleteTarifaTipo,
+  // Cargos (equivalencia CUPS)
+  getCargosTarifa, getCargosTarifaStats, createCargoTarifa, updateCargoTarifa, deleteCargoTarifa, bulkCreateCargosTarifa,
+  // Tarifarios
+  getTarifarios, getTarifarioById, createTarifario, updateTarifario, deleteTarifario, generarTarifarioDesdeBase,
+  // Ítems
+  getTarifarioItems, upsertTarifarioItem, deleteTarifarioItem, bulkTarifarioItems,
+} from '../controllers/tarifasController.js';
 
 const router = Router();
 
@@ -178,5 +189,39 @@ router.post('/cups-codigos', onlyAdmin, createCupsCodigo);
 router.post('/cups-codigos/bulk', onlyAdmin, bulkCreateCupsCodigos);
 router.put('/cups-codigos/:id', onlyAdmin, updateCupsCodigo);
 router.delete('/cups-codigos/:id', onlyAdmin, deleteCupsCodigo);
+
+// ─────────────────────────────────────────────────
+// TARIFAS / TARIFARIOS
+// ─────────────────────────────────────────────────
+// Clasificación (grupos y tipos de cargo)
+router.get('/tarifa-grupos', getTarifaGrupos);
+router.post('/tarifa-grupos', onlyAdmin, createTarifaGrupo);
+router.put('/tarifa-grupos/:id', onlyAdmin, updateTarifaGrupo);
+router.delete('/tarifa-grupos/:id', onlyAdmin, deleteTarifaGrupo);
+router.post('/tarifa-tipos', onlyAdmin, createTarifaTipo);
+router.put('/tarifa-tipos/:id', onlyAdmin, updateTarifaTipo);
+router.delete('/tarifa-tipos/:id', onlyAdmin, deleteTarifaTipo);
+
+// Cargos (catálogo interno con equivalencia CUPS)
+router.get('/cargos-tarifa', getCargosTarifa);
+router.get('/cargos-tarifa/stats', getCargosTarifaStats);
+router.post('/cargos-tarifa', onlyAdmin, createCargoTarifa);
+router.post('/cargos-tarifa/bulk', onlyAdmin, bulkCreateCargosTarifa);
+router.put('/cargos-tarifa/:id', onlyAdmin, updateCargoTarifa);
+router.delete('/cargos-tarifa/:id', onlyAdmin, deleteCargoTarifa);
+
+// Tarifarios (listas de precios)
+router.get('/tarifarios', getTarifarios);
+router.get('/tarifarios/:id', getTarifarioById);
+router.post('/tarifarios', onlyAdmin, createTarifario);
+router.put('/tarifarios/:id', onlyAdmin, updateTarifario);
+router.delete('/tarifarios/:id', onlyAdmin, deleteTarifario);
+router.post('/tarifarios/:id/generar-base', onlyAdmin, generarTarifarioDesdeBase);
+
+// Ítems del tarifario (precios por cargo)
+router.get('/tarifarios/:id/items', getTarifarioItems);
+router.post('/tarifarios/:id/items', onlyAdmin, upsertTarifarioItem);
+router.post('/tarifarios/:id/items/bulk', onlyAdmin, bulkTarifarioItems);
+router.delete('/tarifarios/:id/items/:itemId', onlyAdmin, deleteTarifarioItem);
 
 export default router;
