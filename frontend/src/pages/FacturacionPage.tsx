@@ -13,6 +13,7 @@ import {
 } from '../services/facturacionService';
 import { searchPacientes } from '../services/api';
 import { getParametrosSistema } from '../services/adminService';
+import QRCode from 'qrcode';
 
 const cop = (n: number) =>
   new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(n || 0);
@@ -791,7 +792,7 @@ const FACTURA_CSS = `
   @page { margin: 12mm 14mm; size: A4; }
 `;
 
-function buildFacturaHtml(f: any, clinica: Record<string, string>): string {
+function buildFacturaHtml(f: any, clinica: Record<string, string>, qrDataUrl?: string): string {
   const fechaElab = fdateLarga(f.fecha);
   const ingreso = f.cuenta?.ingreso;
   const medico = ingreso?.medico ? `${ingreso.medico.nombre} ${ingreso.medico.apellido}` : '';
@@ -831,6 +832,7 @@ function buildFacturaHtml(f: any, clinica: Record<string, string>): string {
     <p>N.° <b>${f.prefijo}-${String(f.numero).padStart(6, '0')}</b></p>
     <p>Fecha de elaboración: ${fechaElab}</p>
     <span class="badge-estado" style="${estadoColor[f.estado] || ''}">${f.estado}</span>
+    ${qrDataUrl ? `<div style="margin-top:8px"><img src="${qrDataUrl}" alt="QR" style="width:96px;height:96px" /></div>` : ''}
   </div>
 </div>
 
@@ -884,12 +886,24 @@ ${f.observaciones ? `<div class="info-box" style="margin-top:8px"><h3>Observacio
 </body></html>`;
 }
 
-function imprimirFactura(f: any, clinica: Record<string, string>) {
+function imprimirFactura(f: any, clinica: Record<string, string>, qrDataUrl?: string) {
   const w = window.open('', '_blank');
   if (!w) { alert('Permita ventanas emergentes para imprimir.'); return; }
   w.document.open();
-  w.document.write(buildFacturaHtml(f, clinica));
+  w.document.write(buildFacturaHtml(f, clinica, qrDataUrl));
   w.document.close();
+}
+
+// Contenido codificado en el QR de la factura
+function facturaQrTexto(f: any, clinica: Record<string, string>): string {
+  return [
+    `Factura: ${f.prefijo}-${String(f.numero).padStart(6, '0')}`,
+    `Fecha: ${fdate(f.fecha)}`,
+    clinica.nit ? `NIT Emisor: ${clinica.nit}` : '',
+    `Cliente: ${f.paciente?.nombreCompleto || ''}`,
+    f.paciente?.numeroDocumento ? `Doc: ${f.paciente.tipoDocumento || ''} ${f.paciente.numeroDocumento}` : '',
+    `Total: ${cop(f.total)}`,
+  ].filter(Boolean).join('\n');
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -898,6 +912,7 @@ function imprimirFactura(f: any, clinica: Record<string, string>) {
 function FacturaModal({ facturaId, onClose }: { facturaId: string; onClose: () => void }) {
   const [factura, setFactura] = useState<any | null>(null);
   const [clinica, setClinica] = useState<Record<string, string>>({});
+  const [qrUrl, setQrUrl] = useState<string>('');
 
   useEffect(() => {
     getFactura(facturaId).then(setFactura).catch(() => setFactura(null));
@@ -907,6 +922,14 @@ function FacturaModal({ facturaId, onClose }: { facturaId: string; onClose: () =
       setClinica(map);
     }).catch(() => {});
   }, [facturaId]);
+
+  // Generar el código QR cuando ya hay factura y datos de clínica
+  useEffect(() => {
+    if (!factura) return;
+    QRCode.toDataURL(facturaQrTexto(factura, clinica), { margin: 1, width: 200 })
+      .then(setQrUrl)
+      .catch(() => setQrUrl(''));
+  }, [factura, clinica]);
 
   const ingreso = factura?.cuenta?.ingreso;
   const medico = ingreso?.medico ? `${ingreso.medico.nombre} ${ingreso.medico.apellido}` : '';
@@ -934,6 +957,7 @@ function FacturaModal({ facturaId, onClose }: { facturaId: string; onClose: () =
                 <div className="text-xs text-gray-600">N.° {factura.prefijo}-{String(factura.numero).padStart(6, '0')}</div>
                 <div className="text-xs text-gray-600">Fecha: {fdate(factura.fecha)}</div>
                 <span className={`inline-block mt-1 text-[10px] px-2 py-0.5 rounded border ${estadoBadge(factura.estado)}`}>{factura.estado}</span>
+                {qrUrl && <img src={qrUrl} alt="QR" className="w-20 h-20 mt-2 ml-auto" />}
               </div>
             </div>
 
@@ -986,7 +1010,7 @@ function FacturaModal({ facturaId, onClose }: { facturaId: string; onClose: () =
           </div>
 
           <div className="flex justify-end gap-2 mt-3">
-            <button onClick={() => imprimirFactura(factura, clinica)}
+            <button onClick={() => imprimirFactura(factura, clinica, qrUrl)}
               className="px-4 py-2 text-sm bg-yellow-600 hover:bg-yellow-700 text-white rounded font-semibold flex items-center gap-2">
               <Printer size={16} /> Imprimir / PDF
             </button>
