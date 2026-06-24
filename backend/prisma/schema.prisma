@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model User {
@@ -35,6 +36,7 @@ model User {
   cotizaciones             Cotizacion[]
   crmLeads                 CrmLead[]              @relation("CrmLeadCreador")
   ingresosFacturacion      Ingreso[]
+  contratosCreados         Contrato[]             @relation("ContratoCreadoPor")
 
   @@index([rol])
   @@index([email])
@@ -90,10 +92,11 @@ model Paciente {
   procedimientos    Procedimiento[]
   seguimientos      SeguimientoPostOp[]
   transacciones     Transaccion[]
-  cotizaciones      Cotizacion[]
-  crmLeads          CrmLead[]
-  ingresos          Ingreso[]
-  facturas          Factura[]
+  cotizaciones           Cotizacion[]
+  crmLeads               CrmLead[]
+  ingresos               Ingreso[]
+  facturas               Factura[]
+  contratosBeneficiario  ContratoBeneficiario[]
 
   @@unique([numeroDocumento, tipoDocumento])
   @@index([nombreCompleto])
@@ -1154,4 +1157,127 @@ model Factura {
   @@index([pacienteId])
   @@index([estado])
   @@index([fecha])
+}
+
+// ─────────────────────────────────────────────
+//  MÓDULO DE CONTRATACIÓN
+// ─────────────────────────────────────────────
+
+model Empresa {
+  id               String     @id @default(cuid())
+  razonSocial      String
+  nombreComercial  String?
+  nit              String     @unique
+  tipo             String     @default("EMPRESA") // EMPRESA, ASEGURADORA, CONVENIO
+  contactoNombre   String?
+  contactoCargo    String?
+  contactoEmail    String?
+  contactoTelefono String?
+  direccion        String?
+  ciudad           String?
+  estado           Boolean    @default(true)
+  contratos        Contrato[]
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  @@index([nit])
+  @@index([estado])
+}
+
+model Contrato {
+  id                  String                 @id @default(cuid())
+  numero              Int                    @unique @default(autoincrement())
+  descripcion         String
+  empresaId           String
+  empresa             Empresa                @relation(fields: [empresaId], references: [id])
+  tipo                String                 @default("CONVENIO") // CONVENIO, CORPORATIVO, COLECTIVO
+  estado              String                 @default("BORRADOR") // BORRADOR, ACTIVO, SUSPENDIDO, VENCIDO, CANCELADO
+  fechaInicio         DateTime
+  fechaFin            DateTime
+  montoTotal          Float?
+  montoMensual        Float?
+  diasCredito         Int                    @default(30)
+  porcentajeDescuento Float                  @default(0)
+  porcentajeCobertura Float                  @default(100)
+  observaciones       String?
+  creadoPorId         String
+  creadoPor           User                   @relation("ContratoCreadoPor", fields: [creadoPorId], references: [id])
+  tarifas             ContratoTarifa[]
+  paquetes            ContratoPaquete[]
+  beneficiarios       ContratoBeneficiario[]
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
+
+  @@index([empresaId])
+  @@index([estado])
+  @@index([fechaFin])
+}
+
+model ContratoTarifa {
+  id                  String   @id @default(cuid())
+  contratoId          String
+  contrato            Contrato @relation(fields: [contratoId], references: [id], onDelete: Cascade)
+  codigoCUPS          String
+  descripcionCUPS     String
+  precioBase          Float
+  precioNegociado     Float
+  porcentajeDescuento Float    @default(0)
+  porcentajeCobertura Float    @default(100)
+  activo              Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@unique([contratoId, codigoCUPS])
+  @@index([contratoId])
+  @@index([codigoCUPS])
+}
+
+model ContratoPaquete {
+  id          String               @id @default(cuid())
+  contratoId  String
+  contrato    Contrato             @relation(fields: [contratoId], references: [id], onDelete: Cascade)
+  nombre      String
+  descripcion String?
+  precio      Float
+  activo      Boolean              @default(true)
+  items       ContratoPaqueteItem[]
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  @@index([contratoId])
+}
+
+model ContratoPaqueteItem {
+  id          String          @id @default(cuid())
+  paqueteId   String
+  paquete     ContratoPaquete @relation(fields: [paqueteId], references: [id], onDelete: Cascade)
+  codigoCUPS  String?
+  descripcion String
+  cantidad    Float           @default(1)
+  precioUnit  Float           @default(0)
+  esPrincipal Boolean         @default(false)
+  createdAt   DateTime        @default(now())
+
+  @@index([paqueteId])
+}
+
+model ContratoBeneficiario {
+  id         String    @id @default(cuid())
+  contratoId String
+  contrato   Contrato  @relation(fields: [contratoId], references: [id], onDelete: Cascade)
+  pacienteId String?
+  paciente   Paciente? @relation(fields: [pacienteId], references: [id])
+  nombre     String
+  documento  String
+  tipoDoc    String    @default("CC")
+  email      String?
+  telefono   String?
+  tipo       String    @default("BENEFICIARIO") // TITULAR, BENEFICIARIO
+  estado     String    @default("ACTIVO") // ACTIVO, INACTIVO
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([contratoId])
+  @@index([pacienteId])
+  @@index([documento])
 }

@@ -20,6 +20,7 @@ import pdfRoutes from './routes/pdf.js';
 import mapaCorporalRoutes from './routes/mapaCorporal.js';
 import crmRoutes from './routes/crm.js';
 import facturacionRoutes from './routes/facturacion.js';
+import contratacionRoutes from './routes/contratacion.js';
 
 dotenv.config();
 
@@ -86,6 +87,7 @@ app.use('/api/pdf',   pdfRoutes);
 app.use('/api/mapa-corporal', mapaCorporalRoutes);
 app.use('/api/crm',          crmRoutes);
 app.use('/api/facturacion',  facturacionRoutes);
+app.use('/api/contratacion', contratacionRoutes);
 
 // ============================================
 // MANEJO DE ERRORES
