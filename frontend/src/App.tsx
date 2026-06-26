@@ -17,6 +17,7 @@ import CRMPage from './pages/CRMPage';
 import FacturacionPage from './pages/FacturacionPage';
 import PlantillasPage from './pages/PlantillasPage';
 import MapaCorporalPage from './pages/MapaCorporalPage';
+import OdontogramaPage from './pages/OdontogramaPage';
 import { Body3DTestPage } from './pages/Body3DTestPage';
 import UsuariosPage from './pages/UsuariosPage';
 import AdminPage from './pages/AdminPage';
@@ -36,6 +37,7 @@ const NAV_SECTIONS = [
       { id: 'pacientes',     label: 'Pacientes',          sym: 'P' },
       { id: 'historia',      label: 'Historia Clinica',   sym: 'H' },
       { id: 'fotos',         label: 'Visual Clínico',     sym: 'V' },
+      { id: 'odontograma',   label: 'Odontograma',        sym: 'T' },
       { id: 'mapa-corporal', label: 'Mapa Corporal',      sym: 'C' },
     ],
   },
@@ -442,6 +444,7 @@ function App() {
           {currentPage === 'plantillas'          && <PlantillasPage />}
           {currentPage === 'impresion'           && <CentralImpresionPage />}
           {currentPage === 'mapa-corporal'       && <MapaCorporalPage />}
+          {currentPage === 'odontograma'         && <OdontogramaPage />}
           {currentPage === 'body3d-test'         && <Body3DTestPage />}
           {currentPage === 'usuarios'            && <UsuariosPage />}
           {currentPage === 'admin'               && <AdminPage />}

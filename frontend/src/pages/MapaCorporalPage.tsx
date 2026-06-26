@@ -784,12 +784,12 @@ export default function MapaCorporalPage() {
                   <motion.button
                     key={tipo.tipo}
                     whileTap={{ scale: 0.96 }}
-                    onClick={() => mode === 'EDITAR' && setSelectedTipo(tipo.tipo as Mark['tipo'])}
-                    className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-left transition-all text-xs ${
+                    onClick={() => { setSelectedTipo(tipo.tipo as Mark['tipo']); if (mode !== 'EDITAR') setMode('EDITAR'); }}
+                    className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-left transition-all text-xs cursor-pointer ${
                       selectedTipo === tipo.tipo
                         ? `bg-gradient-to-r ${tipo.color} text-white shadow-md ring-1 ring-white/20`
                         : 'bg-slate-800/80 hover:bg-slate-700 text-gray-300 border border-slate-600/50'
-                    } ${mode !== 'EDITAR' ? 'opacity-60 cursor-default' : 'cursor-pointer'}`}
+                    }`}
                   >
                     <span className="text-base leading-none">{tipo.icon}</span>
                     <span className="font-medium leading-tight truncate">{tipo.label}</span>
