@@ -14,9 +14,11 @@ import {
   AlertTriangle, ChevronDown, FolderOpen, LayoutGrid, BookOpen, GitBranch,
   ClipboardList, Eye, EyeOff, Star, RotateCcw,
   FileText, List, SlidersHorizontal, Stethoscope, Calendar, MessageSquare, Palette,
+  Sparkles,
 } from 'lucide-react';
 import * as svc from '../services/adminService';
 import { useTheme, ThemeId } from '../hooks/useTheme';
+import TabOdontologia from './admin/TabOdontologia';
 
 // ─── CSV helpers ──────────────────────────────────────────────
 function csvToObjects(text: string): any[] {
@@ -3371,6 +3373,14 @@ const MODULOS = [
       { id:'tarifa-clasificacion', label:'Clasificación (Grupos/Tipos)', icon:GitBranch,    component:TabTarifaClasificacion },
       { id:'cargos-tarifa',        label:'Cargos / Equivalencia CUPS',  icon:List,         component:TabCargosTarifa       },
       { id:'tarifarios',           label:'Tarifarios (Listas de precio)', icon:DollarSign,  component:TabTarifarios         },
+    ],
+  },
+  {
+    id: 'odontologia',
+    label: 'Odontología',
+    icon: Sparkles,
+    submodulos: [
+      { id:'odonto-catalogos',  label:'Catálogos Clínicos',   icon:Sparkles,      component:TabOdontologia         },
     ],
   },
   {
