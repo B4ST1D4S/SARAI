@@ -6,6 +6,7 @@
 import { useState } from 'react';
 import { Search, Printer, FileText, ClipboardList, User, Loader2, AlertCircle } from 'lucide-react';
 import { searchPacientes, getHistoriasPaciente, getHistoriaClinica } from '../services/api';
+import { API_BASE_URL } from '../config';
 
 // ─────────────────────────────────────────────────────────
 // Generador HTML para Historia Clínica (secciones 1-11)
@@ -262,7 +263,7 @@ export default function CentralImpresionPage() {
   };
 
   // ── Descargar PDF desde el backend (sin diálogo de impresión) ──
-  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+  const API_BASE = API_BASE_URL;
 
   const handlePrint = async (historiaId: string, tipo: 'hc' | 'ordenes') => {
     const key = historiaId + tipo;
@@ -316,10 +317,10 @@ export default function CentralImpresionPage() {
         </span>
       </div>
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-col md:flex-row flex-1 overflow-auto md:overflow-hidden">
 
-        {/* ══ PANEL IZQUIERDO: búsqueda de pacientes ══ */}
-        <div className="w-72 flex-shrink-0 border-r border-white/[0.08] flex flex-col bg-[#0b0d14]">
+        {/* ══ PANEL BÚSQUEDA (arriba en móvil, izquierda en desktop) ══ */}
+        <div className="w-full md:w-72 flex-shrink-0 border-b md:border-b-0 md:border-r border-white/[0.08] flex flex-col bg-[#0b0d14] max-h-52 md:max-h-none">
           <div className="p-4">
             <p className="text-[9px] text-gray-500 font-bold uppercase tracking-widest mb-2">Buscar Paciente</p>
             <div className="flex gap-2">

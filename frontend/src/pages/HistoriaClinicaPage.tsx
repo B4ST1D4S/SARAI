@@ -10,8 +10,9 @@ import {
   CheckCircle, Plus, Trash2, Save, Printer,
 } from 'lucide-react';
 import {
-  createHistoriaClinica, getAllPacientes, getHistoriasMedico, updateHistoriaClinica,
+  createHistoriaClinica, getAllPacientes, getHistoriasMedico, updateHistoriaClinica, getHistoriasPaciente,
 } from '../services/api';
+import { API_BASE_URL } from '../config';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tipos
@@ -233,9 +234,94 @@ export default function HistoriaClinicaPage({
       setTimeout(() => scrollTo(seccionExterna), 120);
     }
   }, [seccionExterna]);
+  // Cargar la última historia guardada de un paciente y poblar el formulario
+  const cargarHistoriaPorPaciente = useCallback(async (pacId: string) => {
+    try {
+      const r = await getHistoriasPaciente(pacId, token);
+      const lista: any[] = Array.isArray(r.data) ? (r.data as any[]) : ((r.data as any)?.historias || []);
+      if (lista.length > 0) {
+        const h = lista[0]; // más reciente (backend ordena desc)
+        const c = (h.contenido as any) || {};
+        const sv  = c.signosVitales            || {};
+        const ap  = c.antecedentesPersonales   || {};
+        const af  = c.antecedentesFamiliares   || {};
+        const ag  = c.antecedentesGineco        || {};
+        const ecx = c.evolucionCx               || {};
+        const diag = (typeof c.diagnostico === 'object' && c.diagnostico) ? c.diagnostico : {};
+        const pt  = c.planTerapeutico           || {};
+        const om  = c.ordenesMedicas            || {};
+        setForm({
+          pacienteId:             pacId,
+          tipoConsulta:           c.tipoConsulta   || 'INICIAL',
+          tipoHistoria:           h.tipoHistoria   || 'ANAMNESIS',
+          motivoConsulta:         c.quejaPrincipal || '',
+          historiaEnfermedad:     c.historiaEnfermedad || '',
+          peso:                   sv.peso  || '',
+          talla:                  sv.talla || '',
+          imc:                    sv.imc   || '',
+          temperatura:            sv.temperatura            || '',
+          frecuenciaCardiaca:     sv.frecuenciaCardiaca     || '',
+          frecuenciaRespiratoria: sv.frecuenciaRespiratoria || '',
+          taSistolica:            sv.taSistolica            || '',
+          taDiastolica:           sv.taDiastolica           || '',
+          saturacionO2:           sv.saturacionO2           || '',
+          glicemia:               sv.glicemia               || '',
+          antPatologicos:         ap.patologicos    || '',
+          antFarmacologicos:      ap.farmacologicos || '',
+          antQuirurgicos:         ap.quirurgicos    || '',
+          antAlergicos:           ap.alergicos      || '',
+          antToxicos:             ap.toxicos        || '',
+          antHospitalarios:       ap.hospitalarios  || '',
+          antFamHTA:              !!af.hta,
+          antFamDiabetes:         !!af.diabetes,
+          antFamCancer:           !!af.cancer,
+          antFamCardiopatias:     !!af.cardiopatias,
+          antFamOtros:            af.otros          || '',
+          fum:                    ag.fum            || '',
+          gestaciones:            ag.gestaciones    || '',
+          partos:                 ag.partos         || '',
+          cesareas:               ag.cesareas       || '',
+          abortos:                ag.abortos        || '',
+          planificacion:          ag.planificacion  || '',
+          menopausia:             !!ag.menopausia,
+          procedimientoRealizado: ecx.procedimientoRealizado || '',
+          evolucionCx:            ecx.evolucion              || '',
+          complicacionesCx:       ecx.complicaciones         || '',
+          recomendacionesCx:      ecx.recomendaciones        || '',
+          evolucionPostop:        ecx.evolucionPostop        || '',
+          finalidadAtencion:      c.finalidadAtencion || 'D',
+          origenAtencion:         c.origenAtencion    || 'CE',
+          diagnosticoPrincipal:       diag.principal   || '',
+          codigoCie10:                diag.codigoCie10 || '',
+          diagnosticosRelacionados:   diag.relacionados || '',
+          tipoDiagnostico:            diag.tipo        || 'CONFIRMADO',
+          conducta:                   pt.conducta          || c.tratamientoRecomendado || '',
+          incapacidadDias:            pt.incapacidadDias   || '',
+          procedimientosPlan:         pt.procedimientos    || '',
+          seguimiento:                pt.seguimiento       || '',
+          recomendacionesMed:         c.recomendaciones    || '',
+          apoyosDiag:        om.apoyosDiagnosticos || [],
+          procedimientosQx:  om.procedimientosQx  || [],
+          medicamentos:      om.medicamentos       || [],
+          interconsultas:    om.interconsultas     || [],
+        });
+        savedIdRef.current = h.id;
+      } else {
+        setForm({ ...BLANK, pacienteId: pacId });
+        savedIdRef.current = null;
+      }
+    } catch {
+      setForm({ ...BLANK, pacienteId: pacId });
+      savedIdRef.current = null;
+    }
+    setGuardado(false);
+  }, [token]);
+
   useEffect(() => {
-    if (pacienteIdExterno) { s('pacienteId', pacienteIdExterno); setShowForm(true); }
-  }, [pacienteIdExterno]);
+    if (pacienteIdExterno) {
+      cargarHistoriaPorPaciente(pacienteIdExterno).then(() => setShowForm(true));
+    }
+  }, [pacienteIdExterno, cargarHistoriaPorPaciente]);
 
   // Build payload
   const buildPayload = useCallback(() => ({
@@ -401,7 +487,7 @@ export default function HistoriaClinicaPage({
   }, [onRegisterCampos, handleCamposSarai]);
 
   // Descarga de PDF desde el backend (sin diálogo de impresión)
-  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+  const API_BASE = API_BASE_URL;
 
   const descargarPDF = async (tipo: 'hc' | 'ordenes') => {
     const id = savedIdRef.current;
@@ -476,7 +562,7 @@ export default function HistoriaClinicaPage({
 
   // ─────────────────────────────────────────────────────────────────────────
   return (
-    <div className="h-screen overflow-hidden flex flex-col bg-[#080a0f]">
+    <div className="h-[calc(100vh-80px)] overflow-hidden flex flex-col bg-[#080a0f]">
 
       {/* ══ TOP BAR ══ */}
       <div className="flex-shrink-0 flex items-center justify-between px-5 py-3 border-b border-white/[0.06] bg-white/[0.015]">
@@ -489,7 +575,14 @@ export default function HistoriaClinicaPage({
         <div className="flex items-center gap-2">
 
           <button
-            onClick={() => setShowForm(!showForm)}
+            onClick={() => {
+              if (!showForm) {
+                setForm(BLANK);
+                savedIdRef.current = null;
+                setGuardado(false);
+              }
+              setShowForm(!showForm);
+            }}
             className={`px-4 py-2 rounded-xl font-bold text-xs transition-all ${
               showForm
                 ? 'bg-white/5 border border-white/10 text-gray-400 hover:text-white'
@@ -508,7 +601,11 @@ export default function HistoriaClinicaPage({
           {/* Barra de datos del paciente */}
           <div className="flex-shrink-0 grid grid-cols-2 lg:grid-cols-4 gap-3 px-5 py-3 border-b border-white/[0.06] bg-white/[0.01]">
             <F label="Paciente *">
-              <select value={form.pacienteId} onChange={e => s('pacienteId', e.target.value)} required className={ic}>
+              <select value={form.pacienteId} onChange={e => {
+                const id = e.target.value;
+                if (id) cargarHistoriaPorPaciente(id);
+                else { setForm({ ...BLANK }); savedIdRef.current = null; }
+              }} required className={ic}>
                 <option value="">Seleccionar paciente...</option>
                 {pacientes.map((p: any) => (
                   <option key={p.id} value={p.id}>{p.nombreCompleto} — {p.numeroDocumento}</option>
@@ -539,11 +636,8 @@ export default function HistoriaClinicaPage({
           {/* ── Paneles: nav izquierda + formulario derecha ── */}
           <div className="flex flex-1 overflow-hidden">
 
-            {/* ══ PANEL IZQUIERDO ══ */}
-            <div className="w-48 flex-shrink-0 flex flex-col border-r border-white/[0.08] bg-[#0b0d14]">
-
-              {/* barra de progreso */}
-              <div className="px-4 pt-4 pb-2">
+            {/* ══ PANEL IZQUIERDO (oculto en móvil) ══ */}
+            <div className="hidden md:flex w-48 flex-shrink-0 flex-col border-r border-white/[0.08] bg-[#0b0d14]">
                 <div className="flex justify-between items-center mb-1">
                   <span className="text-[9px] text-gray-600 font-bold uppercase tracking-widest">Progreso</span>
                   <span className="text-[10px] text-yellow-400 font-bold">{porcentaje}%</span>
@@ -552,7 +646,6 @@ export default function HistoriaClinicaPage({
                   <motion.div animate={{ width: `${porcentaje}%` }} transition={{ duration: 0.4 }}
                     className="h-full bg-gradient-to-r from-yellow-400 to-amber-500 rounded-full" />
                 </div>
-              </div>
 
               {/* nav secciones */}
               <div className="flex-1 overflow-y-auto px-2 pb-4">
@@ -623,7 +716,7 @@ export default function HistoriaClinicaPage({
 
             {/* ══ PANEL DERECHO: todas las secciones ══ */}
             <div id="hc-scroll-panel" className="flex-1 overflow-y-auto bg-[#080a0f]">
-              <div className="p-6 max-w-4xl">
+              <div className="p-6 w-full">
               <div id="hc-secciones" className="space-y-6">
 
                 {/* 1 */}

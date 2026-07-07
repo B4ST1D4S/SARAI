@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { API_BASE_URL } from '../config';
 import {
   Users,
   Calendar,
@@ -43,10 +44,10 @@ export default function DashboardPage({ onNavegar }: { onNavegar?: (page: string
         const semanaFin = new Date(); semanaFin.setDate(semanaFin.getDate() + 7); semanaFin.setHours(23, 59, 59, 999);
 
         const [resHoy, resSemana] = await Promise.all([
-          fetch(`/api/citas/medico/agenda?fechaInicio=${hoyInicio.toISOString()}&fechaFin=${hoyFin.toISOString()}`, {
+          fetch(`${API_BASE_URL}/citas/medico/agenda?fechaInicio=${hoyInicio.toISOString()}&fechaFin=${hoyFin.toISOString()}`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
-          fetch(`/api/citas/medico/agenda?fechaInicio=${hoyInicio.toISOString()}&fechaFin=${semanaFin.toISOString()}`, {
+          fetch(`${API_BASE_URL}/citas/medico/agenda?fechaInicio=${hoyInicio.toISOString()}&fechaFin=${semanaFin.toISOString()}`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
         ]);
@@ -368,3 +369,5 @@ export default function DashboardPage({ onNavegar }: { onNavegar?: (page: string
     </div>
   );
 }
+
+

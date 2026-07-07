@@ -3,8 +3,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import SaraiECGIcon from './SaraiECGIcon';
 
 // ─── Constantes de endpoints ──────────────────────────────────────────────────
-const WHISPER_URL = 'http://localhost:8000/transcribir';
-const GEMMA_URL   = 'http://localhost:3001/api/sarai/procesar-voz';
+import { API_BASE_URL as _API_BASE, WHISPER_BASE_URL as _WHISPER } from '../config';
+const WHISPER_URL = `${_WHISPER}/transcribir`;
+const GEMMA_URL   = `${_API_BASE}/sarai/procesar-voz`;
 
 interface SaraiAssistantProps {
   onCamposDetectados: (campos: Record<string, string>) => void;
@@ -20,23 +21,34 @@ interface SaraiAssistantProps {
 // ⚠️ ORDEN IMPORTA: entradas más específicas (con más palabras) deben ir ANTES
 //    que las genéricas para evitar que 'agenda' capture 'agenda profesional'.
 const COMANDOS_NAV = [
-  { palabras: ['dashboard', 'inicio', 'panel principal', 'panel'],                                             pagina: 'dashboard',          label: 'Dashboard' },
-  { palabras: ['pacientes', 'lista pacientes', 'lista de pacientes'],                                          pagina: 'pacientes',          label: 'Pacientes' },
-  { palabras: ['historia clínica', 'historia clinica', 'historial', 'historia'],                              pagina: 'historia',           label: 'Historia Clínica' },
-  // Agenda Profesional ANTES de Agenda para evitar colisión
-  { palabras: ['agenda profesional', 'agenda del médico', 'agenda del medico', 'agenda medico'],              pagina: 'agendaProfesional',  label: 'Agenda Profesional' },
-  { palabras: ['configurar agenda', 'config agenda', 'configuracion agenda', 'configuración agenda'],         pagina: 'config-agenda',      label: 'Config Agenda' },
-  { palabras: ['agenda paciente', 'agenda del paciente', 'agenda', 'citas'],                                  pagina: 'agenda',             label: 'Agenda Paciente' },
-  { palabras: ['admisión', 'admision', 'admitir'],                                                            pagina: 'admision',           label: 'Admisión' },
-  { palabras: ['quirófano', 'quirofano', 'cirujano', 'vista cirujano', 'sala de cirugía', 'sala cirugia'],   pagina: 'vista-cirujano',     label: 'Quirófano' },
-  { palabras: ['seguimiento', 'follow up', 'followup', 'control'],                                            pagina: 'followup',           label: 'Seguimiento' },
-  { palabras: ['consentimiento', 'consentimientos', 'consentimiento informado'],                              pagina: 'consentimiento',     label: 'Consentimiento' },
-  { palabras: ['crm', 'gestión de relaciones', 'gestion de relaciones'],                                     pagina: 'crm',                label: 'CRM' },
-  { palabras: ['facturación', 'facturacion', 'facturas', 'factura'],                                         pagina: 'facturacion',        label: 'Facturación' },
-  { palabras: ['plantillas', 'plantilla'],                                                                    pagina: 'plantillas',         label: 'Plantillas' },
-  { palabras: ['fotos', 'fotografías', 'fotografias', 'galería', 'galeria'],                                 pagina: 'fotos',              label: 'Fotos' },
-  { palabras: ['mapa corporal', 'mapa del cuerpo', 'mapa'],                                                   pagina: 'mapa-corporal',      label: 'Mapa Corporal' },
-  { palabras: ['admin', 'administración', 'administracion', 'parametrización', 'parametrizacion', 'sistema'], pagina: 'admin',              label: 'Administración' },
+  // ── CLINICA ──────────────────────────────────────────────────────────────
+  { palabras: ['dashboard', 'inicio', 'panel principal', 'panel'],                                                    pagina: 'dashboard',         label: 'Dashboard' },
+  { palabras: ['pacientes', 'lista pacientes', 'lista de pacientes'],                                                  pagina: 'pacientes',         label: 'Pacientes' },
+  { palabras: ['historia clínica', 'historia clinica', 'historial', 'historia'],                                      pagina: 'historia',          label: 'Historia Clínica' },
+  // ⚠️ Visual Clínico subido aquí para que 'fotos'/'visual clinico' no queden al fondo del array
+  { palabras: ['visual clinico', 'visual clínico', 'fotos', 'fotografías', 'fotografias', 'foto', 'galería', 'galeria'], pagina: 'fotos',           label: 'Visual Clínico' },
+  { palabras: ['mapa corporal', 'mapa del cuerpo', 'mapa'],                                                            pagina: 'mapa-corporal',     label: 'Mapa Corporal' },
+  // ── AGENDA ───────────────────────────────────────────────────────────────
+  // ⚠️ Agenda Profesional ANTES que Agenda Paciente para evitar colisión
+  { palabras: ['agenda profesional', 'agenda del médico', 'agenda del medico', 'agenda medico'],                      pagina: 'agendaProfesional', label: 'Agenda Profesional' },
+  { palabras: ['configurar agenda', 'config agenda', 'configuracion agenda', 'configuración agenda'],                 pagina: 'config-agenda',     label: 'Config Agenda' },
+  { palabras: ['agenda paciente', 'agenda del paciente', 'agenda', 'citas'],                                          pagina: 'agenda',            label: 'Agenda Paciente' },
+  { palabras: ['admisión', 'admision', 'admitir'],                                                                    pagina: 'admision',          label: 'Admisión' },
+  { palabras: ['quirófano', 'quirofano', 'cirujano', 'vista cirujano', 'sala de cirugía', 'sala cirugia'],            pagina: 'vista-cirujano',    label: 'Quirófano' },
+  { palabras: ['seguimiento', 'follow up', 'followup', 'control'],                                                    pagina: 'followup',          label: 'Seguimiento' },
+  // ── GESTIÓN ──────────────────────────────────────────────────────────────
+  { palabras: ['consentimiento', 'consentimientos', 'consentimiento informado'],                                      pagina: 'consentimiento',    label: 'Consentimiento' },
+  // ⚠️ Cotizaciones: palabras distintas de otras entradas, sin colisión
+  { palabras: ['cotizaciones', 'cotizacion', 'cotización', 'presupuesto', 'presupuestos', 'cotizar'],                 pagina: 'cotizaciones',      label: 'Cotizaciones' },
+  { palabras: ['crm', 'gestión de relaciones', 'gestion de relaciones'],                                             pagina: 'crm',               label: 'CRM' },
+  { palabras: ['facturación', 'facturacion', 'facturas', 'factura'],                                                  pagina: 'facturacion',       label: 'Facturación' },
+  { palabras: ['plantillas', 'plantilla'],                                                                            pagina: 'plantillas',        label: 'Plantillas' },
+  // ⚠️ 'imprimir' se eliminó aquí: lo maneja PASO 7 (onImprimir) para no colisionar
+  { palabras: ['central de impresion', 'central impresion', 'impresion', 'impresiones', 'ir a impresion'],            pagina: 'impresion',         label: 'Central Impresión' },
+  // ── ADMINISTRACIÓN ───────────────────────────────────────────────────────
+  { palabras: ['admin', 'administración', 'administracion', 'parametrización', 'parametrizacion', 'sistema'],        pagina: 'admin',             label: 'Administración' },
+  { palabras: ['usuarios', 'usuario', 'gestion usuarios', 'gestión usuarios'],                                       pagina: 'usuarios',          label: 'Usuarios' },
+  { palabras: ['manual', 'manual de usuario', 'ayuda', 'documentacion', 'documentación'],                           pagina: 'manual',            label: 'Manual de Usuario' },
 ];
 
 // Mapa de secciones de Historia Clínica → IDs del DOM
@@ -97,6 +109,7 @@ export default function SaraiAssistant({ onCamposDetectados, token, contexto, on
   const [ultimoSTT, setUltimoSTT] = useState('');  // último texto bruto del STT
   const [estadoComandos, setEstadoComandos] = useState<'idle' | 'starting' | 'active' | 'blocked' | 'unsupported'>('idle');
   const [inputComandoTexto, setInputComandoTexto] = useState(''); // fallback comandos por texto
+  const [nivelPostGrabacion, setNivelPostGrabacion] = useState<{ pct: number; label: string; color: string } | null>(null);
   // Para hacer el widget arrastrable — persistente en sessionStorage
   // Posicionar junto al panel ONLINE/Disponible del Dashboard (top-right)
   // En pantallas lg+: calcula la x para quedar a la izquierda del panel ONLINE
@@ -114,15 +127,15 @@ export default function SaraiAssistant({ onCamposDetectados, token, contexto, on
         y: 80,
       };
     }
-    // móvil/tablet: esquina superior derecha
+    // móvil/tablet: esquina superior derecha — 80px icono + 16px margen
     return {
-      x: Math.max(0, w - 110),
+      x: Math.max(8, w - 96),
       y: 72,
     };
   };
   const [posicion, setPosicion] = useState(calcPosInicial);
   const [dragging, setDragging] = useState(false);
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const dragOffsetRef = useRef({ x: 0, y: 0 });
   const widgetRef = useRef<HTMLDivElement>(null);
 
   // Limpiar posición guardada de sesiones anteriores para que siempre
@@ -285,7 +298,7 @@ export default function SaraiAssistant({ onCamposDetectados, token, contexto, on
         const n = Object.keys(data.campos).length;
         setResultado(`✓ ${n} campos completados`);
         setEst('listo');
-        setTimeout(() => { setEst('esperando'); setResultado(''); setTranscripcion(''); }, 7000);
+        setTimeout(() => { setEst('esperando'); setResultado(''); }, 7000);
       } else {
         setError('Sin campos detectados. Habla con más detalle clínico.');
         setEst('error');
@@ -321,6 +334,7 @@ export default function SaraiAssistant({ onCamposDetectados, token, contexto, on
     setError('');
     setResultado('');
     setTranscripcion('');
+    setNivelPostGrabacion(null);
     chunksRef.current = [];
     peakLevelRef.current = 0;   // reset nivel máximo
 
@@ -469,6 +483,15 @@ export default function SaraiAssistant({ onCamposDetectados, token, contexto, on
       const blob = new Blob(capturedChunks, { type: mimeType });
 
       console.log(`[SARAI] Blob: ${blob.size} bytes | Peak mic: ${(peakCapturado * 100).toFixed(1)}%`);
+
+      // Guardar nivel post-grabación para mostrar indicador en UI
+      const pct = Math.round(peakCapturado * 100);
+      setNivelPostGrabacion(
+        pct === 0   ? { pct, label: '🔴 Micrófono silenciado (0%)', color: 'text-red-400 border-red-500/20 bg-red-500/10' } :
+        pct < 2     ? { pct, label: `🔴 Voz muy baja (${pct}%) — sube el volumen`, color: 'text-red-400 border-red-500/20 bg-red-500/10' } :
+        pct < 5     ? { pct, label: `🟡 Señal débil (${pct}%) — habla más fuerte`, color: 'text-yellow-400 border-yellow-500/20 bg-yellow-500/10' } :
+                      { pct, label: `🟢 Nivel OK (${pct}%)`, color: 'text-emerald-400 border-emerald-500/20 bg-emerald-500/10' }
+      );
 
       if (blob.size < 500) {
         setError('No se grabó audio. Verifica el micrófono y habla al menos 2 segundos.');
@@ -867,62 +890,80 @@ export default function SaraiAssistant({ onCamposDetectados, token, contexto, on
   const nivelLabel      = nivelMax > 50 ? '● VOZ DETECTADA'  : nivelMax > 20 ? '◐ señal débil'   : '○ sin señal';
   const barraGlobalColor = nivelMax > 50 ? 'bg-emerald-400'  : nivelMax > 20 ? 'bg-yellow-400'   : 'bg-red-500';
 
-  // ── Handlers para drag + click en ícono contraído ───────────────────────────
-  const dragMovedRef = useRef(false);
-  const dragStartRef = useRef({ x: 0, y: 0 });
+  // ── Clamp posición al expandir para que el panel no desborde la pantalla ─────
+  useEffect(() => {
+    if (!minimizado) {
+      const expandedW = Math.min(Math.round(window.innerWidth * 0.92), 300);
+      setPosicion(prev => ({
+        x: Math.max(8, Math.min(prev.x, window.innerWidth - expandedW - 8)),
+        y: Math.max(8, Math.min(prev.y, window.innerHeight - 420)),
+      }));
+    }
+  }, [minimizado]);
 
-  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    // En expandido: no draggear sobre botones/inputs
-    if (!minimizado && (e.target as HTMLElement).closest('button, textarea, input, [role="button"]')) return;
-    if (!widgetRef.current) return;
+  // ── Refs estables para los handlers de puntero ──────────────────────────
+  const dragMovedRef           = useRef(false);
+  const dragStartRef           = useRef({ x: 0, y: 0 });
+  const pointerDownOnHeaderRef = useRef(false);  // ¿el tap inició en el header?
+  const minimizadoRef = useRef(minimizado);
+  const posicionRef   = useRef(posicion);
+  useEffect(() => { minimizadoRef.current = minimizado; }, [minimizado]);
+  useEffect(() => { posicionRef.current   = posicion;   }, [posicion]);
 
-    e.preventDefault();
-    dragMovedRef.current = false;
-    dragStartRef.current = { x: e.clientX, y: e.clientY };
+  // ── Drag con Pointer Events API (mouse + táctil en un solo handler) ──────
+  // setPointerCapture le dice al navegador que este elemento captura el puntero:
+  // no hay scroll, no hay interferencia, funciona igual en mouse y touch.
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    // No interceptar botones, inputs ni textareas
+    if ((e.target as HTMLElement).closest('button, textarea, input, [role="button"]')) return;
+    // Guardar si el tap empezó en el header (para colapsar en handlePointerUp)
+    pointerDownOnHeaderRef.current = !!(e.target as HTMLElement).closest('[data-sarai-header]');
+    e.currentTarget.setPointerCapture(e.pointerId);
+    dragMovedRef.current  = false;
+    dragStartRef.current  = { x: e.clientX, y: e.clientY };
+    dragOffsetRef.current = { x: e.clientX - posicionRef.current.x, y: e.clientY - posicionRef.current.y };
     setDragging(true);
-    setDragOffset({ x: e.clientX - posicion.x, y: e.clientY - posicion.y });
   };
 
-  useEffect(() => {
-    if (!dragging) return;
+  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!e.currentTarget.hasPointerCapture(e.pointerId)) return;
+    const dx = e.clientX - dragStartRef.current.x;
+    const dy = e.clientY - dragStartRef.current.y;
+    if (Math.sqrt(dx * dx + dy * dy) > 5) dragMovedRef.current = true;
+    const expandedW = Math.min(Math.round(window.innerWidth * 0.92), 300);
+    const maxX = window.innerWidth  - (minimizadoRef.current ? 64 : expandedW);
+    const maxY = window.innerHeight - 80;
+    setPosicion({
+      x: Math.max(0, Math.min(e.clientX - dragOffsetRef.current.x, maxX)),
+      y: Math.max(0, Math.min(e.clientY - dragOffsetRef.current.y, maxY)),
+    });
+  };
 
-    const handleMouseMove = (e: MouseEvent) => {
-      e.preventDefault();
-      const dx = e.clientX - dragStartRef.current.x;
-      const dy = e.clientY - dragStartRef.current.y;
-      // Marcar como arrastre real si se movió >5px
-      if (Math.sqrt(dx * dx + dy * dy) > 5) dragMovedRef.current = true;
-
-      const newX = e.clientX - dragOffset.x;
-      const newY = e.clientY - dragOffset.y;
-      const maxX = window.innerWidth - (minimizado ? 64 : 320);
-      const maxY = window.innerHeight - 80;
-      setPosicion({
-        x: Math.max(0, Math.min(newX, maxX)),
-        y: Math.max(0, Math.min(newY, maxY)),
-      });
-    };
-
-    const handleMouseUp = () => {
-      setDragging(false);
-      // Si fue clic (sin arrastre) sobre el ícono contraído → expandir
-      if (!dragMovedRef.current && minimizado) {
+  const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!e.currentTarget.hasPointerCapture(e.pointerId)) return;
+    e.currentTarget.releasePointerCapture(e.pointerId);
+    setDragging(false);
+    if (!dragMovedRef.current) {
+      if (minimizadoRef.current) {
+        // Tap sin arrastre sobre ícono minimizado → expandir
         setMinimizado(false);
+      } else if (pointerDownOnHeaderRef.current) {
+        // Tap sin arrastre sobre el header cuando expandido → contraer
+        setMinimizado(true);
       }
-    };
-
-    document.addEventListener('mousemove', handleMouseMove, { passive: false });
-    document.addEventListener('mouseup', handleMouseUp);
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [dragging, dragOffset, minimizado]);
+    }
+  };
 
   return (
     <div
       ref={widgetRef}
-      onMouseDown={handleMouseDown}
+      data-sarai-panel
+      data-sarai-estado={estado}
+      data-sarai-escuchando={escuchandoComandos ? 'true' : 'false'}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
       style={{
         position: 'fixed',
         top: `${posicion.y}px`,
@@ -932,6 +973,8 @@ export default function SaraiAssistant({ onCamposDetectados, token, contexto, on
         filter: minimizado
           ? 'none'
           : 'drop-shadow(0 0 8px rgba(212,175,55,0.35))',
+        touchAction: 'none',
+        WebkitUserSelect: 'none',
       }}
       className="select-none"
     >
@@ -1179,15 +1222,10 @@ export default function SaraiAssistant({ onCamposDetectados, token, contexto, on
           'border-yellow-600/50 shadow-[0_0_12px_rgba(212,175,55,0.25)]'
         } ${fondo} backdrop-blur-md transition-all duration-300`}
       >
-      {/* ── Header — clic en zona de drag colapsa, sin botón flecha separado ─ */}
+      {/* ── Header — tap/clic aquí colapsa (gestionado por handlePointerUp vía data-sarai-header) ─ */}
       <div
+        data-sarai-header
         className="flex items-center justify-between px-3 py-3 cursor-pointer select-none rounded-t-2xl hover:bg-white/[0.03] transition-colors"
-        onClick={(e) => {
-          // Colapsar si el clic NO fue sobre un botón/input interno
-          if (!(e.target as HTMLElement).closest('button, input, textarea')) {
-            setMinimizado(true);
-          }
-        }}
       >
         <div className="flex items-center gap-2">
           <motion.div
@@ -1335,10 +1373,22 @@ export default function SaraiAssistant({ onCamposDetectados, token, contexto, on
                 </motion.p>
               )}
 
-              {/* Transcripción Whisper */}
+              {/* Indicador nivel de voz post-grabación */}
+              {nivelPostGrabacion && estado !== 'grabando' && (
+                <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
+                  className={`flex items-center justify-between px-3 py-1.5 rounded-lg border text-[10px] font-mono ${nivelPostGrabacion.color}`}>
+                  <span>{nivelPostGrabacion.label}</span>
+                  <button onClick={() => setNivelPostGrabacion(null)} className="text-gray-600 hover:text-white ml-2">✕</button>
+                </motion.div>
+              )}
+
+              {/* Transcripción Whisper — persiste hasta la próxima grabación */}
               {transcripcion && (
                 <div className="bg-white/5 rounded-lg p-3 border border-white/10">
-                  <p className="text-[10px] text-gray-600 uppercase tracking-wider mb-1">Transcripción Whisper</p>
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-[10px] text-gray-500 uppercase tracking-wider">Whisper escuchó:</p>
+                    <button onClick={() => setTranscripcion('')} className="text-[9px] text-gray-700 hover:text-gray-400">✕</button>
+                  </div>
                   <p className="text-gray-300 text-xs leading-relaxed italic">"{transcripcion.slice(-500)}"</p>
                 </div>
               )}

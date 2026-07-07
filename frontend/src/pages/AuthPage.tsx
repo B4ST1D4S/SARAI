@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { login } from '../services/api';
 import NeuralCanvas from '../components/NeuralCanvas';
 
-/* ??? Cruz médica SVG con glow ???????????????????????????????? */
+/* ?? Cruz mÃ©dica SVG con glow ??????????????????????????????????????? */
 function MedicalCross() {
   return (
     <svg viewBox="0 0 200 200" className="w-full h-full" fill="none">
@@ -43,7 +43,7 @@ function MedicalCross() {
   );
 }
 
-/* ??? Logo nodos SARAI ???????????????????????????????????????? */
+/* ?? Logo nodos SARAI ???????????????????????????????????????????????? */
 function SaraiNodeLogo() {
   const nodes = [
     [30,8],[52,18],[14,26],[44,36],[26,48],[50,52],[12,56],
@@ -123,7 +123,7 @@ export default function AuthPage() {
              style={{ background: 'radial-gradient(circle, #1E40AF 0%, transparent 70%)' }} />
       </div>
 
-      {/* ?? Cruz médica decorativa (derecha) ?? */}
+      {/* ?? Cruz mÃ©dica decorativa (derecha) ?? */}
       <div className="absolute right-[4%] top-1/2 -translate-y-1/2 w-[320px] h-[320px] opacity-40 pointer-events-none hidden lg:block">
         <MedicalCross />
       </div>
@@ -146,9 +146,9 @@ export default function AuthPage() {
           </h1>
           <p className="text-xs font-semibold tracking-[0.25em] uppercase mt-1"
              style={{ color: '#00B4D8' }}>
-            Asistente Clínico Inteligente
+            Asistente ClÃ­nico Inteligente
           </p>
-          {/* Línea EKG */}
+          {/* LÃ­nea EKG */}
           <div className="flex items-center justify-center gap-3 mt-3">
             <div className="h-px w-12 opacity-40" style={{ background: '#00B4D8' }} />
             <svg viewBox="0 0 80 20" className="w-20 h-4" fill="none">
@@ -218,7 +218,7 @@ export default function AuthPage() {
             <div>
               <label className="block text-xs font-medium mb-1.5 uppercase tracking-wider"
                      style={{ color: 'rgba(148,163,184,0.7)' }}>
-                Contraseña
+                ContraseÃ±a
               </label>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'rgba(100,180,210,0.5)' }}>
@@ -228,7 +228,7 @@ export default function AuthPage() {
                 </span>
                 <input
                   type={showPass ? 'text' : 'password'}
-                  name="password" placeholder="••••••••"
+                  name="password" placeholder="ï¿½ï¿½ï¿½ï¿½ï¿½"
                   value={formData.password} onChange={handleChange}
                   required autoComplete="current-password"
                   className="w-full pl-10 pr-10 py-3 rounded-xl text-white text-sm placeholder-slate-600 focus:outline-none transition"
@@ -275,7 +275,7 @@ export default function AuthPage() {
                   </svg>
                   Verificando...
                 </span>
-              ) : 'Iniciar Sesión'}
+              ) : 'Iniciar Sesion'}
             </button>
           </form>
         </div>

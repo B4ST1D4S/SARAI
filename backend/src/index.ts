@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
+import multer from 'multer';
 import prisma from './lib/prisma.js';
 import authRoutes from './routes/auth.js';
 import pacientesRoutes from './routes/pacientes.js';
@@ -10,6 +11,7 @@ import cupsRoutes from './routes/cups.js';
 import citasRoutes from './routes/citas.js';
 import cotizacionesRoutes from './routes/cotizaciones.js';
 import saraiRoutes from './routes/sarai.js';
+import { transcribirAudio } from './controllers/saraiController.js';
 import disponibilidadRoutes from './routes/disponibilidad.js';
 import usuariosRoutes from './routes/usuarios.js';
 import especialidadesRoutes from './routes/especialidades.js';
@@ -17,6 +19,8 @@ import adminRoutes from './routes/admin.js';
 import pdfRoutes from './routes/pdf.js';
 import mapaCorporalRoutes from './routes/mapaCorporal.js';
 import crmRoutes from './routes/crm.js';
+import facturacionRoutes from './routes/facturacion.js';
+import odontologiaRoutes from './routes/odontologia.js';
 
 dotenv.config();
 
@@ -28,7 +32,16 @@ const PORT = process.env.PORT || 3001;
 // ============================================
 
 app.use(helmet());
-app.use(cors());
+app.use(cors({
+  origin: [
+    'https://app-sarai.vercel.app',
+    'http://localhost:5173',
+    'http://localhost:3000',
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+}));
 // 20 MB para soportar audio base64
 app.use(express.json({ limit: 20 * 1024 * 1024 }));
 app.use(express.urlencoded({ extended: true, limit: 20 * 1024 * 1024 }));
@@ -61,6 +74,11 @@ app.use('/api/cups', cupsRoutes);
 app.use('/api/citas', citasRoutes);
 app.use('/api/cotizaciones', cotizacionesRoutes);
 app.use('/api/sarai', saraiRoutes);
+
+// ── Endpoint de transcripción de audio (compatible con servicio Whisper local) ──
+// Acepta multipart/form-data con campo 'audio', devuelve { texto, idioma, confianza }
+const _upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
+app.post('/transcribir', _upload.single('audio'), transcribirAudio);
 app.use('/api/disponibilidad', disponibilidadRoutes);
 app.use('/api/usuarios', usuariosRoutes);
 app.use('/api/especialidades', especialidadesRoutes);
@@ -68,6 +86,8 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/pdf',   pdfRoutes);
 app.use('/api/mapa-corporal', mapaCorporalRoutes);
 app.use('/api/crm',          crmRoutes);
+app.use('/api/facturacion',  facturacionRoutes);
+app.use('/api/odontologia',  odontologiaRoutes);
 
 // ============================================
 // MANEJO DE ERRORES
@@ -82,51 +102,25 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 });
 
 // ============================================
-// CONEXIÓN A BASE DE DATOS
+// INICIO DEL SERVIDOR (solo local)
 // ============================================
 
-async function connectDatabase() {
-  try {
-    await prisma.$connect();
-    console.log('✅ Database connected successfully');
-    return true;
-  } catch (error) {
-    console.error('❌ Database connection failed:', error);
-    return false;
-  }
-}
-
-// ============================================
-// INICIO DEL SERVIDOR
-// ============================================
-
-async function startServer() {
-  const dbConnected = await connectDatabase();
-  
-  if (!dbConnected) {
-    console.error('Cannot start server without database connection');
-    process.exit(1);
-  }
-
-  const server = app.listen(PORT, () => {
-    console.log(`\n🚀 Server running on http://localhost:${PORT}`);
-    console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
-    console.log(`🗄️  Database: PostgreSQL`);
-    console.log(`📚 API Docs: http://localhost:${PORT}/api/auth/login\n`);
-  });
-
-  // Graceful shutdown
-  process.on('SIGINT', async () => {
-    console.log('\n🛑 Shutting down gracefully...');
-    await prisma.$disconnect();
-    server.close(() => {
-      console.log('Server closed');
-      process.exit(0);
+// En Vercel se exporta directamente sin listen ni process.exit
+if (!process.env.VERCEL) {
+  prisma.$connect()
+    .then(() => {
+      console.log('✅ Database connected successfully');
+      app.listen(PORT, () => {
+        console.log(`\n🚀 Server running on http://localhost:${PORT}`);
+        console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
+        console.log(`🗄️  Database: PostgreSQL`);
+        console.log(`📚 API Docs: http://localhost:${PORT}/api/auth/login\n`);
+      });
+    })
+    .catch((error: unknown) => {
+      console.error('❌ Database connection failed:', error);
     });
-  });
 }
 
-startServer().catch((error) => {
-  console.error('Fatal error:', error);
-  process.exit(1);
-});
+// Exportar app para Vercel serverless
+export default app;

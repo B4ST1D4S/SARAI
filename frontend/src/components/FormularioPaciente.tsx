@@ -1,6 +1,7 @@
 ﻿import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Check, Camera, User, Upload, Video, RefreshCw, AlertTriangle, CheckCircle } from 'lucide-react';
+import { API_BASE_URL } from '../config';
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  OPCIONES PARAMETRIZABLES
@@ -340,7 +341,7 @@ export function FormularioPaciente({
     try {
       const token = localStorage.getItem('accessToken') || '';
       const res = await fetch(
-        `/api/pacientes/verificar-duplicados?nombre=${encodeURIComponent(nombre)}`,
+        `${API_BASE_URL}/pacientes/verificar-duplicados?nombre=${encodeURIComponent(nombre)}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       if (!res.ok) return;

@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import prisma from '../lib/prisma.ts';
+import prisma from '../lib/prisma.js';
 import {
   createCita,
   getCitasByMedico,
@@ -11,6 +11,7 @@ import {
   completarCita,
   enviarRecordatorios24h,
 } from '../services/citasService.js';
+import { crearIngresoYCuentaDesdeCita } from './facturacionController.js';
 
 // Crear cita
 export async function create(req: Request, res: Response): Promise<void> {
@@ -197,10 +198,20 @@ export async function completar(req: Request, res: Response): Promise<void> {
 
     const cita = await completarCita(id, notas);
 
+    // Al completar la cita se genera automáticamente el ingreso + cuenta
+    // para poder facturar. No debe bloquear el cierre de la cita si falla.
+    let ingreso = null;
+    try {
+      ingreso = await crearIngresoYCuentaDesdeCita(id);
+    } catch (facturacionError: any) {
+      console.error('No se pudo crear el ingreso de facturación:', facturacionError?.message);
+    }
+
     res.json({
       success: true,
       message: 'Cita completada exitosamente',
       cita,
+      ingreso,
     });
   } catch (error: any) {
     console.error('Error en completar:', error);
