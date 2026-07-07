@@ -957,6 +957,9 @@ export default function SaraiAssistant({ onCamposDetectados, token, contexto, on
   return (
     <div
       ref={widgetRef}
+      data-sarai-panel
+      data-sarai-estado={estado}
+      data-sarai-escuchando={escuchandoComandos ? 'true' : 'false'}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
