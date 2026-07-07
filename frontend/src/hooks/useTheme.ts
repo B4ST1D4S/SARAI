@@ -1,6 +1,16 @@
 import { useState, useEffect } from 'react';
 
-export type ThemeId = 'dark' | 'premium-light' | 'soft-medical' | 'executive-ai';
+export type ThemeId =
+  | 'dark'
+  | 'premium-light'
+  | 'soft-medical'
+  | 'executive-ai'
+  | 'rose-care'
+  | 'fuchsia-premium'
+  | 'purple-care'
+  | 'arctic-blue'
+  | 'mint-premium'
+  | 'sunset-care';
 
 const STORAGE_KEY = 'sarai-theme';
 const EVENT_NAME  = 'sarai-theme-change';

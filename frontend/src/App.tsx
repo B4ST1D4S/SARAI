@@ -341,10 +341,16 @@ function App() {
         {/* ══════ TOPBAR PREMIUM ══════ */}
         {(() => {
           const T = {
-            'dark':          { bg: 'bg-[#0a0c13]',    border: 'border-white/[0.06]',  nameGrad: 'from-yellow-300 via-amber-400 to-yellow-500', sub: 'text-yellow-500/50', date: 'text-gray-400',    dateSub: 'text-gray-600'    },
-            'premium-light': { bg: 'bg-white',         border: 'border-slate-200',     nameGrad: 'from-blue-700 via-indigo-600 to-blue-800',    sub: 'text-blue-500/60',   date: 'text-slate-600',   dateSub: 'text-slate-400'   },
-            'soft-medical':  { bg: 'bg-slate-50',      border: 'border-slate-200',     nameGrad: 'from-teal-600 via-cyan-600 to-teal-700',      sub: 'text-teal-500/60',   date: 'text-slate-500',   dateSub: 'text-slate-400'   },
-            'executive-ai':  { bg: 'bg-[#0c1220]',     border: 'border-blue-400/12',   nameGrad: 'from-blue-400 via-violet-400 to-blue-500',    sub: 'text-blue-400/45',   date: 'text-blue-300/70', dateSub: 'text-blue-400/40' },
+            'dark':             { bg: 'bg-[#0a0c13]',    border: 'border-white/[0.06]',   nameGrad: 'from-yellow-300 via-amber-400 to-yellow-500',     sub: 'text-yellow-500/50',   date: 'text-gray-400',    dateSub: 'text-gray-600'    },
+            'premium-light':    { bg: 'bg-white',         border: 'border-slate-200',      nameGrad: 'from-blue-700 via-indigo-600 to-blue-800',         sub: 'text-blue-500/60',     date: 'text-slate-600',   dateSub: 'text-slate-400'   },
+            'soft-medical':     { bg: 'bg-slate-50',      border: 'border-slate-200',      nameGrad: 'from-teal-600 via-cyan-600 to-teal-700',           sub: 'text-teal-500/60',     date: 'text-slate-500',   dateSub: 'text-slate-400'   },
+            'executive-ai':     { bg: 'bg-[#0c1220]',     border: 'border-blue-400/12',    nameGrad: 'from-blue-400 via-violet-400 to-blue-500',         sub: 'text-blue-400/45',     date: 'text-blue-300/70', dateSub: 'text-blue-400/40' },
+            'rose-care':        { bg: 'bg-white',         border: 'border-rose-200',       nameGrad: 'from-rose-600 via-pink-500 to-rose-700',           sub: 'text-rose-500/60',     date: 'text-slate-500',   dateSub: 'text-slate-400'   },
+            'fuchsia-premium':  { bg: 'bg-white',         border: 'border-fuchsia-200',    nameGrad: 'from-fuchsia-600 via-purple-500 to-fuchsia-700',   sub: 'text-fuchsia-500/60',  date: 'text-slate-500',   dateSub: 'text-slate-400'   },
+            'purple-care':      { bg: 'bg-white',         border: 'border-violet-200',     nameGrad: 'from-violet-700 via-purple-600 to-violet-800',     sub: 'text-violet-500/60',   date: 'text-slate-500',   dateSub: 'text-slate-400'   },
+            'arctic-blue':      { bg: 'bg-white',         border: 'border-sky-200',        nameGrad: 'from-sky-700 via-blue-600 to-sky-800',             sub: 'text-sky-500/60',      date: 'text-slate-500',   dateSub: 'text-slate-400'   },
+            'mint-premium':     { bg: 'bg-white',         border: 'border-teal-200',       nameGrad: 'from-teal-700 via-emerald-600 to-teal-800',        sub: 'text-teal-500/60',     date: 'text-slate-500',   dateSub: 'text-slate-400'   },
+            'sunset-care':      { bg: 'bg-white',         border: 'border-amber-200',      nameGrad: 'from-amber-600 via-orange-500 to-amber-700',       sub: 'text-amber-500/60',    date: 'text-slate-500',   dateSub: 'text-slate-400'   },
           }[theme] ?? { bg: 'bg-[#0a0c13]', border: 'border-white/[0.06]', nameGrad: 'from-yellow-300 via-amber-400 to-yellow-500', sub: 'text-yellow-500/50', date: 'text-gray-400', dateSub: 'text-gray-600' };
 
           const hoy = new Date();
@@ -382,7 +388,7 @@ function App() {
                 </h1>
                 {/* Línea decorativa bajo el nombre */}
                 <div className="mt-[5px] h-[2px] w-48 sm:w-64 rounded-full"
-                  style={{ background: `linear-gradient(90deg, transparent, ${theme === 'premium-light' || theme === 'soft-medical' ? 'rgba(99,102,241,0.45)' : 'rgba(212,175,55,0.55)'}, transparent)` }} />
+                  style={{ background: `linear-gradient(90deg, transparent, ${{ 'premium-light': 'rgba(37,99,235,0.45)', 'soft-medical': 'rgba(5,150,105,0.45)', 'rose-care': 'rgba(225,29,72,0.45)', 'fuchsia-premium': 'rgba(162,28,175,0.45)', 'purple-care': 'rgba(124,58,237,0.45)', 'arctic-blue': 'rgba(2,132,199,0.45)', 'mint-premium': 'rgba(13,148,136,0.45)', 'sunset-care': 'rgba(217,119,6,0.45)' }[theme] ?? 'rgba(212,175,55,0.55)'}, transparent)` }} />
               </div>
 
               {/* ── DERECHA: fecha + online ── */}
