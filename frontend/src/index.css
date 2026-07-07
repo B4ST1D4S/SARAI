@@ -1586,3 +1586,420 @@ body {
 [data-theme="arctic-blue"]     .bg-black\/60 { background-color: rgba(12,45,72,0.50) !important; }
 [data-theme="mint-premium"]    .bg-black\/60 { background-color: rgba(15,45,42,0.50) !important; }
 [data-theme="sunset-care"]     .bg-black\/60 { background-color: rgba(45,26,10,0.50) !important; }
+
+/* ═══════════════════════════════════════════════════════════════
+   COBERTURA EXTENDIDA — Gradients y hex específicos de módulos
+   Aplica a los 8 temas claros.
+   Cubre: BuscadorPaciente, MapaCorporal, ConfigAgenda,
+          Odontograma, AgendarCita, varios modales.
+═══════════════════════════════════════════════════════════════ */
+
+/* ──────────────────────────────────────────────────────────
+   A. from-slate-900 / from-slate-800 (modales y páginas)
+   ────────────────────────────────────────────────────────── */
+[data-theme="premium-light"]   .from-slate-900 { --tw-gradient-from: #eef2ff var(--tw-gradient-from-position); --tw-gradient-to: rgba(238,242,255,0) var(--tw-gradient-to-position); }
+[data-theme="soft-medical"]    .from-slate-900 { --tw-gradient-from: #eef5f0 var(--tw-gradient-from-position); --tw-gradient-to: rgba(238,245,240,0) var(--tw-gradient-to-position); }
+[data-theme="rose-care"]       .from-slate-900 { --tw-gradient-from: #fff2f5 var(--tw-gradient-from-position); --tw-gradient-to: rgba(255,242,245,0) var(--tw-gradient-to-position); }
+[data-theme="fuchsia-premium"] .from-slate-900 { --tw-gradient-from: #faf0ff var(--tw-gradient-from-position); --tw-gradient-to: rgba(250,240,255,0) var(--tw-gradient-to-position); }
+[data-theme="purple-care"]     .from-slate-900 { --tw-gradient-from: #f5f2ff var(--tw-gradient-from-position); --tw-gradient-to: rgba(245,242,255,0) var(--tw-gradient-to-position); }
+[data-theme="arctic-blue"]     .from-slate-900 { --tw-gradient-from: #f0f8ff var(--tw-gradient-from-position); --tw-gradient-to: rgba(240,248,255,0) var(--tw-gradient-to-position); }
+[data-theme="mint-premium"]    .from-slate-900 { --tw-gradient-from: #f0fdf9 var(--tw-gradient-from-position); --tw-gradient-to: rgba(240,253,249,0) var(--tw-gradient-to-position); }
+[data-theme="sunset-care"]     .from-slate-900 { --tw-gradient-from: #fffbf0 var(--tw-gradient-from-position); --tw-gradient-to: rgba(255,251,240,0) var(--tw-gradient-to-position); }
+
+[data-theme="premium-light"]   .from-slate-800 { --tw-gradient-from: #e4eaff var(--tw-gradient-from-position); --tw-gradient-to: rgba(228,234,255,0) var(--tw-gradient-to-position); }
+[data-theme="soft-medical"]    .from-slate-800 { --tw-gradient-from: #dff0e4 var(--tw-gradient-from-position); --tw-gradient-to: rgba(223,240,228,0) var(--tw-gradient-to-position); }
+[data-theme="rose-care"]       .from-slate-800 { --tw-gradient-from: #fce8ed var(--tw-gradient-from-position); --tw-gradient-to: rgba(252,232,237,0) var(--tw-gradient-to-position); }
+[data-theme="fuchsia-premium"] .from-slate-800 { --tw-gradient-from: #f3d8fe var(--tw-gradient-from-position); --tw-gradient-to: rgba(243,216,254,0) var(--tw-gradient-to-position); }
+[data-theme="purple-care"]     .from-slate-800 { --tw-gradient-from: #ede8ff var(--tw-gradient-from-position); --tw-gradient-to: rgba(237,232,255,0) var(--tw-gradient-to-position); }
+[data-theme="arctic-blue"]     .from-slate-800 { --tw-gradient-from: #e0eefa var(--tw-gradient-from-position); --tw-gradient-to: rgba(224,238,250,0) var(--tw-gradient-to-position); }
+[data-theme="mint-premium"]    .from-slate-800 { --tw-gradient-from: #dffcf5 var(--tw-gradient-from-position); --tw-gradient-to: rgba(223,252,245,0) var(--tw-gradient-to-position); }
+[data-theme="sunset-care"]     .from-slate-800 { --tw-gradient-from: #fef3cc var(--tw-gradient-from-position); --tw-gradient-to: rgba(254,243,204,0) var(--tw-gradient-to-position); }
+
+/* ──────────────────────────────────────────────────────────
+   B. via-slate-900 / via-slate-800 (modales y páginas)
+   ────────────────────────────────────────────────────────── */
+[data-theme="premium-light"]   .via-slate-900 { --tw-gradient-via-stops: var(--tw-gradient-from), #eef2ff var(--tw-gradient-via-position), var(--tw-gradient-to); --tw-gradient-stops: var(--tw-gradient-via-stops); }
+[data-theme="soft-medical"]    .via-slate-900 { --tw-gradient-via-stops: var(--tw-gradient-from), #eef5f0 var(--tw-gradient-via-position), var(--tw-gradient-to); --tw-gradient-stops: var(--tw-gradient-via-stops); }
+[data-theme="rose-care"]       .via-slate-900 { --tw-gradient-via-stops: var(--tw-gradient-from), #fff2f5 var(--tw-gradient-via-position), var(--tw-gradient-to); --tw-gradient-stops: var(--tw-gradient-via-stops); }
+[data-theme="purple-care"]     .via-slate-900 { --tw-gradient-via-stops: var(--tw-gradient-from), #f5f2ff var(--tw-gradient-via-position), var(--tw-gradient-to); --tw-gradient-stops: var(--tw-gradient-via-stops); }
+[data-theme="arctic-blue"]     .via-slate-900 { --tw-gradient-via-stops: var(--tw-gradient-from), #f0f8ff var(--tw-gradient-via-position), var(--tw-gradient-to); --tw-gradient-stops: var(--tw-gradient-via-stops); }
+[data-theme="mint-premium"]    .via-slate-900 { --tw-gradient-via-stops: var(--tw-gradient-from), #f0fdf9 var(--tw-gradient-via-position), var(--tw-gradient-to); --tw-gradient-stops: var(--tw-gradient-via-stops); }
+[data-theme="sunset-care"]     .via-slate-900 { --tw-gradient-via-stops: var(--tw-gradient-from), #fffbf0 var(--tw-gradient-via-position), var(--tw-gradient-to); --tw-gradient-stops: var(--tw-gradient-via-stops); }
+
+[data-theme="premium-light"]   .via-slate-800 { --tw-gradient-via-stops: var(--tw-gradient-from), #e4eaff var(--tw-gradient-via-position), var(--tw-gradient-to); --tw-gradient-stops: var(--tw-gradient-via-stops); }
+[data-theme="soft-medical"]    .via-slate-800 { --tw-gradient-via-stops: var(--tw-gradient-from), #dff0e4 var(--tw-gradient-via-position), var(--tw-gradient-to); --tw-gradient-stops: var(--tw-gradient-via-stops); }
+[data-theme="rose-care"]       .via-slate-800 { --tw-gradient-via-stops: var(--tw-gradient-from), #fce8ed var(--tw-gradient-via-position), var(--tw-gradient-to); --tw-gradient-stops: var(--tw-gradient-via-stops); }
+[data-theme="fuchsia-premium"] .via-slate-800 { --tw-gradient-via-stops: var(--tw-gradient-from), #f3d8fe var(--tw-gradient-via-position), var(--tw-gradient-to); --tw-gradient-stops: var(--tw-gradient-via-stops); }
+[data-theme="purple-care"]     .via-slate-800 { --tw-gradient-via-stops: var(--tw-gradient-from), #ede8ff var(--tw-gradient-via-position), var(--tw-gradient-to); --tw-gradient-stops: var(--tw-gradient-via-stops); }
+[data-theme="arctic-blue"]     .via-slate-800 { --tw-gradient-via-stops: var(--tw-gradient-from), #e0eefa var(--tw-gradient-via-position), var(--tw-gradient-to); --tw-gradient-stops: var(--tw-gradient-via-stops); }
+[data-theme="mint-premium"]    .via-slate-800 { --tw-gradient-via-stops: var(--tw-gradient-from), #dffcf5 var(--tw-gradient-via-position), var(--tw-gradient-to); --tw-gradient-stops: var(--tw-gradient-via-stops); }
+[data-theme="sunset-care"]     .via-slate-800 { --tw-gradient-via-stops: var(--tw-gradient-from), #fef3cc var(--tw-gradient-via-position), var(--tw-gradient-to); --tw-gradient-stops: var(--tw-gradient-via-stops); }
+
+/* ──────────────────────────────────────────────────────────
+   C. to-slate-900 / to-slate-800 (cierre de gradientes)
+   ────────────────────────────────────────────────────────── */
+[data-theme="premium-light"]   .to-slate-900 { --tw-gradient-to: #eef2ff var(--tw-gradient-to-position); }
+[data-theme="soft-medical"]    .to-slate-900 { --tw-gradient-to: #eef5f0 var(--tw-gradient-to-position); }
+[data-theme="rose-care"]       .to-slate-900 { --tw-gradient-to: #fff2f5 var(--tw-gradient-to-position); }
+[data-theme="fuchsia-premium"] .to-slate-900 { --tw-gradient-to: #faf0ff var(--tw-gradient-to-position); }
+[data-theme="purple-care"]     .to-slate-900 { --tw-gradient-to: #f5f2ff var(--tw-gradient-to-position); }
+[data-theme="arctic-blue"]     .to-slate-900 { --tw-gradient-to: #f0f8ff var(--tw-gradient-to-position); }
+[data-theme="mint-premium"]    .to-slate-900 { --tw-gradient-to: #f0fdf9 var(--tw-gradient-to-position); }
+[data-theme="sunset-care"]     .to-slate-900 { --tw-gradient-to: #fffbf0 var(--tw-gradient-to-position); }
+
+[data-theme="premium-light"]   .to-slate-800 { --tw-gradient-to: #e4eaff var(--tw-gradient-to-position); }
+[data-theme="soft-medical"]    .to-slate-800 { --tw-gradient-to: #dff0e4 var(--tw-gradient-to-position); }
+[data-theme="rose-care"]       .to-slate-800 { --tw-gradient-to: #fce8ed var(--tw-gradient-to-position); }
+[data-theme="fuchsia-premium"] .to-slate-800 { --tw-gradient-to: #f3d8fe var(--tw-gradient-to-position); }
+[data-theme="purple-care"]     .to-slate-800 { --tw-gradient-to: #ede8ff var(--tw-gradient-to-position); }
+[data-theme="arctic-blue"]     .to-slate-800 { --tw-gradient-to: #e0eefa var(--tw-gradient-to-position); }
+[data-theme="mint-premium"]    .to-slate-800 { --tw-gradient-to: #dffcf5 var(--tw-gradient-to-position); }
+[data-theme="sunset-care"]     .to-slate-800 { --tw-gradient-to: #fef3cc var(--tw-gradient-to-position); }
+
+/* ──────────────────────────────────────────────────────────
+   D. bg-[#0a0c13] — ConfigAgendaPage panel interior izquierdo
+   ────────────────────────────────────────────────────────── */
+[data-theme="premium-light"]   .bg-\[\#0a0c13\] { background-color: #dbeafe !important; }
+[data-theme="soft-medical"]    .bg-\[\#0a0c13\] { background-color: #d1fae5 !important; }
+[data-theme="rose-care"]       .bg-\[\#0a0c13\] { background-color: #fce7ef !important; }
+[data-theme="fuchsia-premium"] .bg-\[\#0a0c13\] { background-color: #f3d0fe !important; }
+[data-theme="purple-care"]     .bg-\[\#0a0c13\] { background-color: #e9d5ff !important; }
+[data-theme="arctic-blue"]     .bg-\[\#0a0c13\] { background-color: #bae6fd !important; }
+[data-theme="mint-premium"]    .bg-\[\#0a0c13\] { background-color: #a7f3d0 !important; }
+[data-theme="sunset-care"]     .bg-\[\#0a0c13\] { background-color: #fde68a !important; }
+
+/* ──────────────────────────────────────────────────────────
+   E. bg-[#11141b] — OdontogramaPage inputs, dropdowns, cards
+   ────────────────────────────────────────────────────────── */
+[data-theme="premium-light"]   .bg-\[\#11141b\] { background-color: #f8faff !important; }
+[data-theme="soft-medical"]    .bg-\[\#11141b\] { background-color: #f4faf6 !important; }
+[data-theme="rose-care"]       .bg-\[\#11141b\] { background-color: #fff7f9 !important; }
+[data-theme="fuchsia-premium"] .bg-\[\#11141b\] { background-color: #fdf8ff !important; }
+[data-theme="purple-care"]     .bg-\[\#11141b\] { background-color: #faf8ff !important; }
+[data-theme="arctic-blue"]     .bg-\[\#11141b\] { background-color: #f7fbff !important; }
+[data-theme="mint-premium"]    .bg-\[\#11141b\] { background-color: #f5fffe !important; }
+[data-theme="sunset-care"]     .bg-\[\#11141b\] { background-color: #fffdf5 !important; }
+
+/* ──────────────────────────────────────────────────────────
+   F. bg-[#0d0c08] — ConfigAgenda panel "crear/bloqueo/eliminar"
+      Colores cálidos semánticos adaptados a temas claros
+   ────────────────────────────────────────────────────────── */
+[data-theme="premium-light"]   .bg-\[\#0d0c08\] { background-color: #fffbeb !important; }
+[data-theme="soft-medical"]    .bg-\[\#0d0c08\] { background-color: #fffbeb !important; }
+[data-theme="rose-care"]       .bg-\[\#0d0c08\] { background-color: #fffbeb !important; }
+[data-theme="fuchsia-premium"] .bg-\[\#0d0c08\] { background-color: #fffbeb !important; }
+[data-theme="purple-care"]     .bg-\[\#0d0c08\] { background-color: #fffbeb !important; }
+[data-theme="arctic-blue"]     .bg-\[\#0d0c08\] { background-color: #fffbeb !important; }
+[data-theme="mint-premium"]    .bg-\[\#0d0c08\] { background-color: #fffbeb !important; }
+[data-theme="sunset-care"]     .bg-\[\#0d0c08\] { background-color: #fffbeb !important; }
+
+[data-theme="premium-light"]   .bg-\[\#0d0a08\] { background-color: #fff7ed !important; }
+[data-theme="soft-medical"]    .bg-\[\#0d0a08\] { background-color: #fff7ed !important; }
+[data-theme="rose-care"]       .bg-\[\#0d0a08\] { background-color: #fff7ed !important; }
+[data-theme="fuchsia-premium"] .bg-\[\#0d0a08\] { background-color: #fff7ed !important; }
+[data-theme="purple-care"]     .bg-\[\#0d0a08\] { background-color: #fff7ed !important; }
+[data-theme="arctic-blue"]     .bg-\[\#0d0a08\] { background-color: #fff7ed !important; }
+[data-theme="mint-premium"]    .bg-\[\#0d0a08\] { background-color: #fff7ed !important; }
+[data-theme="sunset-care"]     .bg-\[\#0d0a08\] { background-color: #fff7ed !important; }
+
+[data-theme="premium-light"]   .bg-\[\#0d0809\] { background-color: #fff1f2 !important; }
+[data-theme="soft-medical"]    .bg-\[\#0d0809\] { background-color: #fff1f2 !important; }
+[data-theme="rose-care"]       .bg-\[\#0d0809\] { background-color: #fff1f2 !important; }
+[data-theme="fuchsia-premium"] .bg-\[\#0d0809\] { background-color: #fff1f2 !important; }
+[data-theme="purple-care"]     .bg-\[\#0d0809\] { background-color: #fff1f2 !important; }
+[data-theme="arctic-blue"]     .bg-\[\#0d0809\] { background-color: #fff1f2 !important; }
+[data-theme="mint-premium"]    .bg-\[\#0d0809\] { background-color: #fff1f2 !important; }
+[data-theme="sunset-care"]     .bg-\[\#0d0809\] { background-color: #fff1f2 !important; }
+
+/* ──────────────────────────────────────────────────────────
+   G. bg-slate-700/50 botones cancelar en modales
+   ────────────────────────────────────────────────────────── */
+[data-theme="premium-light"]   .bg-slate-700\/50 { background-color: rgba(30,64,175,0.08) !important; }
+[data-theme="soft-medical"]    .bg-slate-700\/50 { background-color: rgba(5,150,105,0.08) !important; }
+[data-theme="rose-care"]       .bg-slate-700\/50 { background-color: rgba(225,29,72,0.08) !important; }
+[data-theme="fuchsia-premium"] .bg-slate-700\/50 { background-color: rgba(162,28,175,0.08) !important; }
+[data-theme="purple-care"]     .bg-slate-700\/50 { background-color: rgba(124,58,237,0.08) !important; }
+[data-theme="arctic-blue"]     .bg-slate-700\/50 { background-color: rgba(2,132,199,0.08) !important; }
+[data-theme="mint-premium"]    .bg-slate-700\/50 { background-color: rgba(13,148,136,0.08) !important; }
+[data-theme="sunset-care"]     .bg-slate-700\/50 { background-color: rgba(217,119,6,0.08) !important; }
+
+/* ──────────────────────────────────────────────────────────
+   H. Inputs/textareas/selects con bg oscuro en módulos
+      Asegura fondo claro y texto oscuro para legibilidad
+   ────────────────────────────────────────────────────────── */
+[data-theme="premium-light"]   input,
+[data-theme="premium-light"]   textarea,
+[data-theme="premium-light"]   select {
+  color-scheme: light;
+}
+[data-theme="soft-medical"]    input,
+[data-theme="soft-medical"]    textarea,
+[data-theme="soft-medical"]    select {
+  color-scheme: light;
+}
+[data-theme="rose-care"]       input,
+[data-theme="rose-care"]       textarea,
+[data-theme="rose-care"]       select {
+  color-scheme: light;
+}
+[data-theme="fuchsia-premium"] input,
+[data-theme="fuchsia-premium"] textarea,
+[data-theme="fuchsia-premium"] select {
+  color-scheme: light;
+}
+[data-theme="purple-care"]     input,
+[data-theme="purple-care"]     textarea,
+[data-theme="purple-care"]     select {
+  color-scheme: light;
+}
+[data-theme="arctic-blue"]     input,
+[data-theme="arctic-blue"]     textarea,
+[data-theme="arctic-blue"]     select {
+  color-scheme: light;
+}
+[data-theme="mint-premium"]    input,
+[data-theme="mint-premium"]    textarea,
+[data-theme="mint-premium"]    select {
+  color-scheme: light;
+}
+[data-theme="sunset-care"]     input,
+[data-theme="sunset-care"]     textarea,
+[data-theme="sunset-care"]     select {
+  color-scheme: light;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   CONTRASTE COMPLETO — Gradients con opacidad · bg/border-slate
+   con opacidad · text-slate-* · División de líneas
+   Aplica a los 8 temas claros.
+═══════════════════════════════════════════════════════════════ */
+
+/* ──────────────────────────────────────────────────────────
+   1. GRADIENTS CON OPACIDAD — faltantes en calendarios y paneles
+   ────────────────────────────────────────────────────────── */
+/* from-slate-900/80  (calendario AgendaPage, panel principal) */
+[data-theme="premium-light"]   .from-slate-900\/80 { --tw-gradient-from: rgba(240,244,255,0.95) var(--tw-gradient-from-position); --tw-gradient-to: rgba(240,244,255,0) var(--tw-gradient-to-position); }
+[data-theme="soft-medical"]    .from-slate-900\/80 { --tw-gradient-from: rgba(238,245,240,0.95) var(--tw-gradient-from-position); --tw-gradient-to: rgba(238,245,240,0) var(--tw-gradient-to-position); }
+[data-theme="rose-care"]       .from-slate-900\/80 { --tw-gradient-from: rgba(255,242,245,0.95) var(--tw-gradient-from-position); --tw-gradient-to: rgba(255,242,245,0) var(--tw-gradient-to-position); }
+[data-theme="fuchsia-premium"] .from-slate-900\/80 { --tw-gradient-from: rgba(250,240,255,0.95) var(--tw-gradient-from-position); --tw-gradient-to: rgba(250,240,255,0) var(--tw-gradient-to-position); }
+[data-theme="purple-care"]     .from-slate-900\/80 { --tw-gradient-from: rgba(245,242,255,0.95) var(--tw-gradient-from-position); --tw-gradient-to: rgba(245,242,255,0) var(--tw-gradient-to-position); }
+[data-theme="arctic-blue"]     .from-slate-900\/80 { --tw-gradient-from: rgba(240,248,255,0.95) var(--tw-gradient-from-position); --tw-gradient-to: rgba(240,248,255,0) var(--tw-gradient-to-position); }
+[data-theme="mint-premium"]    .from-slate-900\/80 { --tw-gradient-from: rgba(240,253,249,0.95) var(--tw-gradient-from-position); --tw-gradient-to: rgba(240,253,249,0) var(--tw-gradient-to-position); }
+[data-theme="sunset-care"]     .from-slate-900\/80 { --tw-gradient-from: rgba(255,251,240,0.95) var(--tw-gradient-from-position); --tw-gradient-to: rgba(255,251,240,0) var(--tw-gradient-to-position); }
+
+/* via-slate-800/60  (calendario AgendaPage) */
+[data-theme="premium-light"]   .via-slate-800\/60 { --tw-gradient-via-stops: var(--tw-gradient-from), rgba(228,234,255,0.88) var(--tw-gradient-via-position), var(--tw-gradient-to); --tw-gradient-stops: var(--tw-gradient-via-stops); }
+[data-theme="soft-medical"]    .via-slate-800\/60 { --tw-gradient-via-stops: var(--tw-gradient-from), rgba(223,240,228,0.88) var(--tw-gradient-via-position), var(--tw-gradient-to); --tw-gradient-stops: var(--tw-gradient-via-stops); }
+[data-theme="rose-care"]       .via-slate-800\/60 { --tw-gradient-via-stops: var(--tw-gradient-from), rgba(252,232,237,0.88) var(--tw-gradient-via-position), var(--tw-gradient-to); --tw-gradient-stops: var(--tw-gradient-via-stops); }
+[data-theme="fuchsia-premium"] .via-slate-800\/60 { --tw-gradient-via-stops: var(--tw-gradient-from), rgba(243,216,254,0.88) var(--tw-gradient-via-position), var(--tw-gradient-to); --tw-gradient-stops: var(--tw-gradient-via-stops); }
+[data-theme="purple-care"]     .via-slate-800\/60 { --tw-gradient-via-stops: var(--tw-gradient-from), rgba(237,232,255,0.88) var(--tw-gradient-via-position), var(--tw-gradient-to); --tw-gradient-stops: var(--tw-gradient-via-stops); }
+[data-theme="arctic-blue"]     .via-slate-800\/60 { --tw-gradient-via-stops: var(--tw-gradient-from), rgba(224,238,250,0.88) var(--tw-gradient-via-position), var(--tw-gradient-to); --tw-gradient-stops: var(--tw-gradient-via-stops); }
+[data-theme="mint-premium"]    .via-slate-800\/60 { --tw-gradient-via-stops: var(--tw-gradient-from), rgba(223,252,245,0.88) var(--tw-gradient-via-position), var(--tw-gradient-to); --tw-gradient-stops: var(--tw-gradient-via-stops); }
+[data-theme="sunset-care"]     .via-slate-800\/60 { --tw-gradient-via-stops: var(--tw-gradient-from), rgba(254,243,204,0.88) var(--tw-gradient-via-position), var(--tw-gradient-to); --tw-gradient-stops: var(--tw-gradient-via-stops); }
+
+/* to-slate-900/80 */
+[data-theme="premium-light"]   .to-slate-900\/80 { --tw-gradient-to: rgba(240,244,255,0.95) var(--tw-gradient-to-position); }
+[data-theme="soft-medical"]    .to-slate-900\/80 { --tw-gradient-to: rgba(238,245,240,0.95) var(--tw-gradient-to-position); }
+[data-theme="rose-care"]       .to-slate-900\/80 { --tw-gradient-to: rgba(255,242,245,0.95) var(--tw-gradient-to-position); }
+[data-theme="fuchsia-premium"] .to-slate-900\/80 { --tw-gradient-to: rgba(250,240,255,0.95) var(--tw-gradient-to-position); }
+[data-theme="purple-care"]     .to-slate-900\/80 { --tw-gradient-to: rgba(245,242,255,0.95) var(--tw-gradient-to-position); }
+[data-theme="arctic-blue"]     .to-slate-900\/80 { --tw-gradient-to: rgba(240,248,255,0.95) var(--tw-gradient-to-position); }
+[data-theme="mint-premium"]    .to-slate-900\/80 { --tw-gradient-to: rgba(240,253,249,0.95) var(--tw-gradient-to-position); }
+[data-theme="sunset-care"]     .to-slate-900\/80 { --tw-gradient-to: rgba(255,251,240,0.95) var(--tw-gradient-to-position); }
+
+/* to-slate-900/30 y to-slate-900/60 */
+[data-theme="premium-light"]   .to-slate-900\/30 { --tw-gradient-to: rgba(240,244,255,0.55) var(--tw-gradient-to-position); }
+[data-theme="soft-medical"]    .to-slate-900\/30 { --tw-gradient-to: rgba(238,245,240,0.55) var(--tw-gradient-to-position); }
+[data-theme="rose-care"]       .to-slate-900\/30 { --tw-gradient-to: rgba(255,242,245,0.55) var(--tw-gradient-to-position); }
+[data-theme="fuchsia-premium"] .to-slate-900\/30 { --tw-gradient-to: rgba(250,240,255,0.55) var(--tw-gradient-to-position); }
+[data-theme="purple-care"]     .to-slate-900\/30 { --tw-gradient-to: rgba(245,242,255,0.55) var(--tw-gradient-to-position); }
+[data-theme="arctic-blue"]     .to-slate-900\/30 { --tw-gradient-to: rgba(240,248,255,0.55) var(--tw-gradient-to-position); }
+[data-theme="mint-premium"]    .to-slate-900\/30 { --tw-gradient-to: rgba(240,253,249,0.55) var(--tw-gradient-to-position); }
+[data-theme="sunset-care"]     .to-slate-900\/30 { --tw-gradient-to: rgba(255,251,240,0.55) var(--tw-gradient-to-position); }
+
+[data-theme="premium-light"]   .to-slate-900\/60 { --tw-gradient-to: rgba(240,244,255,0.85) var(--tw-gradient-to-position); }
+[data-theme="soft-medical"]    .to-slate-900\/60 { --tw-gradient-to: rgba(238,245,240,0.85) var(--tw-gradient-to-position); }
+[data-theme="rose-care"]       .to-slate-900\/60 { --tw-gradient-to: rgba(255,242,245,0.85) var(--tw-gradient-to-position); }
+[data-theme="fuchsia-premium"] .to-slate-900\/60 { --tw-gradient-to: rgba(250,240,255,0.85) var(--tw-gradient-to-position); }
+[data-theme="purple-care"]     .to-slate-900\/60 { --tw-gradient-to: rgba(245,242,255,0.85) var(--tw-gradient-to-position); }
+[data-theme="arctic-blue"]     .to-slate-900\/60 { --tw-gradient-to: rgba(240,248,255,0.85) var(--tw-gradient-to-position); }
+[data-theme="mint-premium"]    .to-slate-900\/60 { --tw-gradient-to: rgba(240,253,249,0.85) var(--tw-gradient-to-position); }
+[data-theme="sunset-care"]     .to-slate-900\/60 { --tw-gradient-to: rgba(255,251,240,0.85) var(--tw-gradient-to-position); }
+
+/* from-slate-800/30 y from-slate-800/60 */
+[data-theme="premium-light"]   .from-slate-800\/30 { --tw-gradient-from: rgba(228,234,255,0.55) var(--tw-gradient-from-position); --tw-gradient-to: rgba(228,234,255,0) var(--tw-gradient-to-position); }
+[data-theme="soft-medical"]    .from-slate-800\/30 { --tw-gradient-from: rgba(223,240,228,0.55) var(--tw-gradient-from-position); --tw-gradient-to: rgba(223,240,228,0) var(--tw-gradient-to-position); }
+[data-theme="rose-care"]       .from-slate-800\/30 { --tw-gradient-from: rgba(252,232,237,0.55) var(--tw-gradient-from-position); --tw-gradient-to: rgba(252,232,237,0) var(--tw-gradient-to-position); }
+[data-theme="fuchsia-premium"] .from-slate-800\/30 { --tw-gradient-from: rgba(243,216,254,0.55) var(--tw-gradient-from-position); --tw-gradient-to: rgba(243,216,254,0) var(--tw-gradient-to-position); }
+[data-theme="purple-care"]     .from-slate-800\/30 { --tw-gradient-from: rgba(237,232,255,0.55) var(--tw-gradient-from-position); --tw-gradient-to: rgba(237,232,255,0) var(--tw-gradient-to-position); }
+[data-theme="arctic-blue"]     .from-slate-800\/30 { --tw-gradient-from: rgba(224,238,250,0.55) var(--tw-gradient-from-position); --tw-gradient-to: rgba(224,238,250,0) var(--tw-gradient-to-position); }
+[data-theme="mint-premium"]    .from-slate-800\/30 { --tw-gradient-from: rgba(223,252,245,0.55) var(--tw-gradient-from-position); --tw-gradient-to: rgba(223,252,245,0) var(--tw-gradient-to-position); }
+[data-theme="sunset-care"]     .from-slate-800\/30 { --tw-gradient-from: rgba(254,243,204,0.55) var(--tw-gradient-from-position); --tw-gradient-to: rgba(254,243,204,0) var(--tw-gradient-to-position); }
+
+[data-theme="premium-light"]   .from-slate-800\/60 { --tw-gradient-from: rgba(228,234,255,0.88) var(--tw-gradient-from-position); --tw-gradient-to: rgba(228,234,255,0) var(--tw-gradient-to-position); }
+[data-theme="soft-medical"]    .from-slate-800\/60 { --tw-gradient-from: rgba(223,240,228,0.88) var(--tw-gradient-from-position); --tw-gradient-to: rgba(223,240,228,0) var(--tw-gradient-to-position); }
+[data-theme="rose-care"]       .from-slate-800\/60 { --tw-gradient-from: rgba(252,232,237,0.88) var(--tw-gradient-from-position); --tw-gradient-to: rgba(252,232,237,0) var(--tw-gradient-to-position); }
+[data-theme="fuchsia-premium"] .from-slate-800\/60 { --tw-gradient-from: rgba(243,216,254,0.88) var(--tw-gradient-from-position); --tw-gradient-to: rgba(243,216,254,0) var(--tw-gradient-to-position); }
+[data-theme="purple-care"]     .from-slate-800\/60 { --tw-gradient-from: rgba(237,232,255,0.88) var(--tw-gradient-from-position); --tw-gradient-to: rgba(237,232,255,0) var(--tw-gradient-to-position); }
+[data-theme="arctic-blue"]     .from-slate-800\/60 { --tw-gradient-from: rgba(224,238,250,0.88) var(--tw-gradient-from-position); --tw-gradient-to: rgba(224,238,250,0) var(--tw-gradient-to-position); }
+[data-theme="mint-premium"]    .from-slate-800\/60 { --tw-gradient-from: rgba(223,252,245,0.88) var(--tw-gradient-from-position); --tw-gradient-to: rgba(223,252,245,0) var(--tw-gradient-to-position); }
+[data-theme="sunset-care"]     .from-slate-800\/60 { --tw-gradient-from: rgba(254,243,204,0.88) var(--tw-gradient-from-position); --tw-gradient-to: rgba(254,243,204,0) var(--tw-gradient-to-position); }
+
+/* ──────────────────────────────────────────────────────────
+   2. bg-slate-700 y bg-slate-600 CON OPACIDAD
+      Días del calendario, celdas y elementos interactivos
+   ────────────────────────────────────────────────────────── */
+/* Accent colors por tema: premium-light=blue, soft-medical=emerald,
+   rose-care=rose, fuchsia-premium=fuchsia, purple-care=violet,
+   arctic-blue=sky, mint-premium=teal, sunset-care=amber        */
+[data-theme="premium-light"]   .bg-slate-700\/30 { background-color: rgba(37,99,235,0.07)  !important; }
+[data-theme="soft-medical"]    .bg-slate-700\/30 { background-color: rgba(5,150,105,0.07)  !important; }
+[data-theme="rose-care"]       .bg-slate-700\/30 { background-color: rgba(225,29,72,0.07)  !important; }
+[data-theme="fuchsia-premium"] .bg-slate-700\/30 { background-color: rgba(162,28,175,0.07) !important; }
+[data-theme="purple-care"]     .bg-slate-700\/30 { background-color: rgba(124,58,237,0.07) !important; }
+[data-theme="arctic-blue"]     .bg-slate-700\/30 { background-color: rgba(2,132,199,0.07)  !important; }
+[data-theme="mint-premium"]    .bg-slate-700\/30 { background-color: rgba(13,148,136,0.07) !important; }
+[data-theme="sunset-care"]     .bg-slate-700\/30 { background-color: rgba(217,119,6,0.07)  !important; }
+
+[data-theme="premium-light"]   .bg-slate-700\/40 { background-color: rgba(37,99,235,0.10)  !important; }
+[data-theme="soft-medical"]    .bg-slate-700\/40 { background-color: rgba(5,150,105,0.10)  !important; }
+[data-theme="rose-care"]       .bg-slate-700\/40 { background-color: rgba(225,29,72,0.10)  !important; }
+[data-theme="fuchsia-premium"] .bg-slate-700\/40 { background-color: rgba(162,28,175,0.10) !important; }
+[data-theme="purple-care"]     .bg-slate-700\/40 { background-color: rgba(124,58,237,0.10) !important; }
+[data-theme="arctic-blue"]     .bg-slate-700\/40 { background-color: rgba(2,132,199,0.10)  !important; }
+[data-theme="mint-premium"]    .bg-slate-700\/40 { background-color: rgba(13,148,136,0.10) !important; }
+[data-theme="sunset-care"]     .bg-slate-700\/40 { background-color: rgba(217,119,6,0.10)  !important; }
+
+[data-theme="premium-light"]   .bg-slate-700\/60 { background-color: rgba(37,99,235,0.13)  !important; }
+[data-theme="soft-medical"]    .bg-slate-700\/60 { background-color: rgba(5,150,105,0.13)  !important; }
+[data-theme="rose-care"]       .bg-slate-700\/60 { background-color: rgba(225,29,72,0.13)  !important; }
+[data-theme="fuchsia-premium"] .bg-slate-700\/60 { background-color: rgba(162,28,175,0.13) !important; }
+[data-theme="purple-care"]     .bg-slate-700\/60 { background-color: rgba(124,58,237,0.13) !important; }
+[data-theme="arctic-blue"]     .bg-slate-700\/60 { background-color: rgba(2,132,199,0.13)  !important; }
+[data-theme="mint-premium"]    .bg-slate-700\/60 { background-color: rgba(13,148,136,0.13) !important; }
+[data-theme="sunset-care"]     .bg-slate-700\/60 { background-color: rgba(217,119,6,0.13)  !important; }
+
+[data-theme="premium-light"]   .bg-slate-700\/70 { background-color: rgba(37,99,235,0.16)  !important; }
+[data-theme="soft-medical"]    .bg-slate-700\/70 { background-color: rgba(5,150,105,0.16)  !important; }
+[data-theme="rose-care"]       .bg-slate-700\/70 { background-color: rgba(225,29,72,0.16)  !important; }
+[data-theme="fuchsia-premium"] .bg-slate-700\/70 { background-color: rgba(162,28,175,0.16) !important; }
+[data-theme="purple-care"]     .bg-slate-700\/70 { background-color: rgba(124,58,237,0.16) !important; }
+[data-theme="arctic-blue"]     .bg-slate-700\/70 { background-color: rgba(2,132,199,0.16)  !important; }
+[data-theme="mint-premium"]    .bg-slate-700\/70 { background-color: rgba(13,148,136,0.16) !important; }
+[data-theme="sunset-care"]     .bg-slate-700\/70 { background-color: rgba(217,119,6,0.16)  !important; }
+
+[data-theme="premium-light"]   .bg-slate-700\/80 { background-color: rgba(37,99,235,0.18)  !important; }
+[data-theme="soft-medical"]    .bg-slate-700\/80 { background-color: rgba(5,150,105,0.18)  !important; }
+[data-theme="rose-care"]       .bg-slate-700\/80 { background-color: rgba(225,29,72,0.18)  !important; }
+[data-theme="fuchsia-premium"] .bg-slate-700\/80 { background-color: rgba(162,28,175,0.18) !important; }
+[data-theme="purple-care"]     .bg-slate-700\/80 { background-color: rgba(124,58,237,0.18) !important; }
+[data-theme="arctic-blue"]     .bg-slate-700\/80 { background-color: rgba(2,132,199,0.18)  !important; }
+[data-theme="mint-premium"]    .bg-slate-700\/80 { background-color: rgba(13,148,136,0.18) !important; }
+[data-theme="sunset-care"]     .bg-slate-700\/80 { background-color: rgba(217,119,6,0.18)  !important; }
+
+[data-theme="premium-light"]   .bg-slate-600\/30 { background-color: rgba(37,99,235,0.05)  !important; }
+[data-theme="soft-medical"]    .bg-slate-600\/30 { background-color: rgba(5,150,105,0.05)  !important; }
+[data-theme="rose-care"]       .bg-slate-600\/30 { background-color: rgba(225,29,72,0.05)  !important; }
+[data-theme="fuchsia-premium"] .bg-slate-600\/30 { background-color: rgba(162,28,175,0.05) !important; }
+[data-theme="purple-care"]     .bg-slate-600\/30 { background-color: rgba(124,58,237,0.05) !important; }
+[data-theme="arctic-blue"]     .bg-slate-600\/30 { background-color: rgba(2,132,199,0.05)  !important; }
+[data-theme="mint-premium"]    .bg-slate-600\/30 { background-color: rgba(13,148,136,0.05) !important; }
+[data-theme="sunset-care"]     .bg-slate-600\/30 { background-color: rgba(217,119,6,0.05)  !important; }
+
+[data-theme="premium-light"]   .bg-slate-600\/50 { background-color: rgba(37,99,235,0.09)  !important; }
+[data-theme="soft-medical"]    .bg-slate-600\/50 { background-color: rgba(5,150,105,0.09)  !important; }
+[data-theme="rose-care"]       .bg-slate-600\/50 { background-color: rgba(225,29,72,0.09)  !important; }
+[data-theme="fuchsia-premium"] .bg-slate-600\/50 { background-color: rgba(162,28,175,0.09) !important; }
+[data-theme="purple-care"]     .bg-slate-600\/50 { background-color: rgba(124,58,237,0.09) !important; }
+[data-theme="arctic-blue"]     .bg-slate-600\/50 { background-color: rgba(2,132,199,0.09)  !important; }
+[data-theme="mint-premium"]    .bg-slate-600\/50 { background-color: rgba(13,148,136,0.09) !important; }
+[data-theme="sunset-care"]     .bg-slate-600\/50 { background-color: rgba(217,119,6,0.09)  !important; }
+
+/* ──────────────────────────────────────────────────────────
+   3. border-slate-* CON OPACIDAD — Líneas y divisores
+   ────────────────────────────────────────────────────────── */
+[data-theme="premium-light"]   .border-slate-500\/20, [data-theme="premium-light"]   .border-slate-600\/20, [data-theme="premium-light"]   .border-slate-700\/30 { border-color: rgba(37,99,235,0.18)  !important; }
+[data-theme="soft-medical"]    .border-slate-500\/20, [data-theme="soft-medical"]    .border-slate-600\/20, [data-theme="soft-medical"]    .border-slate-700\/30 { border-color: rgba(5,150,105,0.18)  !important; }
+[data-theme="rose-care"]       .border-slate-500\/20, [data-theme="rose-care"]       .border-slate-600\/20, [data-theme="rose-care"]       .border-slate-700\/30 { border-color: rgba(225,29,72,0.18)  !important; }
+[data-theme="fuchsia-premium"] .border-slate-500\/20, [data-theme="fuchsia-premium"] .border-slate-600\/20, [data-theme="fuchsia-premium"] .border-slate-700\/30 { border-color: rgba(162,28,175,0.18) !important; }
+[data-theme="purple-care"]     .border-slate-500\/20, [data-theme="purple-care"]     .border-slate-600\/20, [data-theme="purple-care"]     .border-slate-700\/30 { border-color: rgba(124,58,237,0.18) !important; }
+[data-theme="arctic-blue"]     .border-slate-500\/20, [data-theme="arctic-blue"]     .border-slate-600\/20, [data-theme="arctic-blue"]     .border-slate-700\/30 { border-color: rgba(2,132,199,0.18)  !important; }
+[data-theme="mint-premium"]    .border-slate-500\/20, [data-theme="mint-premium"]    .border-slate-600\/20, [data-theme="mint-premium"]    .border-slate-700\/30 { border-color: rgba(13,148,136,0.18) !important; }
+[data-theme="sunset-care"]     .border-slate-500\/20, [data-theme="sunset-care"]     .border-slate-600\/20, [data-theme="sunset-care"]     .border-slate-700\/30 { border-color: rgba(217,119,6,0.18)  !important; }
+
+[data-theme="premium-light"]   .border-slate-500\/30, [data-theme="premium-light"]   .border-slate-600\/30, [data-theme="premium-light"]   .border-slate-700\/40 { border-color: rgba(37,99,235,0.25)  !important; }
+[data-theme="soft-medical"]    .border-slate-500\/30, [data-theme="soft-medical"]    .border-slate-600\/30, [data-theme="soft-medical"]    .border-slate-700\/40 { border-color: rgba(5,150,105,0.25)  !important; }
+[data-theme="rose-care"]       .border-slate-500\/30, [data-theme="rose-care"]       .border-slate-600\/30, [data-theme="rose-care"]       .border-slate-700\/40 { border-color: rgba(225,29,72,0.25)  !important; }
+[data-theme="fuchsia-premium"] .border-slate-500\/30, [data-theme="fuchsia-premium"] .border-slate-600\/30, [data-theme="fuchsia-premium"] .border-slate-700\/40 { border-color: rgba(162,28,175,0.25) !important; }
+[data-theme="purple-care"]     .border-slate-500\/30, [data-theme="purple-care"]     .border-slate-600\/30, [data-theme="purple-care"]     .border-slate-700\/40 { border-color: rgba(124,58,237,0.25) !important; }
+[data-theme="arctic-blue"]     .border-slate-500\/30, [data-theme="arctic-blue"]     .border-slate-600\/30, [data-theme="arctic-blue"]     .border-slate-700\/40 { border-color: rgba(2,132,199,0.25)  !important; }
+[data-theme="mint-premium"]    .border-slate-500\/30, [data-theme="mint-premium"]    .border-slate-600\/30, [data-theme="mint-premium"]    .border-slate-700\/40 { border-color: rgba(13,148,136,0.25) !important; }
+[data-theme="sunset-care"]     .border-slate-500\/30, [data-theme="sunset-care"]     .border-slate-600\/30, [data-theme="sunset-care"]     .border-slate-700\/40 { border-color: rgba(217,119,6,0.25)  !important; }
+
+[data-theme="premium-light"]   .border-slate-500\/40, [data-theme="premium-light"]   .border-slate-600\/40, [data-theme="premium-light"]   .border-slate-700\/50 { border-color: rgba(37,99,235,0.32)  !important; }
+[data-theme="soft-medical"]    .border-slate-500\/40, [data-theme="soft-medical"]    .border-slate-600\/40, [data-theme="soft-medical"]    .border-slate-700\/50 { border-color: rgba(5,150,105,0.32)  !important; }
+[data-theme="rose-care"]       .border-slate-500\/40, [data-theme="rose-care"]       .border-slate-600\/40, [data-theme="rose-care"]       .border-slate-700\/50 { border-color: rgba(225,29,72,0.32)  !important; }
+[data-theme="fuchsia-premium"] .border-slate-500\/40, [data-theme="fuchsia-premium"] .border-slate-600\/40, [data-theme="fuchsia-premium"] .border-slate-700\/50 { border-color: rgba(162,28,175,0.32) !important; }
+[data-theme="purple-care"]     .border-slate-500\/40, [data-theme="purple-care"]     .border-slate-600\/40, [data-theme="purple-care"]     .border-slate-700\/50 { border-color: rgba(124,58,237,0.32) !important; }
+[data-theme="arctic-blue"]     .border-slate-500\/40, [data-theme="arctic-blue"]     .border-slate-600\/40, [data-theme="arctic-blue"]     .border-slate-700\/50 { border-color: rgba(2,132,199,0.32)  !important; }
+[data-theme="mint-premium"]    .border-slate-500\/40, [data-theme="mint-premium"]    .border-slate-600\/40, [data-theme="mint-premium"]    .border-slate-700\/50 { border-color: rgba(13,148,136,0.32) !important; }
+[data-theme="sunset-care"]     .border-slate-500\/40, [data-theme="sunset-care"]     .border-slate-600\/40, [data-theme="sunset-care"]     .border-slate-700\/50 { border-color: rgba(217,119,6,0.32)  !important; }
+
+[data-theme="premium-light"]   .border-slate-500\/50, [data-theme="premium-light"]   .border-slate-600\/50, [data-theme="premium-light"]   .border-slate-700\/60 { border-color: rgba(37,99,235,0.40)  !important; }
+[data-theme="soft-medical"]    .border-slate-500\/50, [data-theme="soft-medical"]    .border-slate-600\/50, [data-theme="soft-medical"]    .border-slate-700\/60 { border-color: rgba(5,150,105,0.40)  !important; }
+[data-theme="rose-care"]       .border-slate-500\/50, [data-theme="rose-care"]       .border-slate-600\/50, [data-theme="rose-care"]       .border-slate-700\/60 { border-color: rgba(225,29,72,0.40)  !important; }
+[data-theme="fuchsia-premium"] .border-slate-500\/50, [data-theme="fuchsia-premium"] .border-slate-600\/50, [data-theme="fuchsia-premium"] .border-slate-700\/60 { border-color: rgba(162,28,175,0.40) !important; }
+[data-theme="purple-care"]     .border-slate-500\/50, [data-theme="purple-care"]     .border-slate-600\/50, [data-theme="purple-care"]     .border-slate-700\/60 { border-color: rgba(124,58,237,0.40) !important; }
+[data-theme="arctic-blue"]     .border-slate-500\/50, [data-theme="arctic-blue"]     .border-slate-600\/50, [data-theme="arctic-blue"]     .border-slate-700\/60 { border-color: rgba(2,132,199,0.40)  !important; }
+[data-theme="mint-premium"]    .border-slate-500\/50, [data-theme="mint-premium"]    .border-slate-600\/50, [data-theme="mint-premium"]    .border-slate-700\/60 { border-color: rgba(13,148,136,0.40) !important; }
+[data-theme="sunset-care"]     .border-slate-500\/50, [data-theme="sunset-care"]     .border-slate-600\/50, [data-theme="sunset-care"]     .border-slate-700\/60 { border-color: rgba(217,119,6,0.40)  !important; }
+
+/* ──────────────────────────────────────────────────────────
+   4. text-slate-* — Contraste de letras en temas claros
+      Los light themes no heredan text-gray-* en todos los casos.
+      text-slate-200/300 son casi blancos → invisibles en fondo claro
+   ────────────────────────────────────────────────────────── */
+[data-theme="premium-light"]   .text-slate-200 { color: #1e3a8a !important; }
+[data-theme="soft-medical"]    .text-slate-200 { color: #064e3b !important; }
+[data-theme="rose-care"]       .text-slate-200 { color: #881337 !important; }
+[data-theme="fuchsia-premium"] .text-slate-200 { color: #4a044e !important; }
+[data-theme="purple-care"]     .text-slate-200 { color: #3b0764 !important; }
+[data-theme="arctic-blue"]     .text-slate-200 { color: #0c4a6e !important; }
+[data-theme="mint-premium"]    .text-slate-200 { color: #042f2e !important; }
+[data-theme="sunset-care"]     .text-slate-200 { color: #451a03 !important; }
+
+[data-theme="premium-light"]   .text-slate-300 { color: #1e40af !important; }
+[data-theme="soft-medical"]    .text-slate-300 { color: #065f46 !important; }
+[data-theme="rose-care"]       .text-slate-300 { color: #9f1239 !important; }
+[data-theme="fuchsia-premium"] .text-slate-300 { color: #701a75 !important; }
+[data-theme="purple-care"]     .text-slate-300 { color: #5b21b6 !important; }
+[data-theme="arctic-blue"]     .text-slate-300 { color: #0369a1 !important; }
+[data-theme="mint-premium"]    .text-slate-300 { color: #134e4a !important; }
+[data-theme="sunset-care"]     .text-slate-300 { color: #92400e !important; }
+
+[data-theme="premium-light"]   .text-slate-400 { color: #2563eb !important; }
+[data-theme="soft-medical"]    .text-slate-400 { color: #059669 !important; }
+[data-theme="rose-care"]       .text-slate-400 { color: #be123c !important; }
+[data-theme="fuchsia-premium"] .text-slate-400 { color: #a21caf !important; }
+[data-theme="purple-care"]     .text-slate-400 { color: #7c3aed !important; }
+[data-theme="arctic-blue"]     .text-slate-400 { color: #0284c7 !important; }
+[data-theme="mint-premium"]    .text-slate-400 { color: #0d9488 !important; }
+[data-theme="sunset-care"]     .text-slate-400 { color: #d97706 !important; }
+
+[data-theme="premium-light"]   .text-slate-500 { color: #475569 !important; }
+[data-theme="soft-medical"]    .text-slate-500 { color: #2d6a4f !important; }
+[data-theme="rose-care"]       .text-slate-500 { color: #6b2d3e !important; }
+[data-theme="fuchsia-premium"] .text-slate-500 { color: #6b21a8 !important; }
+[data-theme="purple-care"]     .text-slate-500 { color: #6d28d9 !important; }
+[data-theme="arctic-blue"]     .text-slate-500 { color: #0369a1 !important; }
+[data-theme="mint-premium"]    .text-slate-500 { color: #0f766e !important; }
+[data-theme="sunset-care"]     .text-slate-500 { color: #b45309 !important; }
+
+[data-theme="premium-light"]   .text-slate-600 { color: #64748b !important; }
+[data-theme="soft-medical"]    .text-slate-600 { color: #3d7a5e !important; }
+[data-theme="rose-care"]       .text-slate-600 { color: #7f3d4e !important; }
+[data-theme="fuchsia-premium"] .text-slate-600 { color: #7e22ce !important; }
+[data-theme="purple-care"]     .text-slate-600 { color: #7c3aed !important; }
+[data-theme="arctic-blue"]     .text-slate-600 { color: #0369a1 !important; }
+[data-theme="mint-premium"]    .text-slate-600 { color: #0d9488 !important; }
+[data-theme="sunset-care"]     .text-slate-600 { color: #b45309 !important; }

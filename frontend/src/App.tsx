@@ -33,32 +33,32 @@ const NAV_SECTIONS = [
   {
     label: 'CLINICA',
     items: [
-      { id: 'dashboard',     label: 'Dashboard',          sym: 'M' },
+      { id: 'dashboard',     label: 'Dashboard',          sym: 'D' },
       { id: 'pacientes',     label: 'Pacientes',          sym: 'P' },
       { id: 'historia',      label: 'Historia Clinica',   sym: 'H' },
       { id: 'fotos',         label: 'Visual Clínico',     sym: 'V' },
-      { id: 'odontograma',   label: 'Odontograma',        sym: 'T' },
-      { id: 'mapa-corporal', label: 'Mapa Corporal',      sym: 'C' },
+      { id: 'odontograma',   label: 'Odontograma',        sym: 'O' },
+      { id: 'mapa-corporal', label: 'Mapa Corporal',      sym: 'M' },
     ],
   },
   {
     label: 'AGENDA',
     items: [
       { id: 'agenda',            label: 'Agenda Paciente',    sym: 'A' },
-      { id: 'admision',          label: 'Admisión',           sym: 'D' },
+      { id: 'admision',          label: 'Admisión',           sym: 'N' },
       { id: 'agendaProfesional', label: 'Agenda Profesional', sym: 'G' },
-      { id: 'config-agenda',     label: 'Config Agenda',      sym: 'Z' },
+      { id: 'config-agenda',     label: 'Config Agenda',      sym: 'C' },
       { id: 'vista-cirujano',    label: 'Quirofano',          sym: 'Q' },
-      { id: 'followup',          label: 'Follow-up',          sym: 'U' },
+      { id: 'followup',          label: 'Follow-up',          sym: 'W' },
     ],
   },
   {
     label: 'GESTION',
     items: [
-      { id: 'consentimiento', label: 'Consentimiento', sym: 'K' },
-      { id: 'cotizaciones',   label: 'Cotizaciones',   sym: 'O' },
+      { id: 'consentimiento', label: 'Consentimiento', sym: 'S' },
+      { id: 'cotizaciones',   label: 'Cotizaciones',   sym: 'T' },
       { id: 'crm',            label: 'CRM',            sym: 'R' },
-      { id: 'facturacion',    label: 'Facturacion',    sym: 'B' },
+      { id: 'facturacion',    label: 'Facturacion',    sym: 'F' },
       { id: 'plantillas',     label: 'Plantillas',     sym: 'L' },
       { id: 'impresion',      label: 'Central Impresión', sym: 'I' },
     ],
@@ -66,9 +66,9 @@ const NAV_SECTIONS = [
   {
     label: 'ADMINISTRACIÓN',
     items: [
-      { id: 'admin', label: 'Parametrización', sym: 'X' },
-      { id: 'usuarios', label: 'Usuarios', sym: 'V' },
-      { id: 'manual', label: 'Manual de Usuario', sym: '?' },
+      { id: 'admin',    label: 'Parametrización',   sym: 'Z' },
+      { id: 'usuarios', label: 'Usuarios',          sym: 'U' },
+      { id: 'manual',   label: 'Manual de Usuario', sym: '?' },
     ],
   },
 ];
@@ -270,9 +270,36 @@ function App() {
     } catch { return { nombre: '', logoUrl: '' }; }
   });
   const { theme } = useTheme();
+  const [hotkeyToast, setHotkeyToast] = useState<string | null>(null);
   // Ref para currentPage — evita stale closure en callbacks de SARAI
   const currentPageRef = useRef(currentPage);
   useEffect(() => { currentPageRef.current = currentPage; }, [currentPage]);
+
+  // ── Atajos de teclado globales Alt + sym ─────────────────────────────────
+  useEffect(() => {
+    if (!user) return;
+    const handler = (e: KeyboardEvent) => {
+      if (!e.altKey || e.ctrlKey || e.metaKey) return;
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      // Bloquear si SARAI está grabando/procesando
+      const saraiRoot = document.querySelector('[data-sarai-estado]');
+      if (saraiRoot) {
+        const estado = saraiRoot.getAttribute('data-sarai-estado') || '';
+        if (['grabando', 'transcribiendo', 'procesando'].includes(estado)) return;
+      }
+      const key = e.key.toUpperCase();
+      const allItems = NAV_SECTIONS.flatMap((s) => s.items);
+      const match = allItems.find((item) => item.sym.toUpperCase() === key);
+      if (!match) return;
+      e.preventDefault();
+      setCurrentPage(match.id);
+      setHotkeyToast(match.label);
+      setTimeout(() => setHotkeyToast(null), 1800);
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [user]);
 
   useEffect(() => {
     const token = localStorage.getItem('accessToken');
@@ -318,6 +345,31 @@ function App() {
   return (
     <div className="min-h-screen bg-[#080a0f] flex">
       <NeuralCanvas opacity={0.13} nodeCount={100} />
+
+      {/* Toast de atajos de teclado */}
+      {hotkeyToast && (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: '2rem',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: 'linear-gradient(135deg, #d4af37, #f0c040)',
+            color: '#0a0a0f',
+            padding: '0.55rem 1.4rem',
+            borderRadius: '999px',
+            fontWeight: 700,
+            fontSize: '0.88rem',
+            letterSpacing: '0.03em',
+            boxShadow: '0 4px 24px rgba(212,175,55,0.45)',
+            zIndex: 99999,
+            pointerEvents: 'none',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          ⌨️ {hotkeyToast}
+        </div>
+      )}
       <Sidebar
         currentPage={currentPage}
         setCurrentPage={setCurrentPage}
