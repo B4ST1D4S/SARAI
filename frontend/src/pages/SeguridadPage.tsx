@@ -31,7 +31,14 @@ function useApi() {
   const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
 
   const get = (path: string) =>
-    fetch(`${API_BASE_URL}/seguridad${path}`, { headers }).then(r => r.json());
+    fetch(`${API_BASE_URL}/seguridad${path}`, { headers }).then(r => r.json()).catch(() => null);
+
+  // Siempre retorna un array — nunca crashea aunque el backend devuelva error JSON
+  const getList = (path: string): Promise<any[]> =>
+    fetch(`${API_BASE_URL}/seguridad${path}`, { headers })
+      .then(r => r.json())
+      .then(data => Array.isArray(data) ? data : [])
+      .catch(() => []);
 
   const post = (path: string, body: any) =>
     fetch(`${API_BASE_URL}/seguridad${path}`, { method: 'POST', headers, body: JSON.stringify(body) }).then(r => r.json());
@@ -42,7 +49,7 @@ function useApi() {
   const del = (path: string) =>
     fetch(`${API_BASE_URL}/seguridad${path}`, { method: 'DELETE', headers }).then(r => r.json());
 
-  return { get, post, put, del };
+  return { get, getList, post, put, del };
 }
 
 // ─────────────────────────────────────────────────────────
@@ -250,7 +257,7 @@ function EmpresasTab({ api }: { api: ReturnType<typeof useApi> }) {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ nombre: '', nit: '', razonSocial: '', ciudad: '', telefono: '', email: '' });
 
-  useEffect(() => { api.get('/empresas').then(setItems).finally(() => setLoading(false)); }, []);
+  useEffect(() => { api.getList('/empresas').then(setItems).finally(() => setLoading(false)); }, []);
 
   const handleCreate = async () => {
     const res = await api.post('/empresas', form);
@@ -311,7 +318,7 @@ function SedesTab({ api }: { api: ReturnType<typeof useApi> }) {
   const [empresas, setEmpresas] = useState<any[]>([]);
 
   useEffect(() => {
-    Promise.all([api.get('/sedes'), api.get('/empresas')]).then(([s, e]) => { setItems(s); setEmpresas(e); }).finally(() => setLoading(false));
+    Promise.all([api.getList('/sedes'), api.getList('/empresas')]).then(([s, e]) => { setItems(s); setEmpresas(e); }).finally(() => setLoading(false));
   }, []);
 
   const handleCreate = async () => {
@@ -366,7 +373,7 @@ function PerfilesTab({ api }: { api: ReturnType<typeof useApi> }) {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ nombre: '', descripcion: '', clonarDesdeId: '' });
 
-  useEffect(() => { api.get('/perfiles').then(setItems).finally(() => setLoading(false)); }, []);
+  useEffect(() => { api.getList('/perfiles').then(setItems).finally(() => setLoading(false)); }, []);
 
   const handleCreate = async () => {
     const res = await api.post('/perfiles', form);
@@ -431,7 +438,7 @@ function RolesTab({ api }: { api: ReturnType<typeof useApi> }) {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ nombre: '', codigo: '', descripcion: '' });
 
-  useEffect(() => { api.get('/roles').then(setItems).finally(() => setLoading(false)); }, []);
+  useEffect(() => { api.getList('/roles').then(setItems).finally(() => setLoading(false)); }, []);
 
   const handleCreate = async () => {
     const res = await api.post('/roles', form);
@@ -480,7 +487,7 @@ function GruposTab({ api }: { api: ReturnType<typeof useApi> }) {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ nombre: '', descripcion: '' });
 
-  useEffect(() => { api.get('/grupos').then(setItems).finally(() => setLoading(false)); }, []);
+  useEffect(() => { api.getList('/grupos').then(setItems).finally(() => setLoading(false)); }, []);
 
   const handleCreate = async () => {
     const res = await api.post('/grupos', form);
@@ -530,11 +537,11 @@ function PermisosTab({ api }: { api: ReturnType<typeof useApi> }) {
   const ACCIONES = ['VER', 'CREAR', 'EDITAR', 'ELIMINAR', 'IMPRIMIR', 'EXPORTAR', 'APROBAR', 'ANULAR'];
 
   useEffect(() => {
-    Promise.all([api.get('/recursos'), api.get('/perfiles')]).then(([r, p]) => { setRecursos(r); setPerfiles(p); }).finally(() => setLoading(false));
+    Promise.all([api.getList('/recursos'), api.getList('/perfiles')]).then(([r, p]) => { setRecursos(r); setPerfiles(p); }).finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
-    if (selPerfil) api.get(`/permisos?sujetoTipo=PERFIL&sujetoId=${selPerfil}`).then(setPermisos);
+    if (selPerfil) api.getList(`/permisos?sujetoTipo=PERFIL&sujetoId=${selPerfil}`).then(setPermisos);
   }, [selPerfil]);
 
   const tienePermiso = (recursoId: string, accion: string) =>
@@ -549,7 +556,7 @@ function PermisosTab({ api }: { api: ReturnType<typeof useApi> }) {
       accion,
       efecto: tiene ? 'DENEGAR' : 'PERMITIR',
     });
-    const updated = await api.get(`/permisos?sujetoTipo=PERFIL&sujetoId=${selPerfil}`);
+    const updated = await api.getList(`/permisos?sujetoTipo=PERFIL&sujetoId=${selPerfil}`);
     setPermisos(updated);
   };
 
@@ -630,7 +637,7 @@ function PoliticasTab({ api }: { api: ReturnType<typeof useApi> }) {
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => { api.get('/politicas').then(setItems).finally(() => setLoading(false)); }, []);
+  useEffect(() => { api.getList('/politicas').then(setItems).finally(() => setLoading(false)); }, []);
 
   return (
     <SectionLayout title="Políticas de Seguridad" icon={<Shield size={20} className="text-indigo-400" />} loading={loading}>
@@ -685,7 +692,7 @@ function SesionesTab({ api }: { api: ReturnType<typeof useApi> }) {
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const load = () => api.get('/sesiones').then(setItems).finally(() => setLoading(false));
+  const load = () => api.getList('/sesiones').then(setItems).finally(() => setLoading(false));
   useEffect(() => { load(); }, []);
 
   const revocar = async (id: string) => { await api.del(`/sesiones/${id}`); load(); };
@@ -731,7 +738,7 @@ function DelegacionesTab({ api }: { api: ReturnType<typeof useApi> }) {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ delegadoId: '', motivo: '', fechaInicio: '', fechaFin: '', recursosCodigos: '' });
 
-  const load = () => api.get('/delegaciones').then(setItems).finally(() => setLoading(false));
+  const load = () => api.getList('/delegaciones').then(setItems).finally(() => setLoading(false));
   useEffect(() => { load(); }, []);
 
   const handleCreate = async () => {
@@ -812,7 +819,7 @@ function AuditoriaTab({ api }: { api: ReturnType<typeof useApi> }) {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
 
-  useEffect(() => { api.get('/auditoria/accesos').then(setItems).finally(() => setLoading(false)); }, []);
+  useEffect(() => { api.getList('/auditoria/accesos').then(setItems).finally(() => setLoading(false)); }, []);
 
   const filtered = items.filter(i =>
     !search || i.email?.toLowerCase().includes(search.toLowerCase()) || i.accion?.toLowerCase().includes(search.toLowerCase())
@@ -871,7 +878,7 @@ function EventosTab({ api }: { api: ReturnType<typeof useApi> }) {
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const load = () => api.get('/auditoria/eventos').then(setItems).finally(() => setLoading(false));
+  const load = () => api.getList('/auditoria/eventos').then(setItems).finally(() => setLoading(false));
   useEffect(() => { load(); }, []);
 
   const resolver = async (id: string) => {
