@@ -18,6 +18,8 @@ const USER_SELECT = {
   activo: true,
   createdAt: true,
   updatedAt: true,
+  perfilId: true,
+  perfil: { select: { id: true, nombre: true } },
 } as const;
 
 const USER_SELECT_WITH_FIRMA = {
@@ -99,6 +101,11 @@ export async function updateUser(id: string, data: UpdateUserDto) {
 
   if (data.rol) {
     updateData.rol = data.rol as any;
+  }
+
+  // perfilId vacío → null (desasignar perfil)
+  if ('perfilId' in updateData) {
+    updateData.perfilId = updateData.perfilId || null;
   }
 
   return prisma.user.update({

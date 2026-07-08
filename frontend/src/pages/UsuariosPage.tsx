@@ -228,6 +228,8 @@ export default function UsuariosPage() {
         if (!payload.email)              delete payload.email;
         if (!payload.telefono)           delete payload.telefono;
         if (!payload.especialidad)       delete payload.especialidad;
+        // perfilId vacío → quitar para no enviar string vacío
+        if (!payload.perfilId)           delete payload.perfilId;
         if (!ROLES_PROFESIONALES.includes(payload.rol)) {
           delete payload.tipoDocumento;
           delete payload.numeroDocumento;
@@ -249,6 +251,8 @@ export default function UsuariosPage() {
         const payload: UpdateUserRequest = { ...form };
         if (!payload.password) delete payload.password;
         if (!payload.email)    delete payload.email;
+        // perfilId vacío → enviar null para desasignar, o quitar si no cambió
+        if (payload.perfilId === '') payload.perfilId = undefined;
         if (!ROLES_PROFESIONALES.includes(payload.rol ?? '')) {
           delete payload.tipoDocumento;
           delete payload.numeroDocumento;
