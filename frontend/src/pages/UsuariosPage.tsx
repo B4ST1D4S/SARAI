@@ -72,6 +72,8 @@ interface UsuarioData {
   firmaBase64?: string;
   activo: boolean;
   createdAt: string;
+  perfilId?: string;
+  perfil?: { id: string; nombre: string };
 }
 
 type FormMode = 'crear' | 'editar';
@@ -90,6 +92,7 @@ const FORM_EMPTY: CreateUserRequest = {
   registroProfesional: '',
   registroMedico: '',
   firmaBase64: '',
+  perfilId: '',
 };
 
 // ─── Componente Principal ─────────────────────────────────────────────────────
@@ -111,6 +114,7 @@ export default function UsuariosPage() {
   const [success, setSuccess]     = useState<string | null>(null);
 
   const [especialidades, setEspecialidades] = useState<EspecialidadItem[]>([]);
+  const [perfilesIam, setPerfilesIam]         = useState<{ id: string; nombre: string }[]>([]);
 
   const token    = localStorage.getItem('accessToken') || '';
   const firmaRef = useRef<HTMLInputElement>(null);
@@ -128,6 +132,12 @@ export default function UsuariosPage() {
     // Cargar especialidades al montar
     getEspecialidades(token).then((res) => {
       if (res.data) setEspecialidades(res.data);
+    });
+    // Cargar perfiles IAM
+    fetch(`${import.meta.env.DEV ? 'http://localhost:3001/api' : 'https://sarai-app-backend.vercel.app/api'}/seguridad/perfiles`, {
+      headers: { Authorization: `Bearer ${token}` },
+    }).then(r => r.json()).then(data => {
+      if (Array.isArray(data)) setPerfilesIam(data);
     });
   }, []);
 
@@ -178,6 +188,7 @@ export default function UsuariosPage() {
       registroProfesional: u.registroProfesional ?? '',
       registroMedico:     u.registroMedico ?? '',
       firmaBase64:        u.firmaBase64 ?? '',
+      perfilId:           u.perfilId ?? '',
     });
     setFirmaPreview(u.firmaBase64 ? u.firmaBase64 : null);
     setError(null);
@@ -547,6 +558,18 @@ export default function UsuariosPage() {
                       >
                         {ROLES.map((r) => (
                           <option key={r.value} value={r.value}>{r.label}</option>
+                        ))}
+                      </select>
+                    </Field>
+                    <Field label="Perfil IAM">
+                      <select
+                        value={form.perfilId ?? ''}
+                        onChange={(e) => setForm((f) => ({ ...f, perfilId: e.target.value || undefined }))}
+                        className={inputCls}
+                      >
+                        <option value=''>— Sin perfil asignado —</option>
+                        {perfilesIam.map((p) => (
+                          <option key={p.id} value={p.id}>{p.nombre}</option>
                         ))}
                       </select>
                     </Field>

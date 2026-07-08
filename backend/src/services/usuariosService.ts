@@ -56,6 +56,7 @@ export interface UpdateUserDto {
   registroMedico?: string;
   firmaBase64?: string;
   activo?: boolean;
+  perfilId?: string | null;
 }
 
 export async function createUser(data: CreateUserDto) {
