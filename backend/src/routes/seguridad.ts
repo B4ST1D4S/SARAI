@@ -32,54 +32,57 @@ const router = Router();
 // Todas las rutas requieren autenticación
 router.use(authenticateToken);
 
+// Roles con acceso de administración IAM
+const IAM_ADMIN = ['SUPER_ADMIN', 'MEDICO'] as const;
+
 // ── Dashboard ─────────────────────────────────────────
 router.get('/dashboard', getDashboardIam);
 
 // ── Empresas ──────────────────────────────────────────
-router.get('/empresas',         authorizeRole('SUPER_ADMIN'), getEmpresas);
-router.post('/empresas',        authorizeRole('SUPER_ADMIN'), createEmpresa);
-router.put('/empresas/:id',     authorizeRole('SUPER_ADMIN'), updateEmpresa);
+router.get('/empresas',         authorizeRole(...IAM_ADMIN), getEmpresas);
+router.post('/empresas',        authorizeRole(...IAM_ADMIN), createEmpresa);
+router.put('/empresas/:id',     authorizeRole(...IAM_ADMIN), updateEmpresa);
 
 // ── Sedes ─────────────────────────────────────────────
-router.get('/sedes',            authorizeRole('SUPER_ADMIN', 'MEDICO'), getSedes);
-router.post('/sedes',           authorizeRole('SUPER_ADMIN'), createSede);
-router.put('/sedes/:id',        authorizeRole('SUPER_ADMIN'), updateSede);
+router.get('/sedes',            authorizeRole(...IAM_ADMIN), getSedes);
+router.post('/sedes',           authorizeRole(...IAM_ADMIN), createSede);
+router.put('/sedes/:id',        authorizeRole(...IAM_ADMIN), updateSede);
 
 // ── Perfiles ──────────────────────────────────────────
-router.get('/perfiles',         authorizeRole('SUPER_ADMIN'), getPerfiles);
-router.post('/perfiles',        authorizeRole('SUPER_ADMIN'), createPerfil);
-router.put('/perfiles/:id',     authorizeRole('SUPER_ADMIN'), updatePerfil);
-router.delete('/perfiles/:id',  authorizeRole('SUPER_ADMIN'), deletePerfil);
+router.get('/perfiles',         authorizeRole(...IAM_ADMIN), getPerfiles);
+router.post('/perfiles',        authorizeRole(...IAM_ADMIN), createPerfil);
+router.put('/perfiles/:id',     authorizeRole(...IAM_ADMIN), updatePerfil);
+router.delete('/perfiles/:id',  authorizeRole(...IAM_ADMIN), deletePerfil);
 
 // ── Roles IAM ─────────────────────────────────────────
-router.get('/roles',            authorizeRole('SUPER_ADMIN'), getIamRoles);
-router.post('/roles',           authorizeRole('SUPER_ADMIN'), createIamRol);
-router.put('/roles/:id',        authorizeRole('SUPER_ADMIN'), updateIamRol);
+router.get('/roles',            authorizeRole(...IAM_ADMIN), getIamRoles);
+router.post('/roles',           authorizeRole(...IAM_ADMIN), createIamRol);
+router.put('/roles/:id',        authorizeRole(...IAM_ADMIN), updateIamRol);
 
 // ── Grupos ────────────────────────────────────────────
-router.get('/grupos',           authorizeRole('SUPER_ADMIN'), getGrupos);
-router.post('/grupos',          authorizeRole('SUPER_ADMIN'), createGrupo);
-router.post('/grupos/:grupoId/usuarios', authorizeRole('SUPER_ADMIN'), addUsuarioGrupo);
+router.get('/grupos',           authorizeRole(...IAM_ADMIN), getGrupos);
+router.post('/grupos',          authorizeRole(...IAM_ADMIN), createGrupo);
+router.post('/grupos/:grupoId/usuarios', authorizeRole(...IAM_ADMIN), addUsuarioGrupo);
 
 // ── Recursos del sistema ──────────────────────────────
 router.get('/recursos',         getRecursos);
-router.post('/recursos/seed',   authorizeRole('SUPER_ADMIN'), seedRecursosSistema);
+router.post('/recursos/seed',   authorizeRole(...IAM_ADMIN), seedRecursosSistema);
 
 // ── Permisos ──────────────────────────────────────────
-router.get('/permisos',         authorizeRole('SUPER_ADMIN'), getPermisos);
-router.post('/permisos',        authorizeRole('SUPER_ADMIN'), setPermiso);
-router.delete('/permisos/:id',  authorizeRole('SUPER_ADMIN'), deletePermiso);
-router.post('/permisos/check',  checkPermiso);          // Any authenticated user
-router.get('/permisos/mine',    getMyPermissions);      // Any authenticated user
+router.get('/permisos',         authorizeRole(...IAM_ADMIN), getPermisos);
+router.post('/permisos',        authorizeRole(...IAM_ADMIN), setPermiso);
+router.delete('/permisos/:id',  authorizeRole(...IAM_ADMIN), deletePermiso);
+router.post('/permisos/check',  checkPermiso);       // cualquier usuario autenticado
+router.get('/permisos/mine',    getMyPermissions);   // cualquier usuario autenticado
 
 // ── Políticas de seguridad ────────────────────────────
-router.get('/politicas',        authorizeRole('SUPER_ADMIN'), getPoliticas);
-router.post('/politicas',       authorizeRole('SUPER_ADMIN'), createPolitica);
-router.put('/politicas/:id',    authorizeRole('SUPER_ADMIN'), updatePolitica);
+router.get('/politicas',        authorizeRole(...IAM_ADMIN), getPoliticas);
+router.post('/politicas',       authorizeRole(...IAM_ADMIN), createPolitica);
+router.put('/politicas/:id',    authorizeRole(...IAM_ADMIN), updatePolitica);
 
 // ── Sesiones activas ──────────────────────────────────
-router.get('/sesiones',         authorizeRole('SUPER_ADMIN'), getSesiones);
-router.delete('/sesiones/:id',  authorizeRole('SUPER_ADMIN'), revocarSesion);
+router.get('/sesiones',         authorizeRole(...IAM_ADMIN), getSesiones);
+router.delete('/sesiones/:id',  authorizeRole(...IAM_ADMIN), revocarSesion);
 
 // ── Delegaciones temporales ───────────────────────────
 router.get('/delegaciones',     getDelegaciones);
@@ -87,8 +90,8 @@ router.post('/delegaciones',    createDelegacion);
 router.delete('/delegaciones/:id', revokeDelegacion);
 
 // ── Auditoría ─────────────────────────────────────────
-router.get('/auditoria/accesos',  authorizeRole('SUPER_ADMIN'), getAuditAccesos);
-router.get('/auditoria/eventos',  authorizeRole('SUPER_ADMIN'), getEventosSeguridad);
-router.put('/auditoria/eventos/:id/resolver', authorizeRole('SUPER_ADMIN'), resolverEvento);
+router.get('/auditoria/accesos',  authorizeRole(...IAM_ADMIN), getAuditAccesos);
+router.get('/auditoria/eventos',  authorizeRole(...IAM_ADMIN), getEventosSeguridad);
+router.put('/auditoria/eventos/:id/resolver', authorizeRole(...IAM_ADMIN), resolverEvento);
 
 export default router;
