@@ -18,6 +18,7 @@ import FacturacionPage from './pages/FacturacionPage';
 import PlantillasPage from './pages/PlantillasPage';
 import MapaCorporalPage from './pages/MapaCorporalPage';
 import OdontogramaPage from './pages/OdontogramaPage';
+import SeguridadPage   from './pages/SeguridadPage';
 import { Body3DTestPage } from './pages/Body3DTestPage';
 import UsuariosPage from './pages/UsuariosPage';
 import AdminPage from './pages/AdminPage';
@@ -68,6 +69,7 @@ const NAV_SECTIONS = [
     items: [
       { id: 'admin',    label: 'Parametrización',   sym: 'Z' },
       { id: 'usuarios', label: 'Usuarios',          sym: 'U' },
+      { id: 'seguridad', label: 'Seguridad & IAM',  sym: 'E' },
       { id: 'manual',   label: 'Manual de Usuario', sym: '?' },
     ],
   },
@@ -506,6 +508,7 @@ function App() {
           {currentPage === 'body3d-test'         && <Body3DTestPage />}
           {currentPage === 'usuarios'            && <UsuariosPage />}
           {currentPage === 'admin'               && <AdminPage />}
+          {currentPage === 'seguridad'            && <SeguridadPage />}
           {currentPage === 'manual'              && <ManualPage />}
         </div>
         </div>
