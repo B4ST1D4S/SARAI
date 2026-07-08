@@ -556,6 +556,85 @@ export const checkPermiso = async (req: Request, res: Response) => {
   }
 };
 
+// Mapa rápido de permisos: solo hace 2-3 queries, devuelve [{recurso, accion}]
+// Usuarios SIN perfilId = sin restricciones IAM (backward-compatible)
+export const getMapaPermisos = async (req: Request, res: Response) => {
+  try {
+    const usuarioId = req.user?.userId;
+    if (!usuarioId) return res.status(401).json({ error: 'No autenticado' });
+
+    const usuario = await prisma.user.findUnique({
+      where: { id: usuarioId },
+      select: { perfilId: true, iamRoles: { select: { rolId: true } }, grupos: { select: { grupoId: true } } },
+    });
+
+    // Sin perfil IAM → devolver null (sin restricciones, acceso total al sistema legacy)
+    if (!usuario?.perfilId) return res.json(null);
+
+    const ahora = new Date();
+    const filtroActivo = {
+      efecto: 'PERMITIR' as const,
+      activo: true,
+      OR: [{ fechaInicio: null }, { fechaInicio: { lte: ahora } }] as any,
+      AND: [{ OR: [{ fechaFin: null }, { fechaFin: { gte: ahora } }] }] as any,
+    };
+
+    // Permisos del perfil + roles + grupos del usuario
+    const [permisoPerfil, permisosRol, permisosGrupo, permisosDirectos] = await Promise.all([
+      prisma.permisoRecurso.findMany({
+        where: { ...filtroActivo, perfilId: usuario.perfilId },
+        include: { recurso: { select: { codigo: true } } },
+      }),
+      usuario.iamRoles.length > 0 ? prisma.permisoRecurso.findMany({
+        where: { ...filtroActivo, rolId: { in: usuario.iamRoles.map(r => r.rolId) } },
+        include: { recurso: { select: { codigo: true } } },
+      }) : [],
+      usuario.grupos.length > 0 ? prisma.permisoRecurso.findMany({
+        where: { ...filtroActivo, grupoId: { in: usuario.grupos.map(g => g.grupoId) } },
+        include: { recurso: { select: { codigo: true } } },
+      }) : [],
+      prisma.permisoRecurso.findMany({
+        where: { ...filtroActivo, usuarioId },
+        include: { recurso: { select: { codigo: true } } },
+      }),
+    ]);
+
+    // Verificar DENCIONs directos del usuario
+    const denegarDirecto = await prisma.permisoRecurso.findMany({
+      where: { efecto: 'DENEGAR', activo: true, usuarioId },
+      include: { recurso: { select: { codigo: true } } },
+    });
+
+    const denegar = new Set(denegarDirecto.map(p => `${p.recurso.codigo}:${p.accion}`));
+
+    const todos = [...permisoPerfil, ...permisosRol, ...permisosGrupo, ...permisosDirectos];
+    const permitidos = todos
+      .filter(p => !denegar.has(`${p.recurso.codigo}:${p.accion}`))
+      .map(p => ({ recurso: p.recurso.codigo, accion: p.accion as string }));
+
+    // Deduplicar
+    const mapa: Record<string, Set<string>> = {};
+    for (const p of permitidos) {
+      if (!mapa[p.recurso]) mapa[p.recurso] = new Set();
+      mapa[p.recurso].add(p.accion);
+    }
+
+    // Convertir a objeto plano { 'CLINICA.PACIENTES': { VER: true, CREAR: false, ... } }
+    const resultado: Record<string, Record<string, boolean>> = {};
+    for (const [cod, acciones] of Object.entries(mapa)) {
+      resultado[cod] = {};
+      for (const a of ['VER','CREAR','EDITAR','ELIMINAR','IMPRIMIR','EXPORTAR','APROBAR','ANULAR']) {
+        resultado[cod][a] = acciones.has(a);
+      }
+    }
+
+    res.json(resultado);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Error al obtener mapa de permisos' });
+  }
+};
+
 // Obtener mapa completo de permisos del usuario autenticado
 export const getMyPermissions = async (req: Request, res: Response) => {
   try {

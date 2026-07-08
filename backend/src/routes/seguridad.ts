@@ -14,7 +14,7 @@ import {
   // Recursos
   getRecursos, seedRecursosSistema,
   // Permisos
-  getPermisos, setPermiso, deletePermiso, checkPermiso, getMyPermissions,
+  getPermisos, setPermiso, deletePermiso, checkPermiso, getMyPermissions, getMapaPermisos,
   // Políticas
   getPoliticas, createPolitica, updatePolitica,
   // Sesiones
@@ -74,6 +74,7 @@ router.post('/permisos',        authorizeRole(...IAM_ADMIN), setPermiso);
 router.delete('/permisos/:id',  authorizeRole(...IAM_ADMIN), deletePermiso);
 router.post('/permisos/check',  checkPermiso);       // cualquier usuario autenticado
 router.get('/permisos/mine',    getMyPermissions);   // cualquier usuario autenticado
+router.get('/permisos/mapa',    getMapaPermisos);    // mapa rápido para enforcement UI
 
 // ── Políticas de seguridad ────────────────────────────
 router.get('/politicas',        authorizeRole(...IAM_ADMIN), getPoliticas);

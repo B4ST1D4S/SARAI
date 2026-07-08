@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Search, Eye, Trash2, Upload } from 'lucide-react';
+import { useIam } from '../context/IamContext';
 import {
   createPaciente,
   getAllPacientes,
@@ -102,8 +103,21 @@ export default function PacientesPage() {
     setLoading(false);
   };
 
+  const { canDo } = useIam();
+  const puedeVer      = canDo('CLINICA.PACIENTES', 'VER');
+  const puedeCrear    = canDo('CLINICA.PACIENTES', 'CREAR');
+  const puedeEliminar = canDo('CLINICA.PACIENTES', 'ELIMINAR');
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-3 sm:p-6">
+      {/* Sin permiso VER → bloquear todo el módulo */}
+      {!puedeVer ? (
+        <div className="flex flex-col items-center justify-center min-h-[60vh] text-gray-500 gap-3">
+          <div className="text-5xl">🔒</div>
+          <p className="text-lg font-semibold">Sin acceso al módulo de Pacientes</p>
+          <p className="text-sm">Tu perfil IAM no tiene permiso VER en este módulo.</p>
+        </div>
+      ) : (
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <motion.div
@@ -116,6 +130,7 @@ export default function PacientesPage() {
             <p className="text-slate-400 text-xs sm:text-sm">Administra la información de tus pacientes</p>
           </div>
           <div className="flex gap-2">
+            {puedeCrear && (
             <motion.button
               onClick={() => setMostrarCargaMasiva(true)}
               whileHover={{ scale: 1.05 }}
@@ -125,6 +140,8 @@ export default function PacientesPage() {
               <Upload size={16} />
               <span className="hidden sm:inline">Carga </span>Masiva
             </motion.button>
+            )}
+            {puedeCrear && (
             <motion.button
               onClick={() => setMostrarFormulario(true)}
               whileHover={{ scale: 1.05 }}
@@ -134,6 +151,7 @@ export default function PacientesPage() {
               <Plus size={16} />
               <span className="hidden sm:inline">Nuevo </span>Paciente
             </motion.button>
+            )}
           </div>
         </motion.div>
 
@@ -242,6 +260,7 @@ export default function PacientesPage() {
                         >
                           <Eye size={18} />
                         </motion.button>
+                        {puedeEliminar && (
                         <motion.button
                           whileHover={{ scale: 1.1 }}
                           whileTap={{ scale: 0.9 }}
@@ -252,6 +271,7 @@ export default function PacientesPage() {
                         >
                           <Trash2 size={18} />
                         </motion.button>
+                        )}
                       </div>
                     </div>
                   </motion.div>
@@ -281,6 +301,7 @@ export default function PacientesPage() {
           />
         )}
       </AnimatePresence>
+      )}
     </div>
   );
 }
