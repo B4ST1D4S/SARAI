@@ -18,6 +18,7 @@ import FacturacionPage from './pages/FacturacionPage';
 import PlantillasPage from './pages/PlantillasPage';
 import MapaCorporalPage from './pages/MapaCorporalPage';
 import OdontogramaPage from './pages/OdontogramaPage';
+import SeguridadPage   from './pages/SeguridadPage';
 import { Body3DTestPage } from './pages/Body3DTestPage';
 import UsuariosPage from './pages/UsuariosPage';
 import AdminPage from './pages/AdminPage';
@@ -28,6 +29,31 @@ import ManualPage from './pages/ManualPage';
 import saraiLogo from './assets/logo1.png';
 import { getParametrosSistema } from './services/adminService';
 import { useTheme } from './hooks/useTheme';
+import { useIam } from './context/IamContext';
+
+// Mapeo id de nav → código de recurso IAM
+// Items sin entrada siempre son visibles (no tienen recurso IAM asignado)
+const NAV_RECURSO: Record<string, string> = {
+  dashboard:          'DASHBOARD',
+  pacientes:          'CLINICA.PACIENTES',
+  historia:           'CLINICA.HISTORIA',
+  fotos:              'CLINICA.VISUAL',
+  odontograma:        'CLINICA.ODONTOGRAMA',
+  'mapa-corporal':    'CLINICA.MAPA',
+  agenda:             'AGENDA.CITAS',
+  admision:           'AGENDA.ADMISION',
+  agendaProfesional:  'AGENDA.PROFESIONAL',
+  'config-agenda':    'AGENDA.CONFIG',
+  'vista-cirujano':   'AGENDA.CIRUGIA',
+  cotizaciones:       'GESTION.COTIZACIONES',
+  crm:                'GESTION.CRM',
+  facturacion:        'GESTION.FACTURACION',
+  plantillas:         'GESTION.PLANTILLAS',
+  impresion:          'GESTION.IMPRESION',
+  admin:              'ADMIN.PARAMETRIZACION',
+  usuarios:           'ADMIN.USUARIOS',
+  seguridad:          'SEGURIDAD',
+};
 
 const NAV_SECTIONS = [
   {
@@ -68,6 +94,7 @@ const NAV_SECTIONS = [
     items: [
       { id: 'admin',    label: 'Parametrización',   sym: 'Z' },
       { id: 'usuarios', label: 'Usuarios',          sym: 'U' },
+      { id: 'seguridad', label: 'Seguridad & IAM',  sym: 'E' },
       { id: 'manual',   label: 'Manual de Usuario', sym: '?' },
     ],
   },
@@ -94,6 +121,14 @@ function Sidebar({
 }) {
   // En móvil el sidebar siempre se muestra expandido cuando está abierto
   const effectiveCollapsed = mobileOpen ? false : collapsed;
+  const { canDo } = useIam();
+
+  // Filtra un item según permisos IAM (mapa null = sin perfil = acceso total)
+  const itemVisible = (id: string) => {
+    const recurso = NAV_RECURSO[id];
+    if (!recurso) return true;       // sin código IAM → siempre visible
+    return canDo(recurso, 'VER');
+  };
 
   const handleNavClick = (id: string) => {
     setCurrentPage(id);
@@ -167,7 +202,7 @@ function Sidebar({
               </AnimatePresence>
               {effectiveCollapsed && <div className="mx-3 mb-1 border-t border-white/5" />}
 
-              {section.items.map((item) => {
+              {section.items.filter(item => itemVisible(item.id)).map((item) => {
                 const active = currentPage === item.id;
                 return (
                   <button
@@ -506,6 +541,7 @@ function App() {
           {currentPage === 'body3d-test'         && <Body3DTestPage />}
           {currentPage === 'usuarios'            && <UsuariosPage />}
           {currentPage === 'admin'               && <AdminPage />}
+          {currentPage === 'seguridad'            && <SeguridadPage />}
           {currentPage === 'manual'              && <ManualPage />}
         </div>
         </div>

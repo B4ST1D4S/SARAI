@@ -416,8 +416,14 @@ function TabEspecialidades() {
         {(modal === 'create' || modal === 'edit') && (
           <Modal title={modal === 'create' ? 'Nueva Especialidad' : 'Editar Especialidad'} onClose={() => setModal(null)}>
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <Field label="Código" value={form.codigo||''} onChange={f('codigo')} required placeholder="Ej: ESP-001" />
+              <div className={modal === 'edit' ? 'grid grid-cols-2 gap-4' : ''}>
+                {modal === 'edit' && (
+                  <div>
+                    <label className="block text-xs text-gray-400 mb-1">Código</label>
+                    <input readOnly value={form.codigo||''}
+                      className="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-3 py-2 text-sm text-gray-400 cursor-not-allowed" />
+                  </div>
+                )}
                 <Field label="Nombre" value={form.nombre||''} onChange={f('nombre')} required placeholder="Ej: Cirugía Plástica" />
               </div>
               <Field label="Descripción" value={form.descripcion||''} onChange={f('descripcion')} type="textarea" />
@@ -529,6 +535,21 @@ function TabTiposConsulta() {
     finally { savingRef.current = false; setSaving(false); }
   };
 
+  // Guarda y queda en modo edición para poder asociar servicios CUPS
+  const saveAndContinue = async () => {
+    if (savingRef.current) return;
+    savingRef.current = true;
+    setSaving(true); setErr('');
+    try {
+      const result = await svc.createTipoConsulta(form) as any;
+      setForm((p: any) => ({ ...p, id: result.id }));
+      setModal('edit');
+      loadSvcs(result.id);
+      load();
+    } catch(e: any) { setErr(e.message); }
+    finally { savingRef.current = false; setSaving(false); }
+  };
+
   const del = async (r: any) => {
     if (!confirm(`¿Desactivar "${r.nombre}"?`)) return;
     try { await svc.deleteTipoConsulta(r.id); load(); } catch(e: any) { alert(e.message); }
@@ -551,6 +572,14 @@ function TabTiposConsulta() {
     try { await svc.removeServicioDeConsulta(confId); await loadSvcs(form.id); }
     catch(e: any) { setSvcErr(e?.message || 'Error al quitar'); }
   };
+
+  // Auto-guarda al entrar al tab Servicios en modo crear
+  useEffect(() => {
+    if (wiz === 2 && modal === 'create' && form.nombre && !savingRef.current) {
+      saveAndContinue();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wiz]);
 
   const f = (k: string) => (v: any) => setForm((p: any) => ({...p, [k]: v}));
   const TABS = ['General', 'Clínica', 'Servicios'];
@@ -717,7 +746,10 @@ function TabTiposConsulta() {
                     {svcErr && <ErrBox msg={svcErr} />}
                   </>
                 ) : (
-                  <p className="text-xs text-gray-500 py-3">Guarda el tipo de consulta primero para poder asociar servicios CUPS.</p>
+                  <div className="flex items-center gap-2 text-xs text-gray-400 py-4">
+                    <span className="w-4 h-4 border-2 border-gray-500 border-t-yellow-400 rounded-full animate-spin" />
+                    Guardando tipo de consulta…
+                  </div>
                 )}
               </div>
             )}
@@ -728,12 +760,13 @@ function TabTiposConsulta() {
               <div>{wiz > 0 && <button onClick={() => setWiz(w => w - 1)} className="px-3 py-2 text-xs text-gray-400 border border-white/10 rounded-lg hover:text-white transition">← Anterior</button>}</div>
               <div className="flex gap-2">
                 <button onClick={() => setModal(null)} className="px-4 py-2 text-xs text-gray-400 hover:text-white border border-white/10 rounded-lg transition">Cancelar</button>
-                {wiz < TABS.length - 1
-                  ? <button onClick={() => setWiz(w => w + 1)} className="flex items-center gap-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white text-xs rounded-lg transition">Siguiente <ChevronRight size={13} /></button>
-                  : wiz === 2
-                    ? <button onClick={() => setModal(null)} className="px-4 py-2 text-xs text-gray-400 hover:text-white border border-white/10 rounded-lg transition">Cerrar</button>
-                    : <button onClick={save} disabled={saving} className="flex items-center gap-2 px-4 py-2 bg-yellow-600 hover:bg-yellow-500 text-white text-xs font-semibold rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none">{saving ? <><span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Guardando…</> : <><Save size={13} /> Guardar</>}</button>
-                }
+                {wiz < TABS.length - 1 ? (
+                  <button onClick={() => setWiz(w => w + 1)} className="flex items-center gap-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white text-xs rounded-lg transition">Siguiente <ChevronRight size={13} /></button>
+                ) : modal === 'edit' ? (
+                  <button onClick={() => setModal(null)} className="px-4 py-2 text-xs text-gray-400 hover:text-white border border-white/10 rounded-lg transition">Cerrar</button>
+                ) : (
+                  <button onClick={save} disabled={saving} className="flex items-center gap-2 px-4 py-2 bg-yellow-600 hover:bg-yellow-500 text-white text-xs font-semibold rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed">{saving ? <><span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Guardando…</> : <><Save size={13} /> Guardar</>}</button>
+                )}
               </div>
             </div>
           </Modal>
@@ -3487,7 +3520,7 @@ const MODULOS = [
 export default function AdminPage() {
   const [activeMod, setActiveMod] = useState('consulta-externa');
   const [activeSub, setActiveSub] = useState('especialidades');
-  const [expanded,  setExpanded]  = useState('consulta-externa');
+  const [expanded,  setExpanded]  = useState('');
 
   // Precarga los datos más comunes en paralelo al montar la página
   // para que el cache esté caliente cuando el usuario navegue a cada tab
