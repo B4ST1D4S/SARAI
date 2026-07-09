@@ -42,6 +42,7 @@ export interface CreateUserDto {
   registroProfesional?: string;
   registroMedico?: string;
   firmaBase64?: string;
+  perfilId?: string;
 }
 
 export interface UpdateUserDto {

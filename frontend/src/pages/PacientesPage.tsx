@@ -108,16 +108,18 @@ export default function PacientesPage() {
   const puedeCrear    = canDo('CLINICA.PACIENTES', 'CREAR');
   const puedeEliminar = canDo('CLINICA.PACIENTES', 'ELIMINAR');
 
+  if (!puedeVer) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-3 sm:p-6 flex flex-col items-center justify-center">
+        <div className="text-5xl mb-3">🔒</div>
+        <p className="text-lg font-semibold text-gray-400">Sin acceso al módulo de Pacientes</p>
+        <p className="text-sm text-gray-500">Tu perfil IAM no tiene permiso VER en este módulo.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-3 sm:p-6">
-      {/* Sin permiso VER → bloquear todo el módulo */}
-      {!puedeVer ? (
-        <div className="flex flex-col items-center justify-center min-h-[60vh] text-gray-500 gap-3">
-          <div className="text-5xl">🔒</div>
-          <p className="text-lg font-semibold">Sin acceso al módulo de Pacientes</p>
-          <p className="text-sm">Tu perfil IAM no tiene permiso VER en este módulo.</p>
-        </div>
-      ) : (
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <motion.div
@@ -301,7 +303,6 @@ export default function PacientesPage() {
           />
         )}
       </AnimatePresence>
-      )}
     </div>
   );
 }

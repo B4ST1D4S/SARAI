@@ -15,6 +15,7 @@ import {
   Stethoscope,
   User,
 } from 'lucide-react';
+import { CargaMasivaUsuarios } from '../components/CargaMasivaUsuarios';
 import {
   createUsuario,
   getAllUsuarios,
@@ -103,6 +104,7 @@ export default function UsuariosPage() {
   const [rolFiltro, setRolFiltro] = useState('TODOS');
 
   const [showModal, setShowModal] = useState(false);
+  const [showCargaMasiva, setShowCargaMasiva] = useState(false);
   const [mode, setMode]           = useState<FormMode>('crear');
   const [editId, setEditId]       = useState<string | null>(null);
 
@@ -296,15 +298,25 @@ export default function UsuariosPage() {
             Gestión de usuarios y profesionales del sistema
           </p>
         </div>
-        <button
-          onClick={abrirCrear}
-          className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-yellow-500 to-amber-500
-                     text-slate-900 font-semibold rounded-xl hover:from-yellow-400 hover:to-amber-400
-                     transition-all shadow-lg shadow-yellow-500/20 text-sm"
-        >
-          <Plus size={16} />
-          Nuevo Usuario
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowCargaMasiva(true)}
+            className="flex items-center gap-2 px-4 py-2.5 bg-white/5 border border-white/10 text-gray-300
+                       font-semibold rounded-xl hover:bg-white/10 transition-all text-sm"
+          >
+            <Upload size={16} />
+            Carga Masiva
+          </button>
+          <button
+            onClick={abrirCrear}
+            className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-yellow-500 to-amber-500
+                       text-slate-900 font-semibold rounded-xl hover:from-yellow-400 hover:to-amber-400
+                       transition-all shadow-lg shadow-yellow-500/20 text-sm"
+          >
+            <Plus size={16} />
+            Nuevo Usuario
+          </button>
+        </div>
       </div>
 
       {/* ── Stats ── */}
@@ -605,6 +617,18 @@ export default function UsuariosPage() {
                           placeholder="+57 300 000 0000" className={inputCls} />
                       </Field>
                     </div>
+                    <Field label="Especialidad">
+                      <select
+                        value={form.especialidad ?? ''}
+                        onChange={(e) => setForm((f) => ({ ...f, especialidad: e.target.value }))}
+                        className={inputCls}
+                      >
+                        <option value="">— Seleccionar especialidad —</option>
+                        {especialidades.map((e) => (
+                          <option key={e.id} value={e.nombre}>{e.nombre}</option>
+                        ))}
+                      </select>
+                    </Field>
                   </Section>
 
                   {/* ── Sección: Datos profesionales (solo MEDICO / AUXILIAR) ── */}
@@ -638,18 +662,6 @@ export default function UsuariosPage() {
                                 placeholder="Ej: 1234567890" className={inputCls} />
                             </Field>
                           </div>
-                          <Field label="Especialidad">
-                            <select
-                              value={form.especialidad ?? ''}
-                              onChange={(e) => setForm((f) => ({ ...f, especialidad: e.target.value }))}
-                              className={inputCls}
-                            >
-                              <option value="">— Seleccionar especialidad —</option>
-                              {especialidades.map((e) => (
-                                <option key={e.id} value={e.nombre}>{e.nombre}</option>
-                              ))}
-                            </select>
-                          </Field>
                           <div className="grid grid-cols-2 gap-4">
                             <Field label="Registro profesional">
                               <input value={form.registroProfesional}
@@ -732,6 +744,16 @@ export default function UsuariosPage() {
               </form>
             </motion.div>
           </>
+        )}
+      </AnimatePresence>
+
+      {/* Modal Carga Masiva */}
+      <AnimatePresence>
+        {showCargaMasiva && (
+          <CargaMasivaUsuarios
+            onClose={() => setShowCargaMasiva(false)}
+            onSuccess={() => { loadUsuarios(); setShowCargaMasiva(false); }}
+          />
         )}
       </AnimatePresence>
     </div>

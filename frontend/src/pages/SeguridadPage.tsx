@@ -533,6 +533,7 @@ function PermisosTab({ api }: { api: ReturnType<typeof useApi> }) {
   const [selPerfil, setSelPerfil] = useState('');
   const [permisos, setPermisos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [guardando, setGuardando] = useState(false);
 
   const ACCIONES = ['VER', 'CREAR', 'EDITAR', 'ELIMINAR', 'IMPRIMIR', 'EXPORTAR', 'APROBAR', 'ANULAR'];
 
@@ -547,15 +548,7 @@ function PermisosTab({ api }: { api: ReturnType<typeof useApi> }) {
   const tienePermiso = (recursoId: string, accion: string) =>
     permisos.some(p => p.recursoId === recursoId && p.accion === accion && p.efecto === 'PERMITIR');
 
-  const togglePermiso = async (recurso: any, accion: string) => {
-    const tiene = tienePermiso(recurso.id, accion);
-    await api.post('/permisos', {
-      sujetoTipo: 'PERFIL',
-      sujetoId: selPerfil,
-      recursoCodigo: recurso.codigo,
-      accion,
-      efecto: tiene ? 'DENEGAR' : 'PERMITIR',
-    });
+  const recargar = async () => {
     const updated = await api.getList(`/permisos?sujetoTipo=PERFIL&sujetoId=${selPerfil}`);
     setPermisos(updated);
   };
@@ -565,9 +558,91 @@ function PermisosTab({ api }: { api: ReturnType<typeof useApi> }) {
 
   const flat = flatRecursos(recursos);
 
+  const togglePermiso = async (recurso: any, accion: string) => {
+    const tiene = tienePermiso(recurso.id, accion);
+    await api.post('/permisos', {
+      sujetoTipo: 'PERFIL', sujetoId: selPerfil,
+      recursoCodigo: recurso.codigo, accion,
+      efecto: tiene ? 'DENEGAR' : 'PERMITIR',
+    });
+    await recargar();
+  };
+
+  // ── Asignar TODOS los permisos al perfil
+  const asignarTodos = async () => {
+    if (!selPerfil || guardando) return;
+    setGuardando(true);
+    await Promise.all(
+      flat.flatMap(({ item }) =>
+        ACCIONES.map(accion =>
+          api.post('/permisos', {
+            sujetoTipo: 'PERFIL', sujetoId: selPerfil,
+            recursoCodigo: item.codigo, accion, efecto: 'PERMITIR',
+          })
+        )
+      )
+    );
+    await recargar();
+    setGuardando(false);
+  };
+
+  // ── Quitar TODOS los permisos del perfil
+  const revocarTodos = async () => {
+    if (!selPerfil || guardando) return;
+    setGuardando(true);
+    await Promise.all(
+      flat.flatMap(({ item }) =>
+        ACCIONES.map(accion =>
+          api.post('/permisos', {
+            sujetoTipo: 'PERFIL', sujetoId: selPerfil,
+            recursoCodigo: item.codigo, accion, efecto: 'DENEGAR',
+          })
+        )
+      )
+    );
+    await recargar();
+    setGuardando(false);
+  };
+
+  // ── Toggle toda una columna (acción)
+  const toggleColumna = async (accion: string) => {
+    if (!selPerfil || guardando) return;
+    const todasTienen = flat.every(({ item }) => tienePermiso(item.id, accion));
+    setGuardando(true);
+    await Promise.all(
+      flat.map(({ item }) =>
+        api.post('/permisos', {
+          sujetoTipo: 'PERFIL', sujetoId: selPerfil,
+          recursoCodigo: item.codigo, accion,
+          efecto: todasTienen ? 'DENEGAR' : 'PERMITIR',
+        })
+      )
+    );
+    await recargar();
+    setGuardando(false);
+  };
+
+  // ── Toggle toda una fila (recurso)
+  const toggleFila = async (recurso: any) => {
+    if (!selPerfil || guardando) return;
+    const todasTienen = ACCIONES.every(a => tienePermiso(recurso.id, a));
+    setGuardando(true);
+    await Promise.all(
+      ACCIONES.map(accion =>
+        api.post('/permisos', {
+          sujetoTipo: 'PERFIL', sujetoId: selPerfil,
+          recursoCodigo: recurso.codigo, accion,
+          efecto: todasTienen ? 'DENEGAR' : 'PERMITIR',
+        })
+      )
+    );
+    await recargar();
+    setGuardando(false);
+  };
+
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-bold text-white flex items-center gap-2">
           <Lock size={20} className="text-rose-400" />
           Matriz de Permisos
@@ -578,45 +653,97 @@ function PermisosTab({ api }: { api: ReturnType<typeof useApi> }) {
         </select>
       </div>
 
+      {/* Barra de acciones masivas */}
+      {selPerfil && (
+        <div className="flex gap-2 mb-4">
+          <button
+            onClick={asignarTodos}
+            disabled={guardando}
+            className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 disabled:opacity-50 transition-all"
+          >
+            <CheckCircle size={13} />
+            {guardando ? 'Guardando…' : 'Marcar todos'}
+          </button>
+          <button
+            onClick={revocarTodos}
+            disabled={guardando}
+            className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 disabled:opacity-50 transition-all"
+          >
+            <XCircle size={13} />
+            {guardando ? 'Guardando…' : 'Quitar todos'}
+          </button>
+          <span className="text-xs text-gray-600 self-center ml-2">
+            También puedes hacer clic en una columna o en el nombre de un recurso para marcar/desmarcar toda esa fila/columna.
+          </span>
+        </div>
+      )}
+
       {selPerfil ? (
         <div className="overflow-auto rounded-2xl border border-white/5">
           <table className="w-full text-xs">
             <thead>
               <tr className="bg-[#0a0c13] border-b border-white/5">
                 <th className="text-left text-gray-500 font-medium px-4 py-3 min-w-[200px]">Recurso</th>
-                {ACCIONES.map(a => (
-                  <th key={a} className="text-center text-gray-500 font-medium px-2 py-3 min-w-[70px]">{a}</th>
-                ))}
+                {ACCIONES.map(a => {
+                  const todasTienen = flat.length > 0 && flat.every(({ item }) => tienePermiso(item.id, a));
+                  return (
+                    <th key={a} className="text-center px-2 py-3 min-w-[70px]">
+                      <button
+                        onClick={() => toggleColumna(a)}
+                        disabled={guardando}
+                        title={`Click para ${todasTienen ? 'quitar' : 'marcar'} todos en ${a}`}
+                        className={`w-full font-semibold transition-colors rounded-lg py-0.5 ${
+                          todasTienen
+                            ? 'text-emerald-400 hover:text-emerald-300'
+                            : 'text-gray-500 hover:text-white'
+                        }`}
+                      >
+                        {a}
+                      </button>
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
             <tbody>
-              {flat.map(({ item, level }) => (
-                <tr key={item.id} className="border-b border-white/[0.03] hover:bg-white/[0.02] transition-colors">
-                  <td className="px-4 py-2.5" style={{ paddingLeft: `${16 + level * 16}px` }}>
-                    <div className="flex items-center gap-1.5">
-                      {level > 0 && <ChevronRight size={11} className="text-gray-600" />}
-                      <span className={`text-${level === 0 ? 'white font-semibold' : level === 1 ? 'gray-300' : 'gray-400'}`}>
-                        {item.nombre}
-                      </span>
-                      <span className="text-gray-600 font-mono text-[10px]">{item.tipo}</span>
-                    </div>
-                  </td>
-                  {ACCIONES.map(accion => (
-                    <td key={accion} className="text-center px-2 py-2.5">
-                      <button
-                        onClick={() => togglePermiso(item, accion)}
-                        className={`w-6 h-6 rounded-lg border transition-all mx-auto flex items-center justify-center ${
-                          tienePermiso(item.id, accion)
-                            ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400'
-                            : 'bg-white/[0.03] border-white/10 text-gray-700 hover:border-white/20'
-                        }`}
-                      >
-                        {tienePermiso(item.id, accion) ? <CheckCircle size={12} /> : <XCircle size={12} />}
-                      </button>
+              {flat.map(({ item, level }) => {
+                const todasFilaTienen = ACCIONES.every(a => tienePermiso(item.id, a));
+                return (
+                  <tr key={item.id} className="border-b border-white/[0.03] hover:bg-white/[0.02] transition-colors">
+                    <td className="px-4 py-2.5" style={{ paddingLeft: `${16 + level * 16}px` }}>
+                      <div className="flex items-center gap-1.5">
+                        {level > 0 && <ChevronRight size={11} className="text-gray-600" />}
+                        <button
+                          onClick={() => toggleFila(item)}
+                          disabled={guardando}
+                          title={`Click para ${todasFilaTienen ? 'quitar' : 'marcar'} todos los permisos de ${item.nombre}`}
+                          className={`text-left font-${level === 0 ? 'semibold' : 'normal'} transition-colors hover:underline ${
+                            level === 0 ? 'text-white' : level === 1 ? 'text-gray-300' : 'text-gray-400'
+                          } ${todasFilaTienen ? 'text-emerald-300' : ''}`}
+                        >
+                          {item.nombre}
+                        </button>
+                        <span className="text-gray-600 font-mono text-[10px]">{item.tipo}</span>
+                      </div>
                     </td>
-                  ))}
-                </tr>
-              ))}
+                    {ACCIONES.map(accion => (
+                      <td key={accion} className="text-center px-2 py-2.5">
+                        <button
+                          onClick={() => togglePermiso(item, accion)}
+                          disabled={guardando}
+                          className={`w-6 h-6 rounded-lg border transition-all mx-auto flex items-center justify-center disabled:opacity-50 ${
+                            tienePermiso(item.id, accion)
+                              ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400'
+                              : 'bg-white/[0.03] border-white/10 text-gray-700 hover:border-white/20'
+                          }`}
+                        >
+                          {tienePermiso(item.id, accion) ? <CheckCircle size={12} /> : <XCircle size={12} />}
+                        </button>
+                      </td>
+                    ))}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
