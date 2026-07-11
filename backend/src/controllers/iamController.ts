@@ -6,6 +6,7 @@
 import { Request, Response } from 'express';
 import { PrismaClient, TipoAccion, EfectoPermiso, TipoRecurso, TipoEventoSeg } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import { randomUUID } from 'crypto';
 
 const prisma = new PrismaClient();
 
@@ -40,9 +41,9 @@ export async function resolverPermiso(
   const usuario = await prisma.user.findUnique({
     where: { id: usuarioId },
     include: {
-      perfil: true,
-      iamRoles: { include: { rol: true } },
-      grupos: { include: { grupo: true } },
+      Perfil: true,
+      UsuarioIamRol: { include: { IamRol: true } },
+      GrupoUsuario: { include: { Grupo: true } },
     },
   });
   if (!usuario || !usuario.activo) return { permitido: false, fuente: 'usuario_inactivo' };
@@ -92,7 +93,7 @@ export async function resolverPermiso(
   }
 
   // ─── 3. Permisos de roles IAM del usuario ─────────────
-  const rolIds = usuario.iamRoles.map(r => r.rolId);
+  const rolIds = usuario.UsuarioIamRol.map((r: any) => r.rolId);
   if (rolIds.length > 0) {
     const permisosRol = await prisma.permisoRecurso.findMany({
       where: { ...filtroTemporal, rolId: { in: rolIds } },
@@ -106,7 +107,7 @@ export async function resolverPermiso(
   }
 
   // ─── 4. Permisos de grupos ─────────────────────────────
-  const grupoIds = usuario.grupos.map(g => g.grupoId);
+  const grupoIds = usuario.GrupoUsuario.map((g: any) => g.grupoId);
   if (grupoIds.length > 0) {
     const permisosGrupo = await prisma.permisoRecurso.findMany({
       where: { ...filtroTemporal, grupoId: { in: grupoIds } },
@@ -143,7 +144,7 @@ export async function resolverPermiso(
 export const getEmpresas = async (req: Request, res: Response) => {
   try {
     const empresas = await prisma.empresa.findMany({
-      include: { _count: { select: { sedes: true, usuarios: true } } },
+      include: { _count: { select: { Sede: true, User: true } } },
       orderBy: { nombre: 'asc' },
     });
     res.json(empresas);
@@ -182,7 +183,7 @@ export const getSedes = async (req: Request, res: Response) => {
     const { empresaId } = req.query;
     const sedes = await prisma.sede.findMany({
       where: empresaId ? { empresaId: String(empresaId) } : {},
-      include: { empresa: { select: { nombre: true } }, _count: { select: { usuarios: true } } },
+      include: { Empresa: { select: { nombre: true } }, _count: { select: { User: true } } },
       orderBy: { nombre: 'asc' },
     });
     res.json(sedes);
@@ -216,8 +217,8 @@ export const getPerfiles = async (req: Request, res: Response) => {
   try {
     const perfiles = await prisma.perfil.findMany({
       include: {
-        empresa: { select: { nombre: true } },
-        _count: { select: { usuarios: true, roles: true, permisos: true } },
+        Empresa: { select: { nombre: true } },
+        _count: { select: { User: true, PerfilIamRol: true, PermisoRecurso: true } },
       },
       orderBy: { nombre: 'asc' },
     });
@@ -233,11 +234,13 @@ export const createPerfil = async (req: Request, res: Response) => {
 
     const perfil = await prisma.perfil.create({
       data: {
+        id: randomUUID(),
         nombre,
         descripcion,
         empresaId: empresaId || null,
         creadoPor: req.user?.userId,
-        roles: rolesIds ? { create: rolesIds.map((id: string) => ({ rolId: id })) } : undefined,
+        updatedAt: new Date(),
+        PerfilIamRol: rolesIds ? { create: rolesIds.map((id: string) => ({ rolId: id })) } : undefined,
       },
     });
 
@@ -247,15 +250,15 @@ export const createPerfil = async (req: Request, res: Response) => {
         where: { perfilId: clonarDesdeId },
       });
       await prisma.permisoRecurso.createMany({
-        data: permisosOrigen.map(p => ({
+        data: permisosOrigen.map((p: any) => ({
           ...p,
-          id: undefined,
+          id: randomUUID(),
           perfilId: perfil.id,
           usuarioId: null,
           rolId: null,
           grupoId: null,
           createdAt: undefined,
-          updatedAt: undefined,
+          updatedAt: new Date(),
           creadoPor: req.user?.userId,
         })),
       });
@@ -293,7 +296,7 @@ export const deletePerfil = async (req: Request, res: Response) => {
 export const getIamRoles = async (req: Request, res: Response) => {
   try {
     const roles = await prisma.iamRol.findMany({
-      include: { _count: { select: { perfiles: true, usuarios: true, permisos: true } } },
+      include: { _count: { select: { PerfilIamRol: true, UsuarioIamRol: true, PermisoRecurso: true } } },
       orderBy: { nombre: 'asc' },
     });
     res.json(roles);
@@ -327,7 +330,7 @@ export const updateIamRol = async (req: Request, res: Response) => {
 export const getGrupos = async (req: Request, res: Response) => {
   try {
     const grupos = await prisma.grupo.findMany({
-      include: { _count: { select: { miembros: true, permisos: true } } },
+      include: { _count: { select: { GrupoUsuario: true, PermisoRecurso: true } } },
       orderBy: { nombre: 'asc' },
     });
     res.json(grupos);
@@ -364,11 +367,11 @@ export const getRecursos = async (req: Request, res: Response) => {
     const recursos = await prisma.recursoSistema.findMany({
       where: { parentId: null },
       include: {
-        hijos: {
+        other_RecursoSistema: {
           include: {
-            hijos: {
+            other_RecursoSistema: {
               include: {
-                hijos: true,
+                other_RecursoSistema: true,
               },
             },
           },
@@ -474,8 +477,8 @@ export const getPermisos = async (req: Request, res: Response) => {
 
     const permisos = await prisma.permisoRecurso.findMany({
       where,
-      include: { recurso: true },
-      orderBy: { recurso: { codigo: 'asc' } },
+      include: { RecursoSistema: true },
+      orderBy: { RecursoSistema: { codigo: 'asc' } },
     });
     res.json(permisos);
   } catch (e) {
@@ -512,6 +515,7 @@ export const setPermiso = async (req: Request, res: Response) => {
     } else {
       permiso = await prisma.permisoRecurso.create({
         data: {
+          id: randomUUID(),
           [sujetoField]: sujetoId,
           recursoId: recurso.id,
           accion,
@@ -521,6 +525,7 @@ export const setPermiso = async (req: Request, res: Response) => {
           motivo: motivo || null,
           scopeSedeId: scopeSedeId || null,
           creadoPor: req.user?.userId,
+          updatedAt: new Date(),
         },
       });
     }
@@ -565,7 +570,7 @@ export const getMapaPermisos = async (req: Request, res: Response) => {
 
     const usuario = await prisma.user.findUnique({
       where: { id: usuarioId },
-      select: { perfilId: true, iamRoles: { select: { rolId: true } }, grupos: { select: { grupoId: true } } },
+      select: { perfilId: true, UsuarioIamRol: { select: { rolId: true } }, GrupoUsuario: { select: { grupoId: true } } },
     });
 
     // Sin perfil IAM → devolver null (sin restricciones, acceso total al sistema legacy)
@@ -583,34 +588,34 @@ export const getMapaPermisos = async (req: Request, res: Response) => {
     const [permisoPerfil, permisosRol, permisosGrupo, permisosDirectos] = await Promise.all([
       prisma.permisoRecurso.findMany({
         where: { ...filtroActivo, perfilId: usuario.perfilId },
-        include: { recurso: { select: { codigo: true } } },
+        include: { RecursoSistema: { select: { codigo: true } } },
       }),
-      usuario.iamRoles.length > 0 ? prisma.permisoRecurso.findMany({
-        where: { ...filtroActivo, rolId: { in: usuario.iamRoles.map(r => r.rolId) } },
-        include: { recurso: { select: { codigo: true } } },
+      usuario.UsuarioIamRol.length > 0 ? prisma.permisoRecurso.findMany({
+        where: { ...filtroActivo, rolId: { in: usuario.UsuarioIamRol.map((r: any) => r.rolId) } },
+        include: { RecursoSistema: { select: { codigo: true } } },
       }) : [],
-      usuario.grupos.length > 0 ? prisma.permisoRecurso.findMany({
-        where: { ...filtroActivo, grupoId: { in: usuario.grupos.map(g => g.grupoId) } },
-        include: { recurso: { select: { codigo: true } } },
+      usuario.GrupoUsuario.length > 0 ? prisma.permisoRecurso.findMany({
+        where: { ...filtroActivo, grupoId: { in: usuario.GrupoUsuario.map((g: any) => g.grupoId) } },
+        include: { RecursoSistema: { select: { codigo: true } } },
       }) : [],
       prisma.permisoRecurso.findMany({
         where: { ...filtroActivo, usuarioId },
-        include: { recurso: { select: { codigo: true } } },
+        include: { RecursoSistema: { select: { codigo: true } } },
       }),
     ]);
 
     // Verificar DENCIONs directos del usuario
     const denegarDirecto = await prisma.permisoRecurso.findMany({
       where: { efecto: 'DENEGAR', activo: true, usuarioId },
-      include: { recurso: { select: { codigo: true } } },
+      include: { RecursoSistema: { select: { codigo: true } } },
     });
 
-    const denegar = new Set(denegarDirecto.map(p => `${p.recurso.codigo}:${p.accion}`));
+    const denegar = new Set(denegarDirecto.map((p: any) => `${p.RecursoSistema.codigo}:${p.accion}`));
 
     const todos = [...permisoPerfil, ...permisosRol, ...permisosGrupo, ...permisosDirectos];
     const permitidos = todos
-      .filter(p => !denegar.has(`${p.recurso.codigo}:${p.accion}`))
-      .map(p => ({ recurso: p.recurso.codigo, accion: p.accion as string }));
+      .filter((p: any) => !denegar.has(`${p.RecursoSistema.codigo}:${p.accion}`))
+      .map((p: any) => ({ recurso: p.RecursoSistema.codigo, accion: p.accion as string }));
 
     // Deduplicar
     const mapa: Record<string, Set<string>> = {};
@@ -664,7 +669,7 @@ export const getMyPermissions = async (req: Request, res: Response) => {
 export const getPoliticas = async (req: Request, res: Response) => {
   try {
     const politicas = await prisma.politicaSeguridad.findMany({
-      include: { empresa: { select: { nombre: true } } },
+      include: { Empresa: { select: { nombre: true } } },
       orderBy: { nombre: 'asc' },
     });
     res.json(politicas);
@@ -698,7 +703,7 @@ export const getSesiones = async (req: Request, res: Response) => {
   try {
     const sesiones = await prisma.sesionActiva.findMany({
       where: { activa: true },
-      include: { usuario: { select: { nombre: true, apellido: true, email: true, rol: true } } },
+      include: { User: { select: { nombre: true, apellido: true, email: true, rol: true } } },
       orderBy: { ultimaActividad: 'desc' },
     });
     res.json(sesiones);
@@ -712,6 +717,7 @@ export const revocarSesion = async (req: Request, res: Response) => {
     await prisma.sesionActiva.update({ where: { id: req.params.id }, data: { activa: false } });
     await prisma.auditAcceso.create({
       data: {
+        id: randomUUID(),
         usuarioId: req.user?.userId,
         accion: 'SESION_REVOCADA',
         recurso: req.params.id,
@@ -732,8 +738,8 @@ export const getDelegaciones = async (req: Request, res: Response) => {
   try {
     const delegaciones = await prisma.delegacionTemporal.findMany({
       include: {
-        delegante: { select: { nombre: true, apellido: true } },
-        delegado:  { select: { nombre: true, apellido: true } },
+        User_DelegacionTemporal_deleganteIdToUser: { select: { nombre: true, apellido: true } },
+        User_DelegacionTemporal_delegadoIdToUser:  { select: { nombre: true, apellido: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -748,17 +754,20 @@ export const createDelegacion = async (req: Request, res: Response) => {
     const { delegadoId, motivo, fechaInicio, fechaFin, recursosCodigos } = req.body;
     const delegacion = await prisma.delegacionTemporal.create({
       data: {
+        id: randomUUID(),
         deleganteId: req.user!.userId,
         delegadoId,
         motivo,
         fechaInicio: new Date(fechaInicio),
         fechaFin: new Date(fechaFin),
         recursosCodigos,
+        updatedAt: new Date(),
       },
     });
     // Log security event
     await prisma.eventoSeguridad.create({
       data: {
+        id: randomUUID(),
         tipo: 'DELEGACION_CREADA',
         usuarioId: req.user?.userId,
         detalles: { delegadoId, recursosCodigos, fechaFin },

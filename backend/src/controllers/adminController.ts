@@ -103,8 +103,8 @@ export async function createHCModulo(req: Request, res: Response) {
     if (existe) return res.status(400).json({ error: 'Código ya existe' });
 
     const item = await prisma.hCModulo.create({
-      data: { codigo, nombre, descripcion, tipoFinalidad, tipoRips, parametrosConfiguracion, programaId,
-              usuarioCreacion: (req as any).user?.id },
+      data: { id: randomUUID(), codigo, nombre, descripcion, tipoFinalidad, tipoRips, parametrosConfiguracion, programaId,
+              usuarioCreacion: (req as any).user?.id, updatedAt: new Date() },
     });
     res.status(201).json(item);
   } catch {
@@ -157,7 +157,7 @@ export async function createDepartamento(req: Request, res: Response) {
     const existe = await prisma.departamento.findUnique({ where: { codigo } });
     if (existe) return res.status(400).json({ error: 'Código ya existe' });
 
-    const item = await prisma.departamento.create({ data: { codigo, nombre, descripcion } });
+    const item = await prisma.departamento.create({ data: { id: randomUUID(), codigo, nombre, descripcion, updatedAt: new Date() } });
     res.status(201).json(item);
   } catch {
     res.status(500).json({ error: 'Error al crear departamento' });
@@ -233,11 +233,11 @@ export async function createServicio(req: Request, res: Response) {
     if (existe) return res.status(400).json({ error: 'Código CUPS ya existe' });
 
     const item = await prisma.servicioFacturable.create({
-      data: { codigoCups, nombre, descripcion, categoria, subcategoria, tipoServicio,
+      data: { id: randomUUID(), codigoCups, nombre, descripcion, categoria, subcategoria, tipoServicio,
               nivelComplejidad, conceptoRips, precioBase: precioBase ?? 0,
               requiereCantidad: requiereCantidad ?? false,
               esHonorario: esHonorario ?? false,
-              esPOS: esPOS ?? false },
+              esPOS: esPOS ?? false, updatedAt: new Date() },
     });
     res.status(201).json(item);
   } catch {
@@ -369,6 +369,7 @@ export async function createTipoConsulta(req: Request, res: Response) {
       for (const svc of servicios) {
         await prisma.configServicioConsulta.create({
           data: {
+            id: randomUUID(),
             tipoConsultaId: tipoConsulta.id,
             servicioId: svc.servicioId,
             esPrincipal: svc.esPrincipal ?? false,
@@ -432,6 +433,7 @@ export async function updateTipoConsulta(req: Request, res: Response) {
       for (const svc of servicios) {
         await prisma.configServicioConsulta.create({
           data: {
+            id: randomUUID(),
             tipoConsultaId: id,
             servicioId: svc.servicioId,
             esPrincipal: svc.esPrincipal ?? false,
@@ -595,6 +597,7 @@ export async function upsertReglaOperativa(req: Request, res: Response) {
     const item = await prisma.reglaOperativa.upsert({
       where: { departamentoId_servicioId: { departamentoId, servicioId } },
       create: {
+        id: randomUUID(),
         departamentoId, servicioId,
         permiteSeleccion: permiteSeleccion ?? true,
         manejaInsumos: manejaInsumos ?? false,
@@ -604,6 +607,7 @@ export async function upsertReglaOperativa(req: Request, res: Response) {
         tomadoAutomatico: tomadoAutomatico ?? false,
         cumplimientoParcial: cumplimientoParcial ?? false,
         manejaCentroCosto: manejaCentroCosto ?? false,
+        updatedAt: new Date(),
       },
       update: {
         permiteSeleccion, manejaInsumos, generaOrden, liquidaHonorarios,
@@ -656,11 +660,13 @@ export async function createPreparacion(req: Request, res: Response) {
 
     const item = await prisma.preparacion.create({
       data: {
+        id: randomUUID(),
         nombre, descripcion,
         tipo: tipo ?? 'consulta',
         especialidadId: especialidadId || null,
         tipoConsultaId: tipoConsultaId || null,
         usuarioCreacion: (req as any).user?.id,
+        updatedAt: new Date(),
       },
     });
     res.status(201).json(item);
@@ -722,11 +728,13 @@ export async function createCargo(req: Request, res: Response) {
     if (existe) return res.status(400).json({ error: 'Ya existe un cargo con ese código' });
     const item = await prisma.cargo.create({
       data: {
+        id: randomUUID(),
         codigo, nombre, descripcion, tipo: tipo || 'CONSULTA',
         valor: Number(valor) || 0, unidad, codigoReferencia,
         aplicaIva: Boolean(aplicaIva), tasaIva: Number(tasaIva) || 0,
         esObligatorio: Boolean(esObligatorio), aplicaPYP: Boolean(aplicaPYP),
         usuarioCreacion: (req as any).user?.userId,
+        updatedAt: new Date(),
       },
     });
     res.status(201).json(item);
@@ -784,7 +792,7 @@ export async function bulkCreateCargos(req: Request, res: Response) {
       if (!row.codigo || !row.nombre) { results.errors.push(`Fila sin codigo/nombre: ${JSON.stringify(row)}`); continue; }
       const exists = await prisma.cargo.findFirst({ where: { codigo: row.codigo } });
       if (exists) { results.skipped++; continue; }
-      await prisma.cargo.create({ data: { codigo: row.codigo, nombre: row.nombre, descripcion: row.descripcion, tipo: row.tipo || 'CONSULTA', valor: Number(row.valor) || 0, unidad: row.unidad, codigoReferencia: row.codigoReferencia, usuarioCreacion: (req as any).user?.userId } });
+      await prisma.cargo.create({ data: { id: randomUUID(), codigo: row.codigo, nombre: row.nombre, descripcion: row.descripcion, tipo: row.tipo || 'CONSULTA', valor: Number(row.valor) || 0, unidad: row.unidad, codigoReferencia: row.codigoReferencia, usuarioCreacion: (req as any).user?.userId, updatedAt: new Date() } });
       results.created++;
     }
     res.json(results);
@@ -804,7 +812,7 @@ export async function bulkCreateEspecialidades(req: Request, res: Response) {
       if (!row.codigo || !row.nombre) { results.errors.push(`Sin codigo/nombre: ${JSON.stringify(row)}`); continue; }
       const exists = await prisma.especialidad.findFirst({ where: { OR: [{ codigo: row.codigo }, { nombre: row.nombre }] } });
       if (exists) { results.skipped++; continue; }
-      await prisma.especialidad.create({ data: { codigo: row.codigo, nombre: row.nombre, descripcion: row.descripcion, usuarioCreacion: (req as any).user?.userId } });
+      await prisma.especialidad.create({ data: { codigo: row.codigo, nombre: row.nombre, descripcion: row.descripcion, usuarioCreacion: (req as any).user?.userId, updatedAt: new Date() } });
       results.created++;
     }
     res.json(results);
@@ -823,7 +831,7 @@ export async function bulkCreateDepartamentos(req: Request, res: Response) {
       if (!row.codigo || !row.nombre) { results.errors.push(`Sin codigo/nombre: ${JSON.stringify(row)}`); continue; }
       const exists = await prisma.departamento.findFirst({ where: { codigo: row.codigo } });
       if (exists) { results.skipped++; continue; }
-      await prisma.departamento.create({ data: { codigo: row.codigo, nombre: row.nombre, descripcion: row.descripcion } });
+      await prisma.departamento.create({ data: { id: randomUUID(), codigo: row.codigo, nombre: row.nombre, descripcion: row.descripcion, updatedAt: new Date() } });
       results.created++;
     }
     res.json(results);
@@ -840,7 +848,7 @@ export async function bulkCreateTiposConsulta(req: Request, res: Response) {
     const results = { created: 0, skipped: 0, errors: [] as string[] };
     for (const row of items) {
       if (!row.nombre) { results.errors.push(`Sin nombre: ${JSON.stringify(row)}`); continue; }
-      await prisma.tipoConsulta.create({ data: { nombre: row.nombre, descripcion: row.descripcion, clasificacion: row.clasificacion || 'CONSULTA', duracionMinutos: Number(row.duracionMinutos) || 30, usuarioCreacion: (req as any).user?.userId } });
+      await prisma.tipoConsulta.create({ data: { id: randomUUID(), nombre: row.nombre, descripcion: row.descripcion, clasificacion: row.clasificacion || 'CONSULTA', duracionMinutos: Number(row.duracionMinutos) || 30, usuarioCreacion: (req as any).user?.userId, updatedAt: new Date() } });
       results.created++;
     }
     res.json(results);
@@ -873,9 +881,11 @@ export async function createTipoConsultorio(req: Request, res: Response) {
     if (existe) return res.status(400).json({ error: 'Código ya existe' });
     const item = await prisma.tipoConsultorio.create({
       data: {
+        id: randomUUID(),
         codigo, tipoConsultorio, descripcion,
         indiceAutomatico: indiceAutomatico ? Number(indiceAutomatico) : null,
         usuarioCreacion: (req as any).user?.id,
+        updatedAt: new Date(),
       },
     });
     res.status(201).json(item);
@@ -924,9 +934,9 @@ export async function getDepartamentoCargos(req: Request, res: Response) {
     const items = await prisma.departamentoCargo.findMany({
       where: { departamentoId },
       include: {
-        cargo: { select: { id: true, codigo: true, nombre: true, tipo: true, valor: true } },
+        Cargo: { select: { id: true, codigo: true, nombre: true, tipo: true, valor: true } },
       },
-      orderBy: { cargo: { nombre: 'asc' } },
+      orderBy: { Cargo: { nombre: 'asc' } },
     });
     res.json(items);
   } catch {
@@ -947,6 +957,7 @@ export async function createDepartamentoCargo(req: Request, res: Response) {
     if (existe) return res.status(400).json({ error: 'El cargo ya está asignado a este departamento' });
     const item = await prisma.departamentoCargo.create({
       data: {
+        id: randomUUID(),
         departamentoId, cargoId,
         permiteSeleccion: permiteSeleccion ?? true,
         manejaInsumos: manejaInsumos ?? false,
@@ -958,8 +969,9 @@ export async function createDepartamentoCargo(req: Request, res: Response) {
         cumplimientoParcial: cumplimientoParcial ?? false,
         manejaCentroCosto: manejaCentroCosto ?? false,
         usuarioCreacion: (req as any).user?.id,
+        updatedAt: new Date(),
       },
-      include: { cargo: { select: { id: true, codigo: true, nombre: true, tipo: true } } },
+      include: { Cargo: { select: { id: true, codigo: true, nombre: true, tipo: true } } },
     });
     res.status(201).json(item);
   } catch {
@@ -982,7 +994,7 @@ export async function updateDepartamentoCargo(req: Request, res: Response) {
         tomadoAutomatico, interfaceExterno, generaOrden, liquidaHonorarios,
         cumplimientoParcial, manejaCentroCosto,
       },
-      include: { cargo: { select: { id: true, codigo: true, nombre: true, tipo: true } } },
+      include: { Cargo: { select: { id: true, codigo: true, nombre: true, tipo: true } } },
     });
     res.json(item);
   } catch {
@@ -1052,7 +1064,7 @@ export async function getCamposPaciente(req: Request, res: Response) {
     const count = await prisma.campoPaciente.count();
     if (count === 0) {
       await prisma.campoPaciente.createMany({
-        data: CAMPOS_BASE.map(c => ({ ...c, esPersonalizado: false, esVisible: true, estado: true })),
+        data: CAMPOS_BASE.map(c => ({ ...c, id: randomUUID(), esPersonalizado: false, esVisible: true, estado: true, updatedAt: new Date() })),
         skipDuplicates: true,
       });
     }
@@ -1074,6 +1086,7 @@ export async function createCampoPaciente(req: Request, res: Response) {
     if (existe) return res.status(400).json({ error: 'Ya existe un campo con ese nombre interno' });
     const item = await prisma.campoPaciente.create({
       data: {
+        id: randomUUID(),
         nombre, etiqueta, seccion,
         tipoCampo: tipoCampo || 'text',
         esObligatorio: Boolean(esObligatorio),
@@ -1083,6 +1096,7 @@ export async function createCampoPaciente(req: Request, res: Response) {
         placeholder: placeholder || null,
         orden: Number(orden) || 99,
         usuarioCreacion: (req as any).user?.id,
+        updatedAt: new Date(),
       },
     });
     res.status(201).json(item);
@@ -1266,7 +1280,7 @@ export async function getListasValores(req: Request, res: Response) {
     const { grupo } = req.query as Record<string, string>;
     const count = await prisma.listaValor.count();
     if (count === 0) {
-      await prisma.listaValor.createMany({ data: LISTAS_BASE, skipDuplicates: true });
+      await prisma.listaValor.createMany({ data: LISTAS_BASE.map(l => ({ ...l, id: randomUUID(), updatedAt: new Date() })), skipDuplicates: true });
     }
     const where: any = {};
     if (grupo) where.grupo = grupo;
@@ -1283,7 +1297,7 @@ export async function createListaValor(req: Request, res: Response) {
     if (!grupo || !valor || !etiqueta) return res.status(400).json({ error: 'grupo, valor y etiqueta son requeridos' });
     const existe = await prisma.listaValor.findUnique({ where: { grupo_valor: { grupo, valor } } });
     if (existe) return res.status(400).json({ error: 'Ya existe ese valor en el grupo' });
-    const item = await prisma.listaValor.create({ data: { grupo, valor, etiqueta, orden: Number(orden) || 99 } });
+    const item = await prisma.listaValor.create({ data: { id: randomUUID(), grupo, valor, etiqueta, orden: Number(orden) || 99, updatedAt: new Date() } });
     res.status(201).json(item);
   } catch {
     res.status(500).json({ error: 'Error al crear valor de lista' });
@@ -1340,7 +1354,7 @@ export async function getMotivosCita(req: Request, res: Response) {
     const { tipo } = req.query as Record<string, string>;
     const count = await prisma.motivoCita.count();
     if (count === 0) {
-      await prisma.motivoCita.createMany({ data: MOTIVOS_BASE, skipDuplicates: true });
+      await prisma.motivoCita.createMany({ data: MOTIVOS_BASE.map(m => ({ ...m, id: randomUUID(), updatedAt: new Date() })), skipDuplicates: true });
     }
     const where: any = { activo: true };
     if (tipo) where.tipo = tipo;
@@ -1362,7 +1376,7 @@ export async function createMotivoCita(req: Request, res: Response) {
     if (existe) return res.status(409).json({ error: `Ya existe un motivo de cita con el nombre "${nombre.trim()}". Verifique antes de guardar.` });
 
     const item = await prisma.motivoCita.create({
-      data: { nombre, descripcion, tipo: tipo || 'consulta', orden: Number(orden) || 99 },
+      data: { id: randomUUID(), nombre, descripcion, tipo: tipo || 'consulta', orden: Number(orden) || 99, updatedAt: new Date() },
     });
     res.status(201).json(item);
   } catch {
