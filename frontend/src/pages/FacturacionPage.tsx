@@ -14,6 +14,7 @@ import {
 import { searchPacientes } from '../services/api';
 import { getParametrosSistema } from '../services/adminService';
 import QRCode from 'qrcode';
+import FevRipsPanel from '../components/FevRipsPanel';
 
 const cop = (n: number) =>
   new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(n || 0);
@@ -707,6 +708,10 @@ function FacturasTab({ onChange }: { onChange: () => void }) {
       )}
 
       {verId && <FacturaModal facturaId={verId} onClose={() => setVerId(null)} />}
+
+      <div className="mt-6">
+        <FevRipsPanel />
+      </div>
     </div>
   );
 }
