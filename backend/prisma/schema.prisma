@@ -1164,21 +1164,25 @@ model Factura {
 // ─────────────────────────────────────────────
 
 model Empresa {
-  id               String     @id @default(cuid())
-  razonSocial      String
-  nombreComercial  String?
-  nit              String     @unique
-  tipo             String     @default("EMPRESA") // EMPRESA, ASEGURADORA, CONVENIO
-  contactoNombre   String?
-  contactoCargo    String?
-  contactoEmail    String?
-  contactoTelefono String?
-  direccion        String?
-  ciudad           String?
-  estado           Boolean    @default(true)
-  contratos        Contrato[]
-  createdAt        DateTime   @default(now())
-  updatedAt        DateTime   @updatedAt
+  id                 String     @id @default(cuid())
+  razonSocial        String
+  nombreComercial    String?
+  nit                String     @unique
+  tipo               String     @default("EMPRESA") // EMPRESA, ASEGURADORA, CONVENIO, CLINICA_PROPIA
+  contactoNombre     String?
+  contactoCargo      String?
+  contactoEmail      String?
+  contactoTelefono   String?
+  direccion          String?
+  ciudad             String?
+  estado             Boolean    @default(true)
+  esClinicaPropia    Boolean    @default(false)
+  sitioWeb           String?
+  regimenTributario  String?
+  logoUrl            String?
+  contratos          Contrato[]
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
 
   @@index([nit])
   @@index([estado])
