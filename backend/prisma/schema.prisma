@@ -1285,3 +1285,43 @@ model ContratoBeneficiario {
   @@index([pacienteId])
   @@index([documento])
 }
+
+// ─────────────────────────────────────────
+// Integración FEV-RIPS (Docker API MSPS) — datos de prueba
+// ─────────────────────────────────────────
+
+model UsuarioSispro {
+  id                   String   @id @default(cuid())
+  nombre               String // etiqueta descriptiva, ej "Usuario pruebas SARAI"
+  tipoIdentificacion   String   @default("CC")
+  numeroIdentificacion String
+  clave                String // credencial real de SISPRO, requerida por LoginSISPRO; no es password de SARAI
+  nit                  String // NIT del prestador/obligado a facturar
+  tipoUsuario          String? // RE, PIN, PINx, PIE (ver manual FEV-RIPS 8.1 LoginSispro)
+  ambiente             String   @default("STAGE") // STAGE, PRODUCCION
+  activo               Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@unique([numeroIdentificacion, nit, ambiente])
+  @@index([nit])
+}
+
+model RipsPrueba {
+  id                     String   @id @default(cuid())
+  nombre                 String // etiqueta descriptiva, ej "RIPS prueba consulta simple"
+  modulo                 String   @default("FacturaElectronica") // FacturaElectronica, NotaCredito, NotaDebito, NotaAjuste, RipsSinFactura, CapitaInicial, CapitaPeriodo, CapitaFinal, NCAcuerdoVoluntades, NCCapita
+  numDocumentoIdObligado String
+  numFactura             String?
+  tipoNota               String?
+  numNota                String?
+  ripsJson               Json
+  xmlFevFile             String? // Base64 del AttachedDocument, cuando aplica
+  ultimoResultado        Json? // Response crudo de la última prueba de cargue
+  cuv                    String?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  @@index([numFactura])
+  @@index([modulo])
+}
