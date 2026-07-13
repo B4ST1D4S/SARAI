@@ -3,13 +3,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   DollarSign, FileText, Receipt, Plus, Search, Trash2, X, CheckCircle,
   RotateCcw, Loader2, Printer, User as UserIcon, Layers,
+  ShieldCheck, ShieldAlert, ClipboardCheck,
 } from 'lucide-react';
 import {
   getResumen, getIngresos, createIngreso, getCuenta, buscarCargos,
   addCuentaItem, updateCuentaItem, deleteCuentaItem, facturarCuenta,
-  getFacturas, getFactura, anularFactura,
+  getFacturas, getFactura, anularFactura, getValidacionRips,
   type Ingreso, type CuentaDetalle, type CargoBusqueda, type Factura,
-  type ResumenFacturacion,
+  type ResumenFacturacion, type ReporteValidacionRips,
 } from '../services/facturacionService';
 import { searchPacientes } from '../services/api';
 import { getParametrosSistema } from '../services/adminService';
@@ -336,6 +337,8 @@ function CuentaDetalleView({ cuentaId, onClose }: { cuentaId: string; onClose: (
   const [facturando, setFacturando] = useState(false);
   const [error, setError] = useState('');
   const [facturaGenerada, setFacturaGenerada] = useState<Factura | null>(null);
+  const [validandoRips, setValidandoRips] = useState(false);
+  const [reporteRips, setReporteRips] = useState<ReporteValidacionRips | null>(null);
 
   const cargar = useCallback(() => {
     setLoading(true);
@@ -344,15 +347,29 @@ function CuentaDetalleView({ cuentaId, onClose }: { cuentaId: string; onClose: (
 
   useEffect(() => { cargar(); }, [cargar]);
 
-  const facturar = async () => {
+  const validarRips = async () => {
+    setValidandoRips(true); setError('');
+    try {
+      setReporteRips(await getValidacionRips(cuentaId));
+    } catch (e: any) {
+      setError(e.message || 'Error al validar RIPS');
+    } finally {
+      setValidandoRips(false);
+    }
+  };
+
+  const facturar = async (omitirValidacionRips = false) => {
     if (!cuenta) return;
     setFacturando(true); setError('');
     try {
-      const f = await facturarCuenta(cuenta.id);
+      const f = await facturarCuenta(cuenta.id, undefined, omitirValidacionRips);
       setFacturaGenerada(f);
+      setReporteRips(null);
       cargar();
     } catch (e: any) {
       setError(e.message || 'Error al facturar');
+      // Si el rechazo es por validación RIPS, mostramos el detalle en el modal.
+      try { setReporteRips(await getValidacionRips(cuentaId)); } catch { /* noop */ }
     } finally {
       setFacturando(false);
     }
@@ -417,7 +434,11 @@ function CuentaDetalleView({ cuentaId, onClose }: { cuentaId: string; onClose: (
                 className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm font-semibold flex items-center gap-2">
                 <Plus size={16} /> Adicionar cargo
               </button>
-              <button onClick={facturar} disabled={facturando || cuenta.items.length === 0}
+              <button onClick={validarRips} disabled={validandoRips || cuenta.items.length === 0}
+                className="px-4 py-2 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-white rounded-lg text-sm font-semibold flex items-center gap-2">
+                {validandoRips ? <Loader2 size={16} className="animate-spin" /> : <ClipboardCheck size={16} />} Validar RIPS
+              </button>
+              <button onClick={() => facturar()} disabled={facturando || cuenta.items.length === 0}
                 className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-lg text-sm font-semibold flex items-center gap-2">
                 {facturando ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle size={16} />} Facturar
               </button>
@@ -425,6 +446,15 @@ function CuentaDetalleView({ cuentaId, onClose }: { cuentaId: string; onClose: (
           )}
           {cuenta.factura && <FacturaVerButton facturaId={cuenta.factura.id} />}
         </div>
+
+        {reporteRips && (
+          <ValidacionRipsModal
+            reporte={reporteRips}
+            facturando={facturando}
+            onFacturarIgual={() => facturar(true)}
+            onClose={() => setReporteRips(null)}
+          />
+        )}
 
         {/* Tabla de ítems */}
         <div className="bg-slate-800/60 border border-white/10 rounded-lg overflow-hidden">
@@ -909,6 +939,73 @@ function facturaQrTexto(f: any, clinica: Record<string, string>): string {
     f.paciente?.numeroDocumento ? `Doc: ${f.paciente.tipoDocumento || ''} ${f.paciente.numeroDocumento}` : '',
     `Total: ${cop(f.total)}`,
   ].filter(Boolean).join('\n');
+}
+
+// ════════════════════════════════════════════════════════════════
+//  Modal: Reporte de validación RIPS antes de cuadrar/facturar
+// ════════════════════════════════════════════════════════════════
+function ValidacionRipsModal({ reporte, facturando, onFacturarIgual, onClose }: {
+  reporte: ReporteValidacionRips;
+  facturando: boolean;
+  onFacturarIgual: () => void;
+  onClose: () => void;
+}) {
+  const ok = reporte.puedeFacturar;
+  return (
+    <ModalShell title="Validación RIPS de la cuenta" onClose={onClose} wide>
+      <div className={`flex items-center gap-3 p-3 rounded-lg border mb-4 ${
+        ok ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-red-500/10 border-red-500/30'
+      }`}>
+        {ok ? <ShieldCheck className="text-emerald-400 shrink-0" size={22} /> : <ShieldAlert className="text-red-400 shrink-0" size={22} />}
+        <div className="text-sm">
+          <div className={`font-semibold ${ok ? 'text-emerald-300' : 'text-red-300'}`}>
+            {ok ? 'La cuenta está lista para facturar' : 'Hay información RIPS pendiente por corregir'}
+          </div>
+          <div className="text-xs text-gray-400">
+            {reporte.totalErrores} rechazo(s) · {reporte.totalNotificaciones} notificación(es)
+          </div>
+        </div>
+      </div>
+
+      {reporte.resultados.length === 0 ? (
+        <div className="text-center py-6 text-gray-500 text-sm">Sin observaciones. Todos los campos RIPS obligatorios están diligenciados.</div>
+      ) : (
+        <div className="space-y-2 max-h-[50vh] overflow-y-auto">
+          {reporte.resultados.map((r, i) => {
+            const esRechazo = r.clase === 'RECHAZADO';
+            return (
+              <div key={i} className={`rounded-lg border p-3 text-xs ${
+                esRechazo ? 'bg-red-500/10 border-red-500/30' : 'bg-amber-500/10 border-amber-500/30'
+              }`}>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                    esRechazo ? 'bg-red-600 text-white' : 'bg-amber-500 text-slate-900'
+                  }`}>{r.clase}</span>
+                  <span className="font-mono text-gray-400">{r.codigo}</span>
+                  <span className="text-gray-500">· {r.fuente}</span>
+                </div>
+                <div className="text-gray-200">{r.descripcion}</div>
+                {r.observaciones && <div className="text-gray-400 mt-1">{r.observaciones}</div>}
+                {r.pathFuente && <div className="text-gray-500 font-mono mt-1 truncate">Ruta: {r.pathFuente}</div>}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <div className="flex justify-end gap-2 mt-4">
+        {!ok && (
+          <button onClick={onFacturarIgual} disabled={facturando}
+            className="px-3 py-2 text-xs bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-slate-900 font-semibold rounded-lg">
+            {facturando ? 'Facturando...' : 'Facturar de todas formas'}
+          </button>
+        )}
+        <button onClick={onClose} className="px-3 py-2 text-xs bg-slate-700 hover:bg-slate-600 text-white rounded-lg">
+          Cerrar
+        </button>
+      </div>
+    </ModalShell>
+  );
 }
 
 // ════════════════════════════════════════════════════════════════

@@ -25,6 +25,14 @@ router.patch('/:id/estado', authorizeRole('SUPER_ADMIN', 'MEDICO'), ctrl.cambiar
 router.post('/:id/tarifas', authorizeRole('SUPER_ADMIN', 'MEDICO'), ctrl.upsertTarifa);
 router.delete('/:id/tarifas/:tarifaId', authorizeRole('SUPER_ADMIN', 'MEDICO'), ctrl.deleteTarifa);
 
+// Excepciones del contrato (rangos por tipo de afiliado, copagos/cuotas moderadoras)
+router.get('/:id/excepciones', ctrl.listExcepciones);
+router.post('/:id/excepciones', authorizeRole('SUPER_ADMIN', 'MEDICO'), ctrl.createExcepcion);
+router.delete('/:id/excepciones/:excepcionId', authorizeRole('SUPER_ADMIN', 'MEDICO'), ctrl.deleteExcepcion);
+
+// Clonar contrato (copia tarifas, paquetes y excepciones como plantilla)
+router.post('/:id/clonar', authorizeRole('SUPER_ADMIN', 'MEDICO'), ctrl.clonarContrato);
+
 // Paquetes del contrato
 router.post('/:id/paquetes', authorizeRole('SUPER_ADMIN', 'MEDICO'), ctrl.createPaquete);
 router.put('/:id/paquetes/:paqueteId', authorizeRole('SUPER_ADMIN', 'MEDICO'), ctrl.updatePaquete);

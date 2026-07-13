@@ -150,6 +150,56 @@ export async function deleteTarifa(req: Request, res: Response): Promise<void> {
   }
 }
 
+// ─── EXCEPCIONES (rangos por tipo de afiliado, copagos/cuotas moderadoras) ──
+
+export async function listExcepciones(req: Request, res: Response): Promise<void> {
+  try {
+    const excepciones = await svc.getExcepciones(req.params.id);
+    res.json({ success: true, excepciones });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+}
+
+export async function createExcepcion(req: Request, res: Response): Promise<void> {
+  try {
+    if (!req.user) { res.status(401).json({ error: 'No autenticado' }); return; }
+    const excepcion = await svc.createExcepcion({ contratoId: req.params.id, ...req.body });
+    res.status(201).json({ success: true, excepcion });
+  } catch (error: any) {
+    const status = error.message.includes('no encontrado') ? 404 : 400;
+    res.status(status).json({ error: error.message });
+  }
+}
+
+export async function deleteExcepcion(req: Request, res: Response): Promise<void> {
+  try {
+    if (!req.user) { res.status(401).json({ error: 'No autenticado' }); return; }
+    await svc.deleteExcepcion(req.params.id, req.params.excepcionId);
+    res.json({ success: true, message: 'Excepción eliminada' });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+}
+
+// ─── CLONAR CONTRATO ────────────────────────────────────────────────────────
+
+export async function clonarContrato(req: Request, res: Response): Promise<void> {
+  try {
+    if (!req.user) { res.status(401).json({ error: 'No autenticado' }); return; }
+    const { descripcion, empresaId, fechaInicio, fechaFin } = req.body;
+    if (!descripcion || !empresaId || !fechaInicio || !fechaFin) {
+      res.status(400).json({ error: 'descripcion, empresaId, fechaInicio y fechaFin son obligatorios' });
+      return;
+    }
+    const contrato = await svc.clonarContrato(req.params.id, { ...req.body, creadoPorId: req.user.userId });
+    res.status(201).json({ success: true, contrato });
+  } catch (error: any) {
+    const status = error.message.includes('no encontrad') ? 404 : 500;
+    res.status(status).json({ error: error.message });
+  }
+}
+
 // ─── PAQUETES ───────────────────────────────────────────────────────────────
 
 export async function createPaquete(req: Request, res: Response): Promise<void> {

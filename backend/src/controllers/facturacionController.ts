@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import prisma from '../lib/prisma.js';
+import { validarRipsCuenta } from '../services/ripsValidacionService.js';
 
 // ════════════════════════════════════════════════════════════════
 // MÓDULO DE FACTURACIÓN (demo funcional)
@@ -310,6 +311,20 @@ export async function buscarCargos(req: Request, res: Response) {
 }
 
 // ─────────────────────────────────────────────────────────────
+//  VALIDACIÓN RIPS (pre-chequeo antes de cuadrar/facturar)
+// ─────────────────────────────────────────────────────────────
+export async function validarRips(req: Request, res: Response) {
+  try {
+    const reporte = await validarRipsCuenta(req.params.id);
+    res.json(reporte);
+  } catch (e: any) {
+    console.error('validarRips:', e);
+    const status = e.message?.includes('no encontrada') ? 404 : 500;
+    res.status(status).json({ error: e.message || 'Error al validar RIPS de la cuenta' });
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
 //  FACTURAS
 // ─────────────────────────────────────────────────────────────
 export async function facturarCuenta(req: Request, res: Response) {
@@ -325,6 +340,20 @@ export async function facturarCuenta(req: Request, res: Response) {
       return res.status(409).json({ error: 'La cuenta no está abierta' });
     if (cuenta.items.length === 0)
       return res.status(400).json({ error: 'La cuenta no tiene ítems para facturar' });
+
+    // Pre-validación RIPS: no se permite cuadrar la cuenta si hay campos
+    // obligatorios sin diligenciar (mismo criterio que el validador local
+    // del sistema de referencia: solo bloquea en RECHAZADO, las
+    // NOTIFICACION quedan como advertencia informativa).
+    if (!req.body?.omitirValidacionRips) {
+      const reporteRips = await validarRipsCuenta(cuentaId);
+      if (!reporteRips.puedeFacturar) {
+        return res.status(422).json({
+          error: 'La cuenta tiene información RIPS pendiente por corregir antes de facturar',
+          validacionRips: reporteRips,
+        });
+      }
+    }
 
     const total = round2(cuenta.items.reduce((s, it) => s + (it.valorTotal || 0), 0));
 
