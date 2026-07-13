@@ -1130,14 +1130,34 @@ model CuentaItem {
   precioUnitario Float        @default(0)
   valorTotal     Float        @default(0)
   // Campos RIPS (Resolución 2275/2023), diligenciados por ítem para poder
-  // pre-validar la cuenta antes de facturar.
+  // pre-validar la cuenta antes de facturar. El componente (tipoRips)
+  // determina cuáles de estos campos son exigibles — ver ripsValidacionService.
+  tipoRips                     String? // AC=Consulta, AP=Procedimiento, AH=Hospitalizacion, AU=Urgencias, AT=Otros servicios
   codDiagnosticoPrincipal      String?
+  tipoDiagnosticoPrincipal     String? // 01 Impresion diagnostica, 02 Confirmado nuevo, 03 Confirmado repetido
   finalidadTecnologiaSalud     String?
+  causaMotivoAtencion          String?
   viaIngresoServicioSalud      String?
+  modalidadGrupoServicioTecSal String?
   numAutorizacion              String?
   codPrestador                 String?
-  conceptoRecaudo               String? // 01-05, define si aplica copago/cuota moderadora
-  valorPagoModerador            Float?
+  conceptoRecaudo              String? // 01-05, define si aplica copago/cuota moderadora
+  valorPagoModerador           Float?
+  // Específicos de Procedimientos (AP)
+  ambitoRealizacionProcedimiento String? // 01 Ambulatorio, 02 Hospitalario, 03 Urgencias
+  viaAccesoQuirurgico            String?
+  numMipres                      String?
+  // Específicos de Hospitalización (AH) / Urgencias (AU)
+  fechaAtencion        DateTime?
+  fechaIngreso         DateTime?
+  fechaSalida          DateTime?
+  estadoSalida         String? // 1 Vivo, 2 Muerto
+  destinoUsuarioEgreso String?
+  codDiagnosticoIngreso String?
+  codDiagnosticoSalida  String?
+  codDiagnosticoMuerte  String?
+  // Específico de Otros Servicios (AT)
+  tipoOtroServicio String?
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 

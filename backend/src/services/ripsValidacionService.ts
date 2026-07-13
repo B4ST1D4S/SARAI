@@ -31,6 +31,68 @@ function esNumerico(v?: string | null) {
   return !!v && /^\d+$/.test(v);
 }
 
+// ────────────────────────────────────────────────────────────────
+//  Clasificación de componente RIPS (AC/AP/AH/AU/AT) por código CUPS.
+//  Heurística propia de SARAI (no un catálogo oficial de excepciones como
+//  el de IPSOFT, que depende de una tabla parametrizable por empresa que
+//  no tenemos): los códigos de consulta externa en la nomenclatura CUPS
+//  vigente empiezan por "89" (confirmado con los ejemplos reales del
+//  manual FEV-RIPS v4.3 del MSPS: 890602, 890201, 890301, 890701...). Todo
+//  lo demás factura como Procedimiento (AP) por defecto. El usuario puede
+//  corregir el componente sugerido en el formulario si no aplica (p. ej.
+//  Urgencias/Hospitalización/Otros servicios dependen del contexto de
+//  atención, no solo del código).
+// ────────────────────────────────────────────────────────────────
+export function clasificarTipoRips(codigo?: string | null): string {
+  const dig = (codigo || '').replace(/\D/g, '');
+  if (dig.startsWith('89')) return 'AC';
+  return 'AP';
+}
+
+export const COMPONENTE_LABEL: Record<string, string> = {
+  AC: 'Consulta',
+  AP: 'Procedimiento',
+  AH: 'Hospitalización',
+  AU: 'Urgencias',
+  AT: 'Otros servicios',
+};
+
+// Campos exigidos (RECHAZADO si faltan) por cada componente RIPS, más allá
+// de los comunes a todo ítem (código CUPS, diagnóstico principal).
+interface CampoRipsRequerido { campo: string; label: string }
+const CAMPOS_OBLIGATORIOS_POR_COMPONENTE: Record<string, CampoRipsRequerido[]> = {
+  AC: [
+    { campo: 'finalidadTecnologiaSalud', label: 'finalidad de la tecnología en salud' },
+    { campo: 'causaMotivoAtencion', label: 'causa/motivo de atención' },
+    { campo: 'tipoDiagnosticoPrincipal', label: 'tipo de diagnóstico principal' },
+  ],
+  AP: [
+    { campo: 'ambitoRealizacionProcedimiento', label: 'ámbito de realización del procedimiento' },
+    { campo: 'finalidadTecnologiaSalud', label: 'finalidad de la tecnología en salud' },
+    { campo: 'tipoDiagnosticoPrincipal', label: 'tipo de diagnóstico principal' },
+  ],
+  AH: [
+    { campo: 'viaIngresoServicioSalud', label: 'vía de ingreso al servicio de salud' },
+    { campo: 'fechaIngreso', label: 'fecha de ingreso' },
+    { campo: 'fechaSalida', label: 'fecha de salida' },
+    { campo: 'causaMotivoAtencion', label: 'causa/motivo de atención' },
+    { campo: 'estadoSalida', label: 'estado de salida (vivo/muerto)' },
+    { campo: 'codDiagnosticoIngreso', label: 'diagnóstico de ingreso' },
+    { campo: 'codDiagnosticoSalida', label: 'diagnóstico de salida' },
+  ],
+  AU: [
+    { campo: 'fechaIngreso', label: 'fecha de ingreso a urgencias' },
+    { campo: 'fechaSalida', label: 'fecha de salida de urgencias' },
+    { campo: 'causaMotivoAtencion', label: 'causa/motivo de atención' },
+    { campo: 'estadoSalida', label: 'estado de salida (vivo/muerto)' },
+    { campo: 'codDiagnosticoIngreso', label: 'diagnóstico de ingreso' },
+    { campo: 'codDiagnosticoSalida', label: 'diagnóstico de salida' },
+  ],
+  AT: [
+    { campo: 'tipoOtroServicio', label: 'tipo de otro servicio' },
+  ],
+};
+
 export async function validarRipsCuenta(cuentaId: string): Promise<ReporteValidacionRips> {
   const cuenta = await prisma.cuenta.findUnique({
     where: { id: cuentaId },
@@ -104,6 +166,8 @@ export async function validarRipsCuenta(cuentaId: string): Promise<ReporteValida
 
   cuenta.items.forEach((item, idx) => {
     const ruta = `usuarios[0].servicios[${idx}]`;
+    const tipoRips = item.tipoRips || clasificarTipoRips(item.codigo);
+    const nombreComponente = COMPONENTE_LABEL[tipoRips] ?? tipoRips;
 
     if (!esNumerico(item.codigo)) {
       resultados.push({
@@ -125,26 +189,34 @@ export async function validarRipsCuenta(cuentaId: string): Promise<ReporteValida
         fuente: 'CuentaItem',
       });
     }
-    if (!item.finalidadTecnologiaSalud) {
+
+    // Campos exigidos según el componente RIPS del ítem (AC/AP/AH/AU/AT)
+    const requeridos = CAMPOS_OBLIGATORIOS_POR_COMPONENTE[tipoRips] ?? [];
+    for (const { campo, label } of requeridos) {
+      const valor = (item as any)[campo];
+      if (valor === null || valor === undefined || valor === '') {
+        resultados.push({
+          clase: 'RECHAZADO',
+          codigo: 'RVS-14',
+          descripcion: `[${tipoRips} — ${nombreComponente}] Falta ${label}`,
+          observaciones: `Ítem "${item.descripcion}" sin ${campo}`,
+          pathFuente: `${ruta}.${campo}`,
+          fuente: 'CuentaItem',
+        });
+      }
+    }
+    // Diagnóstico de causa de muerte, exigido solo si el paciente falleció (AH/AU)
+    if (['AH', 'AU'].includes(tipoRips) && item.estadoSalida === '2' && !item.codDiagnosticoMuerte) {
       resultados.push({
         clase: 'RECHAZADO',
-        codigo: 'RVS-08',
-        descripcion: 'Falta la finalidad de la tecnología en salud del servicio',
-        observaciones: `Ítem "${item.descripcion}" sin finalidadTecnologiaSalud`,
-        pathFuente: `${ruta}.finalidadTecnologiaSalud`,
+        codigo: 'RVS-15',
+        descripcion: `[${tipoRips} — ${nombreComponente}] Falta el diagnóstico de causa de muerte`,
+        observaciones: `Ítem "${item.descripcion}" con estadoSalida=2 (fallecido) sin codDiagnosticoMuerte`,
+        pathFuente: `${ruta}.codDiagnosticoMuerte`,
         fuente: 'CuentaItem',
       });
     }
-    if (!item.viaIngresoServicioSalud) {
-      resultados.push({
-        clase: 'NOTIFICACION',
-        codigo: 'RVS-09',
-        descripcion: 'Se recomienda registrar la vía de ingreso al servicio de salud',
-        observaciones: `Ítem "${item.descripcion}" sin viaIngresoServicioSalud`,
-        pathFuente: `${ruta}.viaIngresoServicioSalud`,
-        fuente: 'CuentaItem',
-      });
-    }
+
     if (!item.codPrestador) {
       resultados.push({
         clase: 'NOTIFICACION',

@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import prisma from '../lib/prisma.js';
-import { validarRipsCuenta } from '../services/ripsValidacionService.js';
+import { validarRipsCuenta, clasificarTipoRips } from '../services/ripsValidacionService.js';
 
 // ════════════════════════════════════════════════════════════════
 // MÓDULO DE FACTURACIÓN (demo funcional)
@@ -173,6 +173,34 @@ export async function getCuentaById(req: Request, res: Response) {
 }
 
 // Agregar un ítem/servicio a la cuenta
+// Campos RIPS opcionales que puede traer el body al adicionar/editar un
+// ítem; se guardan tal cual si vienen informados (fecha* se parsean a Date).
+const CAMPOS_RIPS_TEXTO = [
+  'codDiagnosticoPrincipal', 'tipoDiagnosticoPrincipal', 'finalidadTecnologiaSalud',
+  'causaMotivoAtencion', 'viaIngresoServicioSalud', 'modalidadGrupoServicioTecSal',
+  'numAutorizacion', 'codPrestador', 'conceptoRecaudo',
+  'ambitoRealizacionProcedimiento', 'viaAccesoQuirurgico', 'numMipres',
+  'estadoSalida', 'destinoUsuarioEgreso', 'codDiagnosticoIngreso',
+  'codDiagnosticoSalida', 'codDiagnosticoMuerte', 'tipoOtroServicio',
+] as const;
+const CAMPOS_RIPS_FECHA = ['fechaAtencion', 'fechaIngreso', 'fechaSalida'] as const;
+
+function extraerCamposRips(body: any) {
+  const data: Record<string, any> = {};
+  for (const campo of CAMPOS_RIPS_TEXTO) {
+    if (body[campo] !== undefined) data[campo] = norm(body[campo]) || null;
+  }
+  for (const campo of CAMPOS_RIPS_FECHA) {
+    if (body[campo] !== undefined) data[campo] = body[campo] ? new Date(body[campo]) : null;
+  }
+  if (body.valorPagoModerador !== undefined) {
+    data.valorPagoModerador = body.valorPagoModerador === '' || body.valorPagoModerador == null
+      ? null
+      : toNum(body.valorPagoModerador, 0);
+  }
+  return data;
+}
+
 export async function addCuentaItem(req: Request, res: Response) {
   try {
     const cuentaId = req.params.id;
@@ -181,6 +209,9 @@ export async function addCuentaItem(req: Request, res: Response) {
     if (cuenta.estado !== 'ABIERTA')
       return res.status(409).json({ error: 'La cuenta no está abierta' });
 
+    // cargoId solo aplica si el catálogo de tarifas propias (TarifaCargo) tiene
+    // ese registro; la búsqueda "Desde catálogo" hoy trae códigos CUPS oficiales
+    // (CupsCodigo) que no tienen fila ahí, así que en ese caso NO se envía cargoId.
     const cargoId = norm(req.body.cargoId) || null;
     let descripcion = norm(req.body.descripcion);
     let codigo = norm(req.body.codigo) || null;
@@ -188,7 +219,7 @@ export async function addCuentaItem(req: Request, res: Response) {
     let precioUnitario = toNum(req.body.precioUnitario, NaN);
     const cantidad = Math.max(toNum(req.body.cantidad, 1), 0.01);
 
-    // Si viene un cargo, completar datos y precio sugerido desde el tarifario
+    // Si viene un cargo del tarifario propio, completar datos y precio sugerido
     if (cargoId) {
       const cargo = await prisma.tarifaCargo.findUnique({
         where: { id: cargoId },
@@ -207,6 +238,10 @@ export async function addCuentaItem(req: Request, res: Response) {
 
     const valorTotal = round2(precioUnitario * cantidad);
 
+    // El componente RIPS (tipoRips) viene del front si el usuario lo confirmó/ajustó;
+    // si no, se infiere del código CUPS como valor de partida.
+    const tipoRips = norm(req.body.tipoRips) || (codigo ? clasificarTipoRips(codigo) : null);
+
     const item = await prisma.cuentaItem.create({
       data: {
         cuentaId,
@@ -217,6 +252,8 @@ export async function addCuentaItem(req: Request, res: Response) {
         cantidad,
         precioUnitario,
         valorTotal,
+        tipoRips,
+        ...extraerCamposRips(req.body),
       },
     });
     res.status(201).json(item);
@@ -245,6 +282,8 @@ export async function updateCuentaItem(req: Request, res: Response) {
     };
     if (req.body.descripcion !== undefined) data.descripcion = norm(req.body.descripcion);
     if (req.body.departamento !== undefined) data.departamento = norm(req.body.departamento) || null;
+    if (req.body.tipoRips !== undefined) data.tipoRips = norm(req.body.tipoRips) || null;
+    Object.assign(data, extraerCamposRips(req.body));
 
     const updated = await prisma.cuentaItem.update({ where: { id: item.id }, data });
     res.json(updated);
@@ -273,35 +312,36 @@ export async function deleteCuentaItem(req: Request, res: Response) {
 
 // ─────────────────────────────────────────────────────────────
 //  Búsqueda de cargos facturables (para adicionar a una cuenta)
+//  Fuente: catálogo CUPS oficial (Resolución 2706/2025), que es el que
+//  está poblado. TarifaCargo/Tarifario es una capa de precios negociados
+//  aparte, todavía sin datos — si en el futuro tiene tarifas propias,
+//  se puede cruzar aquí para sugerir precioSugerido real.
 // ─────────────────────────────────────────────────────────────
 export async function buscarCargos(req: Request, res: Response) {
   try {
     const search = norm(req.query.search as string);
-    const where: any = { activo: true };
+    const where: any = { activo: true, esFacturable: true };
     if (search) {
       const dig = search.replace(/\D/g, '');
       where.OR = [
         { descripcion: { contains: search, mode: 'insensitive' } },
         { codigo: { contains: search, mode: 'insensitive' } },
-        ...(dig ? [{ cupsCodigoStr: { startsWith: dig } }] : []),
+        ...(dig ? [{ codigo: { startsWith: dig } }] : []),
       ];
     }
-    const cargos = await prisma.tarifaCargo.findMany({
+    const cargos = await prisma.cupsCodigo.findMany({
       where,
       take: 25,
       orderBy: { descripcion: 'asc' },
-      include: {
-        grupo: { select: { nombre: true } },
-        items: { where: { activo: true }, take: 1, orderBy: { updatedAt: 'desc' } },
-      },
     });
     const data = cargos.map((c) => ({
       id: c.id,
       codigo: c.codigo,
       descripcion: c.descripcion,
-      cupsCodigoStr: c.cupsCodigoStr,
-      grupo: c.grupo?.nombre ?? null,
-      precioSugerido: c.items.length ? c.items[0].precio : 0,
+      cupsCodigoStr: c.codigoFormato,
+      grupo: `Capítulo ${c.capitulo}`,
+      precioSugerido: 0,
+      tipoRips: clasificarTipoRips(c.codigo),
     }));
     res.json(data);
   } catch (e: any) {

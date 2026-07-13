@@ -93,6 +93,7 @@ export interface CargoBusqueda {
   cupsCodigoStr?: string | null;
   grupo?: string | null;
   precioSugerido: number;
+  tipoRips: string;
 }
 
 export interface Factura {
