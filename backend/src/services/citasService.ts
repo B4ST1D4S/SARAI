@@ -61,10 +61,12 @@ export async function createCita(data: CreateCitaRequest) {
   }
 }
 
-// Obtener citas del médico
-export async function getCitasByMedico(medicoId: string, estado?: string, fechaInicio?: string, fechaFin?: string) {
+// Obtener citas del médico. medicoId=null trae las citas de TODOS los
+// profesionales (uso de recepción/admisión), no solo las del usuario logueado.
+export async function getCitasByMedico(medicoId: string | null, estado?: string, fechaInicio?: string, fechaFin?: string) {
   try {
-    const where: any = { medicoId };
+    const where: any = {};
+    if (medicoId) where.medicoId = medicoId;
     if (estado) where.estado = estado;
     if (fechaInicio || fechaFin) {
       where.fechaHora = {};
