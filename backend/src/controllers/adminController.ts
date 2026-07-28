@@ -1177,18 +1177,65 @@ async function seedParamGroup(grupo: string, defaults: any[]) {
     await prisma.parametroSistema.upsert({
       where: { grupo_clave: { grupo, clave: p.clave } },
       update: {},
-      create: { grupo, ...p },
+      create: { id: randomUUID(), grupo, ...p, updatedAt: new Date() },
     });
   }
+}
+
+// "Datos de la Clínica" vive en Empresa (esClinicaPropia: true) en vez de ParametroSistema,
+// para que la clínica propia y las empresas contratantes compartan el mismo modelo.
+const EMPRESA_FIELD_MAP: Record<string, string> = {
+  nombre_clinica: 'razonSocial',
+  nit: 'nit',
+  direccion: 'direccion',
+  ciudad: 'ciudad',
+  telefono: 'contactoTelefono',
+  email_contacto: 'contactoEmail',
+  sitio_web: 'sitioWeb',
+  representante_legal: 'contactoNombre',
+  regimen_tributario: 'regimenTributario',
+  logo_url: 'logoUrl',
+};
+
+async function getOrCreateClinicaPropia() {
+  let empresa = await prisma.empresa.findFirst({ where: { esClinicaPropia: true } });
+  if (!empresa) {
+    empresa = await prisma.empresa.create({
+      data: {
+        razonSocial: 'EstetIA Clínica',
+        nit: '',
+        tipo: 'CLINICA_PROPIA',
+        esClinicaPropia: true,
+      },
+    });
+  }
+  return empresa;
 }
 
 export async function getParametrosSistema(req: Request, res: Response) {
   try {
     const { grupo } = req.params;
+
+    if (grupo === 'clinica') {
+      const empresa = await getOrCreateClinicaPropia();
+      const items = PARAMS_CLINICA.map((p) => ({
+        id: empresa.id,
+        grupo: 'clinica',
+        clave: p.clave,
+        valor: (empresa as any)[EMPRESA_FIELD_MAP[p.clave]] ?? '',
+        etiqueta: p.etiqueta,
+        tipo: p.tipo,
+        orden: p.orden,
+        estado: true,
+        updatedAt: empresa.updatedAt,
+      }));
+      res.json(items);
+      return;
+    }
+
     const count = await prisma.parametroSistema.count({ where: { grupo } });
     if (count === 0) {
-      if (grupo === 'clinica') await seedParamGroup('clinica', PARAMS_CLINICA);
-      else if (grupo === 'agenda') await seedParamGroup('agenda', PARAMS_AGENDA);
+      if (grupo === 'agenda') await seedParamGroup('agenda', PARAMS_AGENDA);
     }
     const items = await prisma.parametroSistema.findMany({
       where: { grupo, estado: true },
@@ -1204,6 +1251,22 @@ export async function updateParametroSistema(req: Request, res: Response) {
   try {
     const { grupo, clave } = req.params;
     const { valor } = req.body;
+
+    if (grupo === 'clinica') {
+      const field = EMPRESA_FIELD_MAP[clave];
+      if (!field) {
+        res.status(400).json({ error: 'Clave no válida' });
+        return;
+      }
+      const empresa = await getOrCreateClinicaPropia();
+      const updated = await prisma.empresa.update({
+        where: { id: empresa.id },
+        data: { [field]: valor },
+      });
+      res.json({ grupo, clave, valor: (updated as any)[field] ?? '', updatedAt: updated.updatedAt });
+      return;
+    }
+
     const now = new Date();
     const item = await prisma.parametroSistema.upsert({
       where: { grupo_clave: { grupo, clave } },
