@@ -37,6 +37,7 @@ model User {
   crmLeads                 CrmLead[]              @relation("CrmLeadCreador")
   ingresosFacturacion      Ingreso[]
   contratosCreados         Contrato[]             @relation("ContratoCreadoPor")
+  odontogramas             Odontograma[]
 
   @@index([rol])
   @@index([email])
@@ -97,6 +98,13 @@ model Paciente {
   ingresos               Ingreso[]
   facturas               Factura[]
   contratosBeneficiario  ContratoBeneficiario[]
+  cotizaciones      Cotizacion[]
+  crmLeads          CrmLead[]
+  ingresos          Ingreso[]
+  facturas          Factura[]
+  odontogramas      Odontograma[]
+  odontoPlanItems   OdontoPlanItem[]
+  odontoEvoluciones OdontoEvolucion[]
 
   @@unique([numeroDocumento, tipoDocumento])
   @@index([nombreCompleto])
@@ -1017,6 +1025,8 @@ model TarifaCargo {
   activo    Boolean      @default(true)
   items     TarifaItem[]
   cuentaItems CuentaItem[]
+  odontoPlanItems    OdontoPlanItem[]
+  odontoSugerencias  OdontoHallazgoSugerencia[]
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
 
@@ -1284,4 +1294,216 @@ model ContratoBeneficiario {
   @@index([contratoId])
   @@index([pacienteId])
   @@index([documento])
+// ──────────────────────────────────────────────────────────────────────────
+//  MÓDULO DE ODONTOLOGÍA (Odontograma Primera Vez + Tratamiento)
+//  Cumplimiento: Res. 1995/1999, Ley 2015/2020, Res. 866/2021, Habeas Data.
+//  - Catálogos parametrizables: hallazgos, estados clínicos, prioridades, riesgo
+//  - Odontograma: valoración por paciente (PRIMERA_VEZ | TRATAMIENTO)
+//  - Hallazgos por pieza/superficie (numeración FDI)
+//  - Plan de tratamiento → procedimiento CUPS (TarifaCargo) → facturación
+//  - Evolución / línea de tiempo clínica
+// ──────────────────────────────────────────────────────────────────────────
+
+// Catálogo de hallazgos odontológicos (caries, fractura, ausente, corona, etc.)
+model OdontoHallazgo {
+  id               String  @id @default(cuid())
+  codigo           String  @unique
+  nombre           String
+  descripcion      String?
+  // Color visual para representar el hallazgo en el odontograma (hex)
+  color            String  @default("#ef4444")
+  icono            String? // nombre de icono lucide opcional
+  // Si true, este hallazgo genera automáticamente un ítem en el plan de tratamiento
+  generaTratamiento Boolean @default(true)
+  // Prioridad sugerida por defecto al generar tratamiento
+  prioridadDefault String? // referencia a OdontoPrioridad.codigo
+  // Categoría: PATOLOGIA, RESTAURACION, PROTESIS, ENDODONCIA, PERIODONCIA, etc.
+  categoria        String?
+  orden            Int     @default(0)
+  activo           Boolean @default(true)
+  sugerencias      OdontoHallazgoSugerencia[]
+  piezas           OdontoPiezaHallazgo[]
+  planItems        OdontoPlanItem[]
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([activo])
+  @@index([categoria])
+}
+
+// Sugerencias de procedimientos CUPS por hallazgo (mapeo hallazgo → cargo facturable)
+model OdontoHallazgoSugerencia {
+  id          String         @id @default(cuid())
+  hallazgoId  String
+  hallazgo    OdontoHallazgo @relation(fields: [hallazgoId], references: [id], onDelete: Cascade)
+  cargoId     String
+  cargo       TarifaCargo    @relation(fields: [cargoId], references: [id], onDelete: Cascade)
+  porDefecto  Boolean        @default(false)
+  createdAt   DateTime       @default(now())
+
+  @@unique([hallazgoId, cargoId])
+  @@index([hallazgoId])
+  @@index([cargoId])
+}
+
+// Catálogo de estados clínicos (Sano, Caries, Tratado, Ausente, etc.)
+model OdontoEstado {
+  id        String   @id @default(cuid())
+  codigo    String   @unique
+  nombre    String
+  color     String   @default("#22c55e")
+  orden     Int      @default(0)
+  activo    Boolean  @default(true)
+  piezas    OdontoPiezaHallazgo[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([activo])
+}
+
+// Catálogo de prioridades (Urgente, Alta, Media, Baja)
+model OdontoPrioridad {
+  id        String   @id @default(cuid())
+  codigo    String   @unique
+  nombre    String
+  color     String   @default("#f59e0b")
+  nivel     Int      @default(0) // mayor = más urgente
+  orden     Int      @default(0)
+  activo    Boolean  @default(true)
+  planItems OdontoPlanItem[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([activo])
+}
+
+// Catálogo de riesgo clínico (Bajo, Moderado, Alto)
+model OdontoRiesgo {
+  id        String   @id @default(cuid())
+  codigo    String   @unique
+  nombre    String
+  color     String   @default("#3b82f6")
+  orden     Int      @default(0)
+  activo    Boolean  @default(true)
+  odontogramas Odontograma[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([activo])
+}
+
+// Odontograma: valoración odontológica de un paciente
+model Odontograma {
+  id                 String   @id @default(cuid())
+  pacienteId         String
+  paciente           Paciente @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
+  medicoId           String?
+  medico             User?    @relation(fields: [medicoId], references: [id])
+  historiaClinicaId  String?
+  citaId             String?
+  tipo               String   @default("PRIMERA_VEZ") // PRIMERA_VEZ | TRATAMIENTO
+  denticion          String   @default("PERMANENTE")  // PERMANENTE | TEMPORAL | MIXTA
+  estado             String   @default("EN_PROCESO")  // EN_PROCESO | FINALIZADO | ARCHIVADO
+  // Hallazgos generales: higiene oral, periodontal, oclusión, ATM, observaciones
+  hallazgosGenerales Json?
+  // Sección estética (sonrisa, color, alineación, etc.)
+  estetica           Json?
+  // Resumen clínico generado/asistido por SARAI
+  resumenIA          String?
+  riesgoId           String?
+  riesgo             OdontoRiesgo? @relation(fields: [riesgoId], references: [id])
+  firmado            Boolean  @default(false)
+  hashIntegridad     String?
+  piezas             OdontoPiezaHallazgo[]
+  planItems          OdontoPlanItem[]
+  evoluciones        OdontoEvolucion[]
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([pacienteId])
+  @@index([tipo])
+  @@index([estado])
+  @@index([medicoId])
+}
+
+// Hallazgo registrado sobre una pieza dental (o superficie específica)
+model OdontoPiezaHallazgo {
+  id            String        @id @default(cuid())
+  odontogramaId String
+  odontograma   Odontograma   @relation(fields: [odontogramaId], references: [id], onDelete: Cascade)
+  diente        Int           // numeración FDI (11..48 / 51..85)
+  // Superficie: null = pieza completa | VESTIBULAR, LINGUAL, PALATINA, MESIAL, DISTAL, OCLUSAL, INCISAL
+  superficie    String?
+  hallazgoId    String
+  hallazgo      OdontoHallazgo @relation(fields: [hallazgoId], references: [id])
+  estadoId      String?
+  estado        OdontoEstado?  @relation(fields: [estadoId], references: [id])
+  observaciones String?
+  colorOverride String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@index([odontogramaId])
+  @@index([diente])
+  @@index([hallazgoId])
+}
+
+// Ítem del plan de tratamiento (sirve para Primera Vez y seguimiento de Tratamiento)
+model OdontoPlanItem {
+  id                     String         @id @default(cuid())
+  odontogramaId          String
+  odontograma            Odontograma    @relation(fields: [odontogramaId], references: [id], onDelete: Cascade)
+  pacienteId             String
+  paciente               Paciente       @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
+  diente                 Int?
+  superficie             String?
+  hallazgoId             String?
+  hallazgo               OdontoHallazgo? @relation(fields: [hallazgoId], references: [id])
+  diagnostico            String
+  // Procedimiento facturable (CUPS) — se consume del catálogo de cargos/tarifas
+  cargoId                String?
+  cargo                  TarifaCargo?   @relation(fields: [cargoId], references: [id])
+  codigoCups             String?
+  descripcionProcedimiento String
+  prioridadId            String?
+  prioridad              OdontoPrioridad? @relation(fields: [prioridadId], references: [id])
+  // Estado del tratamiento
+  estadoTratamiento      String         @default("PLANEADO") // PLANEADO | AGENDADO | EN_TRATAMIENTO | FINALIZADO | SUSPENDIDO | CANCELADO
+  medicoId               String?
+  observaciones          String?
+  evolucion              String?
+  precio                 Float          @default(0)
+  fechaProgramada        DateTime?
+  fechaEjecucion         DateTime?
+  // Integración con facturación (evita duplicar cargos)
+  cuentaItemId           String?
+  facturado              Boolean        @default(false)
+  orden                  Int            @default(0)
+  createdAt              DateTime       @default(now())
+  updatedAt              DateTime       @updatedAt
+
+  @@index([odontogramaId])
+  @@index([pacienteId])
+  @@index([estadoTratamiento])
+  @@index([cargoId])
+}
+
+// Evolución / línea de tiempo clínica del tratamiento
+model OdontoEvolucion {
+  id            String       @id @default(cuid())
+  odontogramaId String
+  odontograma   Odontograma  @relation(fields: [odontogramaId], references: [id], onDelete: Cascade)
+  pacienteId    String
+  paciente      Paciente     @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
+  planItemId    String?
+  // Tipo: VALORACION | PLANIFICACION | PROCEDIMIENTO | CONTROL | ALTA | NOTA
+  tipo          String       @default("NOTA")
+  descripcion   String
+  medicoId      String?
+  fecha         DateTime     @default(now())
+  createdAt     DateTime     @default(now())
+
+  @@index([odontogramaId])
+  @@index([pacienteId])
+  @@index([fecha])
 }

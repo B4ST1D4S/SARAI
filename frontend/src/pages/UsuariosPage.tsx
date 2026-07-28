@@ -15,6 +15,7 @@ import {
   Stethoscope,
   User,
 } from 'lucide-react';
+import { CargaMasivaUsuarios } from '../components/CargaMasivaUsuarios';
 import {
   createUsuario,
   getAllUsuarios,
@@ -72,6 +73,8 @@ interface UsuarioData {
   firmaBase64?: string;
   activo: boolean;
   createdAt: string;
+  perfilId?: string;
+  perfil?: { id: string; nombre: string };
 }
 
 type FormMode = 'crear' | 'editar';
@@ -90,6 +93,7 @@ const FORM_EMPTY: CreateUserRequest = {
   registroProfesional: '',
   registroMedico: '',
   firmaBase64: '',
+  perfilId: '',
 };
 
 // ─── Componente Principal ─────────────────────────────────────────────────────
@@ -100,6 +104,7 @@ export default function UsuariosPage() {
   const [rolFiltro, setRolFiltro] = useState('TODOS');
 
   const [showModal, setShowModal] = useState(false);
+  const [showCargaMasiva, setShowCargaMasiva] = useState(false);
   const [mode, setMode]           = useState<FormMode>('crear');
   const [editId, setEditId]       = useState<string | null>(null);
 
@@ -111,6 +116,7 @@ export default function UsuariosPage() {
   const [success, setSuccess]     = useState<string | null>(null);
 
   const [especialidades, setEspecialidades] = useState<EspecialidadItem[]>([]);
+  const [perfilesIam, setPerfilesIam]         = useState<{ id: string; nombre: string }[]>([]);
 
   const token    = localStorage.getItem('accessToken') || '';
   const firmaRef = useRef<HTMLInputElement>(null);
@@ -128,6 +134,12 @@ export default function UsuariosPage() {
     // Cargar especialidades al montar
     getEspecialidades(token).then((res) => {
       if (res.data) setEspecialidades(res.data);
+    });
+    // Cargar perfiles IAM
+    fetch(`${import.meta.env.DEV ? 'http://localhost:3001/api' : 'https://sarai-app-backend.vercel.app/api'}/seguridad/perfiles`, {
+      headers: { Authorization: `Bearer ${token}` },
+    }).then(r => r.json()).then(data => {
+      if (Array.isArray(data)) setPerfilesIam(data);
     });
   }, []);
 
@@ -178,6 +190,7 @@ export default function UsuariosPage() {
       registroProfesional: u.registroProfesional ?? '',
       registroMedico:     u.registroMedico ?? '',
       firmaBase64:        u.firmaBase64 ?? '',
+      perfilId:           u.perfilId ?? '',
     });
     setFirmaPreview(u.firmaBase64 ? u.firmaBase64 : null);
     setError(null);
@@ -217,6 +230,8 @@ export default function UsuariosPage() {
         if (!payload.email)              delete payload.email;
         if (!payload.telefono)           delete payload.telefono;
         if (!payload.especialidad)       delete payload.especialidad;
+        // perfilId vacío → quitar para no enviar string vacío
+        if (!payload.perfilId)           delete payload.perfilId;
         if (!ROLES_PROFESIONALES.includes(payload.rol)) {
           delete payload.tipoDocumento;
           delete payload.numeroDocumento;
@@ -238,6 +253,8 @@ export default function UsuariosPage() {
         const payload: UpdateUserRequest = { ...form };
         if (!payload.password) delete payload.password;
         if (!payload.email)    delete payload.email;
+        // perfilId vacío → enviar null para desasignar, o quitar si no cambió
+        if (payload.perfilId === '') payload.perfilId = undefined;
         if (!ROLES_PROFESIONALES.includes(payload.rol ?? '')) {
           delete payload.tipoDocumento;
           delete payload.numeroDocumento;
@@ -281,15 +298,25 @@ export default function UsuariosPage() {
             Gestión de usuarios y profesionales del sistema
           </p>
         </div>
-        <button
-          onClick={abrirCrear}
-          className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-yellow-500 to-amber-500
-                     text-slate-900 font-semibold rounded-xl hover:from-yellow-400 hover:to-amber-400
-                     transition-all shadow-lg shadow-yellow-500/20 text-sm"
-        >
-          <Plus size={16} />
-          Nuevo Usuario
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowCargaMasiva(true)}
+            className="flex items-center gap-2 px-4 py-2.5 bg-white/5 border border-white/10 text-gray-300
+                       font-semibold rounded-xl hover:bg-white/10 transition-all text-sm"
+          >
+            <Upload size={16} />
+            Carga Masiva
+          </button>
+          <button
+            onClick={abrirCrear}
+            className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-yellow-500 to-amber-500
+                       text-slate-900 font-semibold rounded-xl hover:from-yellow-400 hover:to-amber-400
+                       transition-all shadow-lg shadow-yellow-500/20 text-sm"
+          >
+            <Plus size={16} />
+            Nuevo Usuario
+          </button>
+        </div>
       </div>
 
       {/* ── Stats ── */}
@@ -550,6 +577,18 @@ export default function UsuariosPage() {
                         ))}
                       </select>
                     </Field>
+                    <Field label="Perfil IAM">
+                      <select
+                        value={form.perfilId ?? ''}
+                        onChange={(e) => setForm((f) => ({ ...f, perfilId: e.target.value || undefined }))}
+                        className={inputCls}
+                      >
+                        <option value=''>— Sin perfil asignado —</option>
+                        {perfilesIam.map((p) => (
+                          <option key={p.id} value={p.id}>{p.nombre}</option>
+                        ))}
+                      </select>
+                    </Field>
                   </Section>
 
                   {/* ── Sección: Datos personales ── */}
@@ -578,6 +617,18 @@ export default function UsuariosPage() {
                           placeholder="+57 300 000 0000" className={inputCls} />
                       </Field>
                     </div>
+                    <Field label="Especialidad">
+                      <select
+                        value={form.especialidad ?? ''}
+                        onChange={(e) => setForm((f) => ({ ...f, especialidad: e.target.value }))}
+                        className={inputCls}
+                      >
+                        <option value="">— Seleccionar especialidad —</option>
+                        {especialidades.map((e) => (
+                          <option key={e.id} value={e.nombre}>{e.nombre}</option>
+                        ))}
+                      </select>
+                    </Field>
                   </Section>
 
                   {/* ── Sección: Datos profesionales (solo MEDICO / AUXILIAR) ── */}
@@ -611,18 +662,6 @@ export default function UsuariosPage() {
                                 placeholder="Ej: 1234567890" className={inputCls} />
                             </Field>
                           </div>
-                          <Field label="Especialidad">
-                            <select
-                              value={form.especialidad ?? ''}
-                              onChange={(e) => setForm((f) => ({ ...f, especialidad: e.target.value }))}
-                              className={inputCls}
-                            >
-                              <option value="">— Seleccionar especialidad —</option>
-                              {especialidades.map((e) => (
-                                <option key={e.id} value={e.nombre}>{e.nombre}</option>
-                              ))}
-                            </select>
-                          </Field>
                           <div className="grid grid-cols-2 gap-4">
                             <Field label="Registro profesional">
                               <input value={form.registroProfesional}
@@ -705,6 +744,16 @@ export default function UsuariosPage() {
               </form>
             </motion.div>
           </>
+        )}
+      </AnimatePresence>
+
+      {/* Modal Carga Masiva */}
+      <AnimatePresence>
+        {showCargaMasiva && (
+          <CargaMasivaUsuarios
+            onClose={() => setShowCargaMasiva(false)}
+            onSuccess={() => { loadUsuarios(); setShowCargaMasiva(false); }}
+          />
         )}
       </AnimatePresence>
     </div>
