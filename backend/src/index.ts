@@ -22,6 +22,7 @@ import crmRoutes from './routes/crm.js';
 import facturacionRoutes from './routes/facturacion.js';
 import contratacionRoutes from './routes/contratacion.js';
 import odontologiaRoutes from './routes/odontologia.js';
+import seguridadRoutes from './routes/seguridad.js';
 
 dotenv.config();
 
@@ -90,6 +91,7 @@ app.use('/api/crm',          crmRoutes);
 app.use('/api/facturacion',  facturacionRoutes);
 app.use('/api/contratacion', contratacionRoutes);
 app.use('/api/odontologia',  odontologiaRoutes);
+app.use('/api/seguridad',    seguridadRoutes);
 
 // ============================================
 // MANEJO DE ERRORES
