@@ -30,24 +30,32 @@ function useApi() {
   const token = localStorage.getItem('accessToken') || '';
   const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
 
-  const get = (path: string) =>
-    fetch(`${API_BASE_URL}/seguridad${path}`, { headers }).then(r => r.json()).catch(() => null);
+  const request = async (path: string, init?: RequestInit) => {
+    const response = await fetch(`${API_BASE_URL}/seguridad${path}`, {
+      ...init,
+      headers,
+    });
+    const data = await response.json().catch(() => null);
+    if (!response.ok) {
+      const mensaje = data?.error || data?.message || `Error HTTP ${response.status}`;
+      throw new Error(mensaje);
+    }
+    return data;
+  };
 
-  // Siempre retorna un array — nunca crashea aunque el backend devuelva error JSON
+  const get = (path: string) => request(path).catch(() => null);
+
   const getList = (path: string): Promise<any[]> =>
-    fetch(`${API_BASE_URL}/seguridad${path}`, { headers })
-      .then(r => r.json())
-      .then(data => Array.isArray(data) ? data : [])
-      .catch(() => []);
+    request(path).then(data => Array.isArray(data) ? data : []);
 
   const post = (path: string, body: any) =>
-    fetch(`${API_BASE_URL}/seguridad${path}`, { method: 'POST', headers, body: JSON.stringify(body) }).then(r => r.json());
+    request(path, { method: 'POST', body: JSON.stringify(body) });
 
   const put = (path: string, body: any) =>
-    fetch(`${API_BASE_URL}/seguridad${path}`, { method: 'PUT', headers, body: JSON.stringify(body) }).then(r => r.json());
+    request(path, { method: 'PUT', body: JSON.stringify(body) });
 
   const del = (path: string) =>
-    fetch(`${API_BASE_URL}/seguridad${path}`, { method: 'DELETE', headers }).then(r => r.json());
+    request(path, { method: 'DELETE' });
 
   return { get, getList, post, put, del };
 }
@@ -370,10 +378,19 @@ function SedesTab({ api }: { api: ReturnType<typeof useApi> }) {
 function PerfilesTab({ api }: { api: ReturnType<typeof useApi> }) {
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ nombre: '', descripcion: '', clonarDesdeId: '' });
 
-  useEffect(() => { api.getList('/perfiles').then(setItems).finally(() => setLoading(false)); }, []);
+  useEffect(() => {
+    api.getList('/perfiles')
+      .then((data) => {
+        setItems(data);
+        setError(null);
+      })
+      .catch((e) => setError(e instanceof Error ? e.message : 'Error al cargar perfiles'))
+      .finally(() => setLoading(false));
+  }, []);
 
   const handleCreate = async () => {
     const res = await api.post('/perfiles', form);
@@ -403,6 +420,11 @@ function PerfilesTab({ api }: { api: ReturnType<typeof useApi> }) {
         )}
       </AnimatePresence>
       <div className="space-y-2">
+        {error && (
+          <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 text-red-300 text-xs">
+            No se pudieron cargar los perfiles: {error}
+          </div>
+        )}
         {items.map(p => (
           <Card key={p.id} className="p-4 flex items-center gap-4">
             <div className="w-9 h-9 rounded-xl bg-violet-500/15 border border-violet-500/20 flex items-center justify-center flex-shrink-0">
@@ -534,15 +556,32 @@ function PermisosTab({ api }: { api: ReturnType<typeof useApi> }) {
   const [permisos, setPermisos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const ACCIONES = ['VER', 'CREAR', 'EDITAR', 'ELIMINAR', 'IMPRIMIR', 'EXPORTAR', 'APROBAR', 'ANULAR'];
 
   useEffect(() => {
-    Promise.all([api.getList('/recursos'), api.getList('/perfiles')]).then(([r, p]) => { setRecursos(r); setPerfiles(p); }).finally(() => setLoading(false));
+    Promise.all([api.getList('/recursos'), api.getList('/perfiles')])
+      .then(([r, p]) => {
+        setRecursos(r);
+        setPerfiles(p);
+        setError(null);
+      })
+      .catch((e) => setError(e instanceof Error ? e.message : 'Error al cargar recursos/perfiles'))
+      .finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
-    if (selPerfil) api.getList(`/permisos?sujetoTipo=PERFIL&sujetoId=${selPerfil}`).then(setPermisos);
+    if (!selPerfil) {
+      setPermisos([]);
+      return;
+    }
+    api.getList(`/permisos?sujetoTipo=PERFIL&sujetoId=${selPerfil}`)
+      .then((data) => {
+        setPermisos(data);
+        setError(null);
+      })
+      .catch((e) => setError(e instanceof Error ? e.message : 'Error al cargar permisos del perfil'));
   }, [selPerfil]);
 
   const tienePermiso = (recursoId: string, accion: string) =>
@@ -560,48 +599,65 @@ function PermisosTab({ api }: { api: ReturnType<typeof useApi> }) {
 
   const togglePermiso = async (recurso: any, accion: string) => {
     const tiene = tienePermiso(recurso.id, accion);
-    await api.post('/permisos', {
-      sujetoTipo: 'PERFIL', sujetoId: selPerfil,
-      recursoCodigo: recurso.codigo, accion,
-      efecto: tiene ? 'DENEGAR' : 'PERMITIR',
-    });
-    await recargar();
+    try {
+      await api.post('/permisos', {
+        sujetoTipo: 'PERFIL', sujetoId: selPerfil,
+        recursoCodigo: recurso.codigo, accion,
+        efecto: tiene ? 'DENEGAR' : 'PERMITIR',
+      });
+      setError(null);
+      await recargar();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Error al actualizar permiso');
+    }
   };
 
   // ── Asignar TODOS los permisos al perfil
   const asignarTodos = async () => {
     if (!selPerfil || guardando) return;
     setGuardando(true);
-    await Promise.all(
-      flat.flatMap(({ item }) =>
-        ACCIONES.map(accion =>
-          api.post('/permisos', {
-            sujetoTipo: 'PERFIL', sujetoId: selPerfil,
-            recursoCodigo: item.codigo, accion, efecto: 'PERMITIR',
-          })
+    try {
+      await Promise.all(
+        flat.flatMap(({ item }) =>
+          ACCIONES.map(accion =>
+            api.post('/permisos', {
+              sujetoTipo: 'PERFIL', sujetoId: selPerfil,
+              recursoCodigo: item.codigo, accion, efecto: 'PERMITIR',
+            })
+          )
         )
-      )
-    );
-    await recargar();
-    setGuardando(false);
+      );
+      setError(null);
+      await recargar();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Error al asignar permisos');
+    } finally {
+      setGuardando(false);
+    }
   };
 
   // ── Quitar TODOS los permisos del perfil
   const revocarTodos = async () => {
     if (!selPerfil || guardando) return;
     setGuardando(true);
-    await Promise.all(
-      flat.flatMap(({ item }) =>
-        ACCIONES.map(accion =>
-          api.post('/permisos', {
-            sujetoTipo: 'PERFIL', sujetoId: selPerfil,
-            recursoCodigo: item.codigo, accion, efecto: 'DENEGAR',
-          })
+    try {
+      await Promise.all(
+        flat.flatMap(({ item }) =>
+          ACCIONES.map(accion =>
+            api.post('/permisos', {
+              sujetoTipo: 'PERFIL', sujetoId: selPerfil,
+              recursoCodigo: item.codigo, accion, efecto: 'DENEGAR',
+            })
+          )
         )
-      )
-    );
-    await recargar();
-    setGuardando(false);
+      );
+      setError(null);
+      await recargar();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Error al revocar permisos');
+    } finally {
+      setGuardando(false);
+    }
   };
 
   // ── Toggle toda una columna (acción)
@@ -609,17 +665,23 @@ function PermisosTab({ api }: { api: ReturnType<typeof useApi> }) {
     if (!selPerfil || guardando) return;
     const todasTienen = flat.every(({ item }) => tienePermiso(item.id, accion));
     setGuardando(true);
-    await Promise.all(
-      flat.map(({ item }) =>
-        api.post('/permisos', {
-          sujetoTipo: 'PERFIL', sujetoId: selPerfil,
-          recursoCodigo: item.codigo, accion,
-          efecto: todasTienen ? 'DENEGAR' : 'PERMITIR',
-        })
-      )
-    );
-    await recargar();
-    setGuardando(false);
+    try {
+      await Promise.all(
+        flat.map(({ item }) =>
+          api.post('/permisos', {
+            sujetoTipo: 'PERFIL', sujetoId: selPerfil,
+            recursoCodigo: item.codigo, accion,
+            efecto: todasTienen ? 'DENEGAR' : 'PERMITIR',
+          })
+        )
+      );
+      setError(null);
+      await recargar();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Error al actualizar columna');
+    } finally {
+      setGuardando(false);
+    }
   };
 
   // ── Toggle toda una fila (recurso)
@@ -627,17 +689,23 @@ function PermisosTab({ api }: { api: ReturnType<typeof useApi> }) {
     if (!selPerfil || guardando) return;
     const todasTienen = ACCIONES.every(a => tienePermiso(recurso.id, a));
     setGuardando(true);
-    await Promise.all(
-      ACCIONES.map(accion =>
-        api.post('/permisos', {
-          sujetoTipo: 'PERFIL', sujetoId: selPerfil,
-          recursoCodigo: recurso.codigo, accion,
-          efecto: todasTienen ? 'DENEGAR' : 'PERMITIR',
-        })
-      )
-    );
-    await recargar();
-    setGuardando(false);
+    try {
+      await Promise.all(
+        ACCIONES.map(accion =>
+          api.post('/permisos', {
+            sujetoTipo: 'PERFIL', sujetoId: selPerfil,
+            recursoCodigo: recurso.codigo, accion,
+            efecto: todasTienen ? 'DENEGAR' : 'PERMITIR',
+          })
+        )
+      );
+      setError(null);
+      await recargar();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Error al actualizar fila');
+    } finally {
+      setGuardando(false);
+    }
   };
 
   return (
@@ -675,6 +743,12 @@ function PermisosTab({ api }: { api: ReturnType<typeof useApi> }) {
           <span className="text-xs text-gray-600 self-center ml-2">
             También puedes hacer clic en una columna o en el nombre de un recurso para marcar/desmarcar toda esa fila/columna.
           </span>
+        </div>
+      )}
+
+      {error && (
+        <div className="mb-4 bg-red-500/10 border border-red-500/30 rounded-xl p-3 text-red-300 text-xs">
+          Error en permisos: {error}
         </div>
       )}
 
