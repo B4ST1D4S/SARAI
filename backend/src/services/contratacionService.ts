@@ -29,7 +29,7 @@ function validarCucon(data: { tieneCucon?: boolean; codigoCucon?: string | null;
 // ─── EMPRESAS ───────────────────────────────────────────────────────────────
 
 export async function getEmpresas(soloActivas = false) {
-  return prisma.empresa.findMany({
+  return prisma.empresaContratante.findMany({
     where: soloActivas ? { estado: true } : undefined,
     include: {
       _count: { select: { contratos: true } },
@@ -39,7 +39,7 @@ export async function getEmpresas(soloActivas = false) {
 }
 
 export async function getEmpresaById(id: string) {
-  const empresa = await prisma.empresa.findUnique({
+  const empresa = await prisma.empresaContratante.findUnique({
     where: { id },
     include: {
       contratos: {
@@ -64,10 +64,10 @@ export async function createEmpresa(data: {
   direccion?: string;
   ciudad?: string;
 }) {
-  const existe = await prisma.empresa.findUnique({ where: { nit: data.nit } });
+  const existe = await prisma.empresaContratante.findUnique({ where: { nit: data.nit } });
   if (existe) throw new Error(`Ya existe una empresa con NIT ${data.nit}`);
 
-  return prisma.empresa.create({ data });
+  return prisma.empresaContratante.create({ data });
 }
 
 export async function updateEmpresa(id: string, data: Partial<{
@@ -82,9 +82,9 @@ export async function updateEmpresa(id: string, data: Partial<{
   ciudad: string;
   estado: boolean;
 }>) {
-  const empresa = await prisma.empresa.findUnique({ where: { id } });
+  const empresa = await prisma.empresaContratante.findUnique({ where: { id } });
   if (!empresa) throw new Error('Empresa no encontrada');
-  return prisma.empresa.update({ where: { id }, data });
+  return prisma.empresaContratante.update({ where: { id }, data });
 }
 
 // ─── CONTRATOS ──────────────────────────────────────────────────────────────
@@ -157,7 +157,7 @@ export async function createContrato(data: {
   facturaSinContrato?: string;
   creadoPorId: string;
 }) {
-  const empresa = await prisma.empresa.findUnique({ where: { id: data.empresaId } });
+  const empresa = await prisma.empresaContratante.findUnique({ where: { id: data.empresaId } });
   if (!empresa) throw new Error('Empresa no encontrada');
 
   validarCucon({
@@ -383,7 +383,7 @@ export async function clonarContrato(
   });
   if (!origen) throw new Error('Contrato de origen no encontrado');
 
-  const empresa = await prisma.empresa.findUnique({ where: { id: data.empresaId } });
+  const empresa = await prisma.empresaContratante.findUnique({ where: { id: data.empresaId } });
   if (!empresa) throw new Error('Empresa no encontrada');
 
   return prisma.$transaction(async (tx) => {
@@ -576,7 +576,7 @@ export async function getStats() {
     prisma.contrato.count({
       where: { estado: 'ACTIVO', fechaFin: { gte: hoy, lte: en30Dias } },
     }),
-    prisma.empresa.count({ where: { estado: true } }),
+    prisma.empresaContratante.count({ where: { estado: true } }),
   ]);
 
   return { totalContratos, activos, porVencer, empresas };

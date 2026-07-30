@@ -1198,9 +1198,9 @@ const EMPRESA_FIELD_MAP: Record<string, string> = {
 };
 
 async function getOrCreateClinicaPropia() {
-  let empresa = await prisma.empresa.findFirst({ where: { esClinicaPropia: true } });
+  let empresa = await prisma.empresaContratante.findFirst({ where: { esClinicaPropia: true } });
   if (!empresa) {
-    empresa = await prisma.empresa.create({
+    empresa = await prisma.empresaContratante.create({
       data: {
         razonSocial: 'EstetIA Clínica',
         nit: '',
@@ -1259,7 +1259,7 @@ export async function updateParametroSistema(req: Request, res: Response) {
         return;
       }
       const empresa = await getOrCreateClinicaPropia();
-      const updated = await prisma.empresa.update({
+      const updated = await prisma.empresaContratante.update({
         where: { id: empresa.id },
         data: { [field]: valor },
       });

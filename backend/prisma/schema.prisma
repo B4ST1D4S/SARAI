@@ -51,35 +51,7 @@ model User {
   Perfil                                                  Perfil?                 @relation(fields: [perfilId], references: [id])
   Sede                                                    Sede?                   @relation(fields: [sedeId], references: [id])
   UsuarioIamRol                                           UsuarioIamRol[]
-  id                       String                 @id @default(cuid())
-  email                    String?                @unique
-  password                 String
-  nombre                   String
-  apellido                 String
-  rol                      Role                   @default(RECEPCIONISTA)
-  especialidad             String?
-  numeroDocumento          String?
-  telefono                 String?
-  activo                   Boolean                @default(true)
-  createdAt                DateTime               @default(now())
-  updatedAt                DateTime               @updatedAt
-  username                 String?                @unique
-  firmaBase64              String?
-  registroMedico           String?
-  registroProfesional      String?
-  tipoDocumento            String?
-  auditLogs                AuditLog[]
-  bloqueosAgenda           BloqueDisponibilidad[]
-  citasAsignadas           Cita[]
-  disponibilidades         DisponibilidadMedico[]
-  historiasEditadas        HistoriaClinica[]
-  pacientesCreados         Paciente[]
-  procedimientosRealizados Procedimiento[]
-  cotizaciones             Cotizacion[]
-  crmLeads                 CrmLead[]              @relation("CrmLeadCreador")
-  ingresosFacturacion      Ingreso[]
-  contratosCreados         Contrato[]             @relation("ContratoCreadoPor")
-  odontogramas             Odontograma[]
+  contratosCreados                                        Contrato[]              @relation("ContratoCreadoPor")
 
   @@index([rol])
   @@index([email])
@@ -125,38 +97,27 @@ model Paciente {
   creadoPor         String?
   createdAt         DateTime                  @default(now())
   updatedAt         DateTime                  @updatedAt
-  alergias          Alergia[]
-  alertas           Alerta[]
-  antecedentes      AntecedentesQuirurgicos[]
-  citas             Cita[]
-  consentimientos   Consentimiento[]
-  cotizaciones      Cotizacion[]
-  crmLeads          CrmLead[]
-  facturas          Factura[]
-  fotos             FotoClinica[]
-  historiasClinicas HistoriaClinica[]
-  ingresos          Ingreso[]
-  mapaCorporal      MapaCorporal[]
-  medicacionActual  Medicamento[]
-  odontoEvoluciones OdontoEvolucion[]
-  odontoPlanItems   OdontoPlanItem[]
-  odontogramas      Odontograma[]
-  creadoBy          User?                     @relation(fields: [creadoPor], references: [id])
-  procedimientos    Procedimiento[]
-  seguimientos      SeguimientoPostOp[]
-  transacciones     Transaccion[]
-  cotizaciones           Cotizacion[]
-  crmLeads               CrmLead[]
-  ingresos               Ingreso[]
-  facturas               Factura[]
-  contratosBeneficiario  ContratoBeneficiario[]
-  cotizaciones      Cotizacion[]
-  crmLeads          CrmLead[]
-  ingresos          Ingreso[]
-  facturas          Factura[]
-  odontogramas      Odontograma[]
-  odontoPlanItems   OdontoPlanItem[]
-  odontoEvoluciones OdontoEvolucion[]
+  alergias              Alergia[]
+  alertas               Alerta[]
+  antecedentes          AntecedentesQuirurgicos[]
+  citas                 Cita[]
+  consentimientos       Consentimiento[]
+  cotizaciones          Cotizacion[]
+  crmLeads              CrmLead[]
+  facturas              Factura[]
+  fotos                 FotoClinica[]
+  historiasClinicas     HistoriaClinica[]
+  ingresos              Ingreso[]
+  mapaCorporal          MapaCorporal[]
+  medicacionActual      Medicamento[]
+  odontoEvoluciones     OdontoEvolucion[]
+  odontoPlanItems       OdontoPlanItem[]
+  odontogramas          Odontograma[]
+  creadoBy              User?                     @relation(fields: [creadoPor], references: [id])
+  procedimientos        Procedimiento[]
+  seguimientos          SeguimientoPostOp[]
+  transacciones         Transaccion[]
+  contratosBeneficiario ContratoBeneficiario[]
 
   @@unique([numeroDocumento, tipoDocumento])
   @@index([nombreCompleto])
@@ -1183,7 +1144,12 @@ model Factura {
 //  MÓDULO DE CONTRATACIÓN
 // ─────────────────────────────────────────────
 
-model Empresa {
+// Empresa cliente/contratante (aseguradoras, convenios, y la propia clínica
+// vía esClinicaPropia). Distinta de Empresa (tenant/organización de IAM,
+// más abajo en este archivo) — colisión de nombres detectada al mergear
+// contratación con el módulo de IAM/seguridad; se renombra esta para no
+// tocar la infraestructura de multi-tenancy ya migrada.
+model EmpresaContratante {
   id                 String     @id @default(cuid())
   razonSocial        String
   nombreComercial    String?
@@ -1206,6 +1172,7 @@ model Empresa {
 
   @@index([nit])
   @@index([estado])
+  @@map("Empresa")
 }
 
 model Contrato {
@@ -1213,7 +1180,7 @@ model Contrato {
   numero              Int                    @unique @default(autoincrement())
   descripcion         String
   empresaId           String
-  empresa             Empresa                @relation(fields: [empresaId], references: [id])
+  empresa             EmpresaContratante     @relation(fields: [empresaId], references: [id])
   tipo                String                 @default("CONVENIO") // CONVENIO, CORPORATIVO, COLECTIVO
   estado              String                 @default("BORRADOR") // BORRADOR, ACTIVO, SUSPENDIDO, VENCIDO, CANCELADO
   fechaInicio         DateTime
@@ -1339,6 +1306,8 @@ model ContratoBeneficiario {
   @@index([contratoId])
   @@index([pacienteId])
   @@index([documento])
+}
+
 // ──────────────────────────────────────────────────────────────────────────
 //  MÓDULO DE ODONTOLOGÍA (Odontograma Primera Vez + Tratamiento)
 //  Cumplimiento: Res. 1995/1999, Ley 2015/2020, Res. 866/2021, Habeas Data.
@@ -1630,6 +1599,7 @@ model Empresa {
   User              User[]
 
   @@index([activo])
+  @@map("EmpresaTenant")
 }
 
 model EventoSeguridad {
