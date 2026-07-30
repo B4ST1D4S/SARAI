@@ -21,6 +21,7 @@ import mapaCorporalRoutes from './routes/mapaCorporal.js';
 import crmRoutes from './routes/crm.js';
 import facturacionRoutes from './routes/facturacion.js';
 import contratacionRoutes from './routes/contratacion.js';
+import fevRipsRoutes from './routes/fevRips.js';
 import odontologiaRoutes from './routes/odontologia.js';
 import seguridadRoutes from './routes/seguridad.js';
 
@@ -90,6 +91,7 @@ app.use('/api/mapa-corporal', mapaCorporalRoutes);
 app.use('/api/crm',          crmRoutes);
 app.use('/api/facturacion',  facturacionRoutes);
 app.use('/api/contratacion', contratacionRoutes);
+app.use('/api/fev-rips', fevRipsRoutes);
 app.use('/api/odontologia',  odontologiaRoutes);
 app.use('/api/seguridad',    seguridadRoutes);
 

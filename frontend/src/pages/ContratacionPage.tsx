@@ -4,7 +4,7 @@ import {
   Building2, FileText, Plus, Search, X, ChevronRight, Users,
   Package, Tag, CheckCircle2, XCircle, Clock, AlertTriangle,
   Edit2, Trash2, ChevronDown, RefreshCw, DollarSign, Calendar,
-  Phone, Mail, MapPin, User, Shield, Briefcase, Save, Eye,
+  Phone, Mail, MapPin, User, Shield, Briefcase, Save, Eye, Copy,
 } from 'lucide-react';
 import { apiCall } from '../services/api';
 
@@ -67,6 +67,24 @@ interface Beneficiario {
   paciente?: { id: string; nombreCompleto: string; numeroDocumento: string } | null;
 }
 
+interface ContratoExcepcion {
+  id: string;
+  tarifaId?: string | null;
+  tarifa?: { id: string; codigoCUPS: string; descripcionCUPS: string } | null;
+  tipoAfiliado: string;
+  edadMinima?: number | null;
+  edadMaxima?: number | null;
+  sexo: string;
+  aplicaCopago: boolean;
+  porcentajeCopago: number;
+  aplicaCuotaModeradora: boolean;
+  porcentajeCuotaModeradora: number;
+  numVecesMaximo?: number | null;
+  excluyePorEdad: boolean;
+  excluyePorCotizar: boolean;
+  observaciones?: string | null;
+}
+
 interface Contrato {
   id: string;
   numero: number;
@@ -83,6 +101,9 @@ interface Contrato {
   porcentajeDescuento: number;
   porcentajeCobertura: number;
   observaciones?: string;
+  tieneCucon: boolean;
+  codigoCucon?: string | null;
+  facturaSinContrato?: string | null;
   creadoPor: { id: string; nombre: string; apellido: string };
   tarifas: ContratoTarifa[];
   paquetes: ContratoPaquete[];
@@ -121,6 +142,18 @@ const ESTADOS_CONTRATO: Record<string, { label: string; color: string; icon: Rea
 const TIPOS_EMPRESA = ['EMPRESA', 'ASEGURADORA', 'CONVENIO'];
 const TIPOS_CONTRATO = ['CONVENIO', 'CORPORATIVO', 'COLECTIVO'];
 
+// Vinculación FEV-RIPS / Registro de Contratos SISPRO: códigos de "factura sin contrato"
+const FACTURA_SIN_CONTRATO_OPCIONES: Record<string, string> = {
+  '01': 'Atención de urgencias',
+  '02': 'A cargo de ADRES/aseguradora SOAT/planes voluntarios',
+  '03': 'Atención por fallos de tutela/órdenes judiciales',
+  '04': 'Atención por portabilidad/asignación masiva de afiliados',
+  '05': 'Casos excepcionales por cotizaciones/autorizaciones sin contrato',
+  '06': 'Gestión de recuperación de órganos para trasplante',
+};
+
+const TIPOS_AFILIADO = ['TITULAR', 'BENEFICIARIO', 'COTIZANTE', 'AMBOS'];
+
 function EstadoChip({ estado }: { estado: string }) {
   const cfg = ESTADOS_CONTRATO[estado] ?? ESTADOS_CONTRATO.BORRADOR;
   return (
@@ -154,6 +187,7 @@ export default function ContratacionPage() {
   // Modales
   const [showNuevoContrato, setShowNuevoContrato] = useState(false);
   const [showNuevaEmpresa, setShowNuevaEmpresa] = useState(false);
+  const [showClonarContrato, setShowClonarContrato] = useState(false);
   const [contratoDetalle, setContratoDetalle] = useState<Contrato | null>(null);
   const [empresaEditar, setEmpresaEditar] = useState<Empresa | null>(null);
 
@@ -227,6 +261,14 @@ export default function ContratacionPage() {
             <button onClick={cargarTodo} className="p-2 text-slate-400 hover:text-white transition-colors" title="Recargar">
               <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
             </button>
+            {tab === 'contratos' && contratos.length > 0 && (
+              <button
+                onClick={() => setShowClonarContrato(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 border border-white/10 hover:bg-white/5 text-slate-300 text-sm font-medium rounded-lg transition-colors"
+              >
+                <Copy size={15} /> Copiar desde otro
+              </button>
+            )}
             <button
               onClick={() => tab === 'contratos' ? setShowNuevoContrato(true) : setShowNuevaEmpresa(true)}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-lg transition-colors"
@@ -316,6 +358,19 @@ export default function ContratacionPage() {
             token={token}
             onClose={() => setShowNuevoContrato(false)}
             onCreado={(c) => { setContratos(prev => [c, ...prev]); setShowNuevoContrato(false); cargarTodo(); }}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Modal clonar contrato */}
+      <AnimatePresence>
+        {showClonarContrato && (
+          <ModalClonarContrato
+            contratos={contratos}
+            empresas={empresas}
+            token={token}
+            onClose={() => setShowClonarContrato(false)}
+            onCreado={(c) => { setContratos(prev => [c, ...prev]); setShowClonarContrato(false); cargarTodo(); }}
           />
         )}
       </AnimatePresence>
@@ -585,15 +640,24 @@ function ModalNuevoContrato({ empresas, token, onClose, onCreado }: {
     montoTotal: '', montoMensual: '', diasCredito: '30',
     porcentajeDescuento: '0', porcentajeCobertura: '100',
     observaciones: '',
+    tieneCucon: false, codigoCucon: '', facturaSinContrato: '',
   });
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
+  const set = (k: string, v: string | boolean) => setForm(f => ({ ...f, [k]: v }));
 
   async function guardar() {
     if (!form.descripcion.trim() || !form.empresaId || !form.fechaInicio || !form.fechaFin) {
       setErr('Completa los campos obligatorios: descripción, empresa y fechas');
+      return;
+    }
+    if (form.tieneCucon && !/^[a-fA-F0-9]{64}$/.test(form.codigoCucon)) {
+      setErr('El código CUCON debe ser una cadena hexadecimal de 64 caracteres');
+      return;
+    }
+    if (!form.tieneCucon && !form.facturaSinContrato) {
+      setErr('Selecciona un código de factura sin contrato (obligatorio si no tiene CUCON)');
       return;
     }
     setSaving(true);
@@ -608,6 +672,8 @@ function ModalNuevoContrato({ empresas, token, onClose, onCreado }: {
         diasCredito: Number(form.diasCredito),
         porcentajeDescuento: Number(form.porcentajeDescuento),
         porcentajeCobertura: Number(form.porcentajeCobertura),
+        codigoCucon: form.tieneCucon ? form.codigoCucon : undefined,
+        facturaSinContrato: form.tieneCucon ? undefined : form.facturaSinContrato,
       },
     });
     setSaving(false);
@@ -677,6 +743,38 @@ function ModalNuevoContrato({ empresas, token, onClose, onCreado }: {
             </Campo>
           </div>
 
+          {/* Vinculación FEV-RIPS: CUCON o factura sin contrato */}
+          <div className="border-t border-white/5 pt-4">
+            <p className="text-xs font-medium text-slate-400 mb-2 flex items-center gap-1">
+              <Shield size={12} /> Vinculación FEV-RIPS (Registro de Contratos SISPRO)
+            </p>
+            <div className="flex items-center gap-4 mb-3">
+              <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
+                <input type="radio" checked={form.tieneCucon} onChange={() => set('tieneCucon', true)} />
+                Tiene CUCON
+              </label>
+              <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
+                <input type="radio" checked={!form.tieneCucon} onChange={() => set('tieneCucon', false)} />
+                Factura sin contrato
+              </label>
+            </div>
+            {form.tieneCucon ? (
+              <Campo label="Código CUCON (64 caracteres hex) *">
+                <input value={form.codigoCucon} onChange={e => set('codigoCucon', e.target.value)}
+                  placeholder="Hash SHA-256 del contrato ante SISPRO" className={`${inputCls} font-mono text-xs`} />
+              </Campo>
+            ) : (
+              <Campo label="Código de factura sin contrato *">
+                <select value={form.facturaSinContrato} onChange={e => set('facturaSinContrato', e.target.value)} className={inputCls}>
+                  <option value="">Seleccionar código</option>
+                  {Object.entries(FACTURA_SIN_CONTRATO_OPCIONES).map(([cod, label]) => (
+                    <option key={cod} value={cod}>{cod} — {label}</option>
+                  ))}
+                </select>
+              </Campo>
+            )}
+          </div>
+
           <Campo label="Observaciones">
             <textarea value={form.observaciones} onChange={e => set('observaciones', e.target.value)}
               rows={2} placeholder="Notas internas del contrato..." className={inputCls} />
@@ -684,6 +782,99 @@ function ModalNuevoContrato({ empresas, token, onClose, onCreado }: {
         </div>
 
         <ModalFooter onClose={onClose} onSave={guardar} saving={saving} label="Crear Contrato" />
+      </div>
+    </ModalOverlay>
+  );
+}
+
+// ─── MODAL CLONAR CONTRATO ───────────────────────────────────────────────────
+// Copia tarifas, paquetes y excepciones de un contrato existente hacia uno
+// nuevo, para usarlo como plantilla de partida.
+
+function ModalClonarContrato({ contratos, empresas, token, onClose, onCreado }: {
+  contratos: Contrato[];
+  empresas: Empresa[];
+  token: string;
+  onClose: () => void;
+  onCreado: (c: Contrato) => void;
+}) {
+  const [form, setForm] = useState({
+    contratoOrigenId: '', descripcion: '', empresaId: '',
+    fechaInicio: '', fechaFin: '',
+  });
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
+  const origen = contratos.find(c => c.id === form.contratoOrigenId);
+
+  async function guardar() {
+    if (!form.contratoOrigenId || !form.descripcion.trim() || !form.empresaId || !form.fechaInicio || !form.fechaFin) {
+      setErr('Completa el contrato de origen, descripción, empresa y fechas');
+      return;
+    }
+    setSaving(true);
+    setErr(null);
+    const res = await apiCall<{ contrato: Contrato }>(`/contratacion/${form.contratoOrigenId}/clonar`, {
+      method: 'POST',
+      token,
+      body: {
+        descripcion: form.descripcion,
+        empresaId: form.empresaId,
+        fechaInicio: form.fechaInicio,
+        fechaFin: form.fechaFin,
+      },
+    });
+    setSaving(false);
+    if (res.error) { setErr(res.error); return; }
+    if (res.data?.contrato) onCreado(res.data.contrato);
+  }
+
+  return (
+    <ModalOverlay onClose={onClose}>
+      <div className="w-full max-w-xl">
+        <ModalHeader title="Copiar contrato existente" icon={<Copy size={16} />} onClose={onClose} />
+        <div className="p-5 space-y-4">
+          {err && <ErrBox msg={err} />}
+
+          <Campo label="Contrato de origen *">
+            <select value={form.contratoOrigenId} onChange={e => set('contratoOrigenId', e.target.value)} className={inputCls}>
+              <option value="">Seleccionar contrato a copiar</option>
+              {contratos.map(c => (
+                <option key={c.id} value={c.id}>#{c.numero} — {c.descripcion} ({c.empresa.razonSocial})</option>
+              ))}
+            </select>
+          </Campo>
+
+          {origen && (
+            <div className="text-xs text-slate-400 bg-white/[0.02] border border-white/5 rounded-lg p-3">
+              Se copiarán: <b className="text-slate-300">{origen.tarifas.length} tarifas</b>, <b className="text-slate-300">{origen.paquetes.length} paquetes</b> y sus excepciones asociadas.
+              El nuevo contrato queda en estado <b>BORRADOR</b> y sin CUCON/factura-sin-contrato (debes diligenciarlo aparte).
+            </div>
+          )}
+
+          <Campo label="Descripción del nuevo contrato *">
+            <input value={form.descripcion} onChange={e => set('descripcion', e.target.value)}
+              placeholder="Nombre o descripción del contrato" className={inputCls} />
+          </Campo>
+
+          <Campo label="Empresa *">
+            <select value={form.empresaId} onChange={e => set('empresaId', e.target.value)} className={inputCls}>
+              <option value="">Seleccionar empresa</option>
+              {empresas.filter(e => e.estado).map(e => <option key={e.id} value={e.id}>{e.razonSocial}</option>)}
+            </select>
+          </Campo>
+
+          <div className="grid grid-cols-2 gap-3">
+            <Campo label="Fecha inicio *">
+              <input type="date" value={form.fechaInicio} onChange={e => set('fechaInicio', e.target.value)} className={inputCls} />
+            </Campo>
+            <Campo label="Fecha fin *">
+              <input type="date" value={form.fechaFin} onChange={e => set('fechaFin', e.target.value)} className={inputCls} />
+            </Campo>
+          </div>
+        </div>
+        <ModalFooter onClose={onClose} onSave={guardar} saving={saving} label="Copiar Contrato" />
       </div>
     </ModalOverlay>
   );
@@ -807,12 +998,22 @@ function ModalDetalleContrato({ contrato, token, onClose, onActualizar }: {
   onClose: () => void;
   onActualizar: (c: Contrato) => void;
 }) {
-  const [tabDetalle, setTabDetalle] = useState<'info' | 'tarifas' | 'paquetes' | 'beneficiarios'>('info');
+  const [tabDetalle, setTabDetalle] = useState<'info' | 'tarifas' | 'paquetes' | 'excepciones' | 'beneficiarios'>('info');
   const [cambiandoEstado, setCambiandoEstado] = useState(false);
   const [beneficiarios, setBeneficiarios] = useState<Beneficiario[]>([]);
   const [loadingBenef, setLoadingBenef] = useState(false);
+  const [excepciones, setExcepciones] = useState<ContratoExcepcion[]>([]);
+  const [loadingExc, setLoadingExc] = useState(false);
+  const [showNuevaExcepcion, setShowNuevaExcepcion] = useState(false);
 
-  // Cargar beneficiarios cuando se activa la pestaña
+  const cargarExcepciones = () => {
+    setLoadingExc(true);
+    apiCall<{ excepciones: ContratoExcepcion[] }>(`/contratacion/${contrato.id}/excepciones`, { token })
+      .then(r => { if (r.data?.excepciones) setExcepciones(r.data.excepciones); })
+      .finally(() => setLoadingExc(false));
+  };
+
+  // Cargar beneficiarios / excepciones cuando se activa la pestaña
   useEffect(() => {
     if (tabDetalle === 'beneficiarios' && !beneficiarios.length) {
       setLoadingBenef(true);
@@ -820,7 +1021,16 @@ function ModalDetalleContrato({ contrato, token, onClose, onActualizar }: {
         .then(r => { if (r.data?.beneficiarios) setBeneficiarios(r.data.beneficiarios); })
         .finally(() => setLoadingBenef(false));
     }
+    if (tabDetalle === 'excepciones' && !excepciones.length) {
+      cargarExcepciones();
+    }
   }, [tabDetalle]);
+
+  async function eliminarExcepcion(id: string) {
+    if (!confirm('¿Eliminar esta excepción?')) return;
+    await apiCall(`/contratacion/${contrato.id}/excepciones/${id}`, { method: 'DELETE', token });
+    setExcepciones(prev => prev.filter(e => e.id !== id));
+  }
 
   const transicionesValidas: Record<string, string[]> = {
     BORRADOR: ['ACTIVO', 'CANCELADO'],
@@ -889,6 +1099,7 @@ function ModalDetalleContrato({ contrato, token, onClose, onActualizar }: {
             ['info', 'Información', <FileText size={12} />],
             ['tarifas', `Tarifas (${contrato.tarifas.length})`, <Tag size={12} />],
             ['paquetes', `Paquetes (${contrato.paquetes.length})`, <Package size={12} />],
+            ['excepciones', `Excepciones${excepciones.length ? ` (${excepciones.length})` : ''}`, <AlertTriangle size={12} />],
             ['beneficiarios', `Beneficiarios (${contrato._count.beneficiarios})`, <Users size={12} />],
           ] as const).map(([id, label, icon]) => (
             <button
@@ -924,6 +1135,23 @@ function ModalDetalleContrato({ contrato, token, onClose, onActualizar }: {
                   <InfoItem icon={<FileText size={13} />} label="Observaciones" value={contrato.observaciones} />
                 </div>
               )}
+
+              {/* CUCON / factura sin contrato */}
+              <div className="col-span-2 border-t border-white/5 pt-4 mt-2">
+                <p className="text-xs font-medium text-slate-400 mb-3 flex items-center gap-1">
+                  <Shield size={12} /> Vinculación FEV-RIPS
+                </p>
+                {contrato.tieneCucon ? (
+                  <InfoItem icon={<Shield size={12} />} label="CUCON" value={contrato.codigoCucon || '—'} />
+                ) : (
+                  <InfoItem
+                    icon={<Shield size={12} />}
+                    label="Factura sin contrato"
+                    value={contrato.facturaSinContrato ? `${contrato.facturaSinContrato} — ${FACTURA_SIN_CONTRATO_OPCIONES[contrato.facturaSinContrato] ?? ''}` : '—'}
+                  />
+                )}
+              </div>
+
               {/* Datos empresa */}
               <div className="col-span-2 border-t border-white/5 pt-4 mt-2">
                 <p className="text-xs font-medium text-slate-400 mb-3 flex items-center gap-1">
@@ -1019,6 +1247,59 @@ function ModalDetalleContrato({ contrato, token, onClose, onActualizar }: {
             </div>
           )}
 
+          {/* EXCEPCIONES */}
+          {tabDetalle === 'excepciones' && (
+            <div>
+              <div className="flex justify-end mb-3">
+                <button
+                  onClick={() => setShowNuevaExcepcion(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium rounded-lg transition-colors"
+                >
+                  <Plus size={13} /> Nueva excepción
+                </button>
+              </div>
+              {loadingExc ? (
+                <div className="flex justify-center py-8 text-slate-500">
+                  <RefreshCw size={18} className="animate-spin mr-2" /> Cargando excepciones...
+                </div>
+              ) : excepciones.length === 0 ? (
+                <div className="text-center py-8 text-slate-500">
+                  <AlertTriangle size={30} className="mx-auto mb-2 opacity-30" />
+                  <p className="text-sm">Sin rangos de afiliado, copagos o cuotas moderadoras configurados</p>
+                  <p className="text-xs mt-1 text-slate-600">Define reglas por edad, sexo y tipo de afiliado sobre todo el contrato o una tarifa específica</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {excepciones.map(ex => (
+                    <div key={ex.id} className="bg-white/[0.02] border border-white/5 rounded-lg p-3">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <div className="flex items-center gap-2 flex-wrap text-xs">
+                          <span className="px-2 py-0.5 rounded-full border text-indigo-400 bg-indigo-500/10 border-indigo-500/30">{ex.tipoAfiliado}</span>
+                          <span className="text-slate-400">Sexo: {ex.sexo}</span>
+                          {(ex.edadMinima != null || ex.edadMaxima != null) && (
+                            <span className="text-slate-400">Edad: {ex.edadMinima ?? 0} - {ex.edadMaxima ?? '∞'}</span>
+                          )}
+                          {ex.tarifa && <span className="font-mono text-amber-400">CUPS {ex.tarifa.codigoCUPS}</span>}
+                        </div>
+                        <button onClick={() => eliminarExcepcion(ex.id)} className="text-slate-500 hover:text-red-400 transition-colors">
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                      <div className="flex items-center gap-3 text-xs text-slate-400">
+                        {ex.aplicaCopago && <span>Copago: <b className="text-emerald-400">{ex.porcentajeCopago}%</b></span>}
+                        {ex.aplicaCuotaModeradora && <span>Cuota moderadora: <b className="text-emerald-400">{ex.porcentajeCuotaModeradora}%</b></span>}
+                        {ex.numVecesMaximo != null && <span>Máx. veces: {ex.numVecesMaximo}</span>}
+                        {ex.excluyePorEdad && <span className="text-red-400">Excluye por edad</span>}
+                        {ex.excluyePorCotizar && <span className="text-red-400">Excluye por cotizar</span>}
+                      </div>
+                      {ex.observaciones && <p className="text-xs text-slate-500 mt-1">{ex.observaciones}</p>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* BENEFICIARIOS */}
           {tabDetalle === 'beneficiarios' && (
             <div>
@@ -1064,6 +1345,147 @@ function ModalDetalleContrato({ contrato, token, onClose, onActualizar }: {
             </div>
           )}
         </div>
+      </div>
+
+      {showNuevaExcepcion && (
+        <ModalNuevaExcepcion
+          contratoId={contrato.id}
+          tarifas={contrato.tarifas}
+          token={token}
+          onClose={() => setShowNuevaExcepcion(false)}
+          onCreada={(ex) => { setExcepciones(prev => [ex, ...prev]); setShowNuevaExcepcion(false); }}
+        />
+      )}
+    </ModalOverlay>
+  );
+}
+
+// ─── MODAL NUEVA EXCEPCIÓN ───────────────────────────────────────────────────
+
+function ModalNuevaExcepcion({ contratoId, tarifas, token, onClose, onCreada }: {
+  contratoId: string;
+  tarifas: ContratoTarifa[];
+  token: string;
+  onClose: () => void;
+  onCreada: (ex: ContratoExcepcion) => void;
+}) {
+  const [form, setForm] = useState({
+    tarifaId: '', tipoAfiliado: 'AMBOS', sexo: 'AMBOS',
+    edadMinima: '', edadMaxima: '',
+    aplicaCopago: false, porcentajeCopago: '0',
+    aplicaCuotaModeradora: false, porcentajeCuotaModeradora: '0',
+    numVecesMaximo: '', excluyePorEdad: false, excluyePorCotizar: false,
+    observaciones: '',
+  });
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const set = (k: string, v: string | boolean) => setForm(f => ({ ...f, [k]: v }));
+
+  async function guardar() {
+    setSaving(true);
+    setErr(null);
+    const res = await apiCall<{ excepcion: ContratoExcepcion }>(`/contratacion/${contratoId}/excepciones`, {
+      method: 'POST',
+      token,
+      body: {
+        tarifaId: form.tarifaId || undefined,
+        tipoAfiliado: form.tipoAfiliado,
+        sexo: form.sexo,
+        edadMinima: form.edadMinima ? Number(form.edadMinima) : undefined,
+        edadMaxima: form.edadMaxima ? Number(form.edadMaxima) : undefined,
+        aplicaCopago: form.aplicaCopago,
+        porcentajeCopago: Number(form.porcentajeCopago),
+        aplicaCuotaModeradora: form.aplicaCuotaModeradora,
+        porcentajeCuotaModeradora: Number(form.porcentajeCuotaModeradora),
+        numVecesMaximo: form.numVecesMaximo ? Number(form.numVecesMaximo) : undefined,
+        excluyePorEdad: form.excluyePorEdad,
+        excluyePorCotizar: form.excluyePorCotizar,
+        observaciones: form.observaciones || undefined,
+      },
+    });
+    setSaving(false);
+    if (res.error) { setErr(res.error); return; }
+    if (res.data?.excepcion) onCreada(res.data.excepcion);
+  }
+
+  return (
+    <ModalOverlay onClose={onClose}>
+      <div className="w-full max-w-lg">
+        <ModalHeader title="Nueva Excepción" icon={<AlertTriangle size={16} />} onClose={onClose} />
+        <div className="p-5 space-y-4">
+          {err && <ErrBox msg={err} />}
+
+          <Campo label="Aplica sobre">
+            <select value={form.tarifaId} onChange={e => set('tarifaId', e.target.value)} className={inputCls}>
+              <option value="">Todo el contrato</option>
+              {tarifas.map(t => <option key={t.id} value={t.id}>{t.codigoCUPS} — {t.descripcionCUPS}</option>)}
+            </select>
+          </Campo>
+
+          <div className="grid grid-cols-2 gap-3">
+            <Campo label="Tipo de afiliado">
+              <select value={form.tipoAfiliado} onChange={e => set('tipoAfiliado', e.target.value)} className={inputCls}>
+                {TIPOS_AFILIADO.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </Campo>
+            <Campo label="Sexo">
+              <select value={form.sexo} onChange={e => set('sexo', e.target.value)} className={inputCls}>
+                <option value="AMBOS">Ambos</option>
+                <option value="M">Masculino</option>
+                <option value="F">Femenino</option>
+              </select>
+            </Campo>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <Campo label="Edad mínima">
+              <input type="number" min="0" value={form.edadMinima} onChange={e => set('edadMinima', e.target.value)} className={inputCls} />
+            </Campo>
+            <Campo label="Edad máxima">
+              <input type="number" min="0" value={form.edadMaxima} onChange={e => set('edadMaxima', e.target.value)} className={inputCls} />
+            </Campo>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="flex items-center gap-2 text-xs text-slate-300 mb-1 cursor-pointer">
+                <input type="checkbox" checked={form.aplicaCopago} onChange={e => set('aplicaCopago', e.target.checked)} />
+                Aplica copago
+              </label>
+              <input type="number" min="0" max="100" disabled={!form.aplicaCopago} value={form.porcentajeCopago}
+                onChange={e => set('porcentajeCopago', e.target.value)} placeholder="% Copago" className={inputCls} />
+            </div>
+            <div>
+              <label className="flex items-center gap-2 text-xs text-slate-300 mb-1 cursor-pointer">
+                <input type="checkbox" checked={form.aplicaCuotaModeradora} onChange={e => set('aplicaCuotaModeradora', e.target.checked)} />
+                Aplica cuota moderadora
+              </label>
+              <input type="number" min="0" max="100" disabled={!form.aplicaCuotaModeradora} value={form.porcentajeCuotaModeradora}
+                onChange={e => set('porcentajeCuotaModeradora', e.target.value)} placeholder="% Cuota moderadora" className={inputCls} />
+            </div>
+          </div>
+
+          <Campo label="Número máximo de veces (opcional)">
+            <input type="number" min="0" value={form.numVecesMaximo} onChange={e => set('numVecesMaximo', e.target.value)} className={inputCls} />
+          </Campo>
+
+          <div className="flex items-center gap-4">
+            <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
+              <input type="checkbox" checked={form.excluyePorEdad} onChange={e => set('excluyePorEdad', e.target.checked)} />
+              Excluye por edad
+            </label>
+            <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
+              <input type="checkbox" checked={form.excluyePorCotizar} onChange={e => set('excluyePorCotizar', e.target.checked)} />
+              Excluye por cotizar
+            </label>
+          </div>
+
+          <Campo label="Observaciones">
+            <textarea value={form.observaciones} onChange={e => set('observaciones', e.target.value)} rows={2} className={inputCls} />
+          </Campo>
+        </div>
+        <ModalFooter onClose={onClose} onSave={guardar} saving={saving} label="Crear Excepción" />
       </div>
     </ModalOverlay>
   );

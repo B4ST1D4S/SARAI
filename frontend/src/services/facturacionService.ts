@@ -93,6 +93,7 @@ export interface CargoBusqueda {
   cupsCodigoStr?: string | null;
   grupo?: string | null;
   precioSugerido: number;
+  tipoRips: string;
 }
 
 export interface Factura {
@@ -159,11 +160,31 @@ export const updateCuentaItem = (
 export const deleteCuentaItem = (cuentaId: string, itemId: string) =>
   req<{ success: boolean }>(`/cuentas/${cuentaId}/items/${itemId}`, { method: 'DELETE' });
 
-export const facturarCuenta = (cuentaId: string, observaciones?: string) =>
+export const facturarCuenta = (cuentaId: string, observaciones?: string, omitirValidacionRips?: boolean) =>
   req<Factura>(`/cuentas/${cuentaId}/facturar`, {
     method: 'POST',
-    body: JSON.stringify({ observaciones }),
+    body: JSON.stringify({ observaciones, omitirValidacionRips }),
   });
+
+export interface ResultadoValidacionRips {
+  clase: 'RECHAZADO' | 'NOTIFICACION';
+  codigo: string;
+  descripcion: string;
+  observaciones: string;
+  pathFuente: string;
+  fuente: 'Paciente' | 'CuentaItem' | 'Contrato';
+}
+
+export interface ReporteValidacionRips {
+  cuentaId: string;
+  totalErrores: number;
+  totalNotificaciones: number;
+  puedeFacturar: boolean;
+  resultados: ResultadoValidacionRips[];
+}
+
+export const getValidacionRips = (cuentaId: string) =>
+  req<ReporteValidacionRips>(`/cuentas/${cuentaId}/validar-rips`);
 
 export const getFacturas = (params: { search?: string; estado?: string } = {}) => {
   const q = new URLSearchParams();

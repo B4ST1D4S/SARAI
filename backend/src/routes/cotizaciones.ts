@@ -18,7 +18,7 @@ router.use(authenticateToken);
 router.get('/', getAll);
 
 // POST /api/cotizaciones - Crear cotización (solo médicos)
-router.post('/', authorizeRole('MEDICO', 'RECEPCIONISTA'), create);
+router.post('/', authorizeRole('SUPER_ADMIN', 'MEDICO', 'RECEPCIONISTA'), create);
 
 // GET /api/cotizaciones/paciente/:pacienteId - Obtener cotizaciones de paciente
 router.get('/paciente/:pacienteId', getPaciente);

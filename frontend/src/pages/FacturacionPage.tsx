@@ -3,17 +3,19 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   DollarSign, FileText, Receipt, Plus, Search, Trash2, X, CheckCircle,
   RotateCcw, Loader2, Printer, User as UserIcon, Layers,
+  ShieldCheck, ShieldAlert, ClipboardCheck,
 } from 'lucide-react';
 import {
   getResumen, getIngresos, createIngreso, getCuenta, buscarCargos,
   addCuentaItem, updateCuentaItem, deleteCuentaItem, facturarCuenta,
-  getFacturas, getFactura, anularFactura,
+  getFacturas, getFactura, anularFactura, getValidacionRips,
   type Ingreso, type CuentaDetalle, type CargoBusqueda, type Factura,
-  type ResumenFacturacion,
+  type ResumenFacturacion, type ReporteValidacionRips,
 } from '../services/facturacionService';
 import { searchPacientes } from '../services/api';
 import { getParametrosSistema } from '../services/adminService';
 import QRCode from 'qrcode';
+import FevRipsPanel from '../components/FevRipsPanel';
 
 const cop = (n: number) =>
   new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(n || 0);
@@ -335,6 +337,8 @@ function CuentaDetalleView({ cuentaId, onClose }: { cuentaId: string; onClose: (
   const [facturando, setFacturando] = useState(false);
   const [error, setError] = useState('');
   const [facturaGenerada, setFacturaGenerada] = useState<Factura | null>(null);
+  const [validandoRips, setValidandoRips] = useState(false);
+  const [reporteRips, setReporteRips] = useState<ReporteValidacionRips | null>(null);
 
   const cargar = useCallback(() => {
     setLoading(true);
@@ -343,15 +347,29 @@ function CuentaDetalleView({ cuentaId, onClose }: { cuentaId: string; onClose: (
 
   useEffect(() => { cargar(); }, [cargar]);
 
-  const facturar = async () => {
+  const validarRips = async () => {
+    setValidandoRips(true); setError('');
+    try {
+      setReporteRips(await getValidacionRips(cuentaId));
+    } catch (e: any) {
+      setError(e.message || 'Error al validar RIPS');
+    } finally {
+      setValidandoRips(false);
+    }
+  };
+
+  const facturar = async (omitirValidacionRips = false) => {
     if (!cuenta) return;
     setFacturando(true); setError('');
     try {
-      const f = await facturarCuenta(cuenta.id);
+      const f = await facturarCuenta(cuenta.id, undefined, omitirValidacionRips);
       setFacturaGenerada(f);
+      setReporteRips(null);
       cargar();
     } catch (e: any) {
       setError(e.message || 'Error al facturar');
+      // Si el rechazo es por validación RIPS, mostramos el detalle en el modal.
+      try { setReporteRips(await getValidacionRips(cuentaId)); } catch { /* noop */ }
     } finally {
       setFacturando(false);
     }
@@ -416,7 +434,11 @@ function CuentaDetalleView({ cuentaId, onClose }: { cuentaId: string; onClose: (
                 className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm font-semibold flex items-center gap-2">
                 <Plus size={16} /> Adicionar cargo
               </button>
-              <button onClick={facturar} disabled={facturando || cuenta.items.length === 0}
+              <button onClick={validarRips} disabled={validandoRips || cuenta.items.length === 0}
+                className="px-4 py-2 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-white rounded-lg text-sm font-semibold flex items-center gap-2">
+                {validandoRips ? <Loader2 size={16} className="animate-spin" /> : <ClipboardCheck size={16} />} Validar RIPS
+              </button>
+              <button onClick={() => facturar()} disabled={facturando || cuenta.items.length === 0}
                 className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-lg text-sm font-semibold flex items-center gap-2">
                 {facturando ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle size={16} />} Facturar
               </button>
@@ -424,6 +446,15 @@ function CuentaDetalleView({ cuentaId, onClose }: { cuentaId: string; onClose: (
           )}
           {cuenta.factura && <FacturaVerButton facturaId={cuenta.factura.id} />}
         </div>
+
+        {reporteRips && (
+          <ValidacionRipsModal
+            reporte={reporteRips}
+            facturando={facturando}
+            onFacturarIgual={() => facturar(true)}
+            onClose={() => setReporteRips(null)}
+          />
+        )}
 
         {/* Tabla de ítems */}
         <div className="bg-slate-800/60 border border-white/10 rounded-lg overflow-hidden">
@@ -493,6 +524,26 @@ function CuentaDetalleView({ cuentaId, onClose }: { cuentaId: string; onClose: (
   );
 }
 
+// Componentes RIPS soportados y campos que exige cada uno (ver ripsValidacionService
+// en el backend — misma clasificación, para que la UI y la validación coincidan).
+const TIPOS_RIPS = [
+  { value: 'AC', label: 'AC · Consulta' },
+  { value: 'AP', label: 'AP · Procedimiento' },
+  { value: 'AH', label: 'AH · Hospitalización' },
+  { value: 'AU', label: 'AU · Urgencias' },
+  { value: 'AT', label: 'AT · Otros servicios' },
+];
+
+const RIPS_FORM_INICIAL = {
+  tipoRips: 'AP',
+  codDiagnosticoPrincipal: '', tipoDiagnosticoPrincipal: '', finalidadTecnologiaSalud: '',
+  causaMotivoAtencion: '', viaIngresoServicioSalud: '', modalidadGrupoServicioTecSal: '',
+  numAutorizacion: '', codPrestador: '', ambitoRealizacionProcedimiento: '',
+  viaAccesoQuirurgico: '', numMipres: '', fechaAtencion: '', fechaIngreso: '', fechaSalida: '',
+  estadoSalida: '', destinoUsuarioEgreso: '', codDiagnosticoIngreso: '', codDiagnosticoSalida: '',
+  codDiagnosticoMuerte: '', tipoOtroServicio: '',
+};
+
 // ════════════════════════════════════════════════════════════════
 //  Modal: Adicionar cargo a la cuenta
 // ════════════════════════════════════════════════════════════════
@@ -506,6 +557,9 @@ function AgregarCargoModal({ onClose, onAdd }: { onClose: () => void; onAdd: (bo
   const [modo, setModo] = useState<'cargo' | 'libre'>('cargo');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [rips, setRips] = useState({ ...RIPS_FORM_INICIAL });
+
+  const setR = (k: string, v: string) => setRips((f) => ({ ...f, [k]: v }));
 
   useEffect(() => {
     if (sel || q.trim().length < 2) { setResultados([]); return; }
@@ -517,13 +571,16 @@ function AgregarCargoModal({ onClose, onAdd }: { onClose: () => void; onAdd: (bo
 
   const guardar = async () => {
     setSaving(true); setError('');
+    const ripsLimpio = Object.fromEntries(
+      Object.entries(rips).filter(([, v]) => v !== '')
+    );
     try {
       if (modo === 'cargo') {
         if (!sel) { setError('Selecciona un cargo'); setSaving(false); return; }
-        await onAdd({ cargoId: sel.id, cantidad, precioUnitario: precio });
+        await onAdd({ codigo: sel.codigo, descripcion: sel.descripcion, cantidad, precioUnitario: precio, ...ripsLimpio });
       } else {
         if (!descLibre.trim()) { setError('Ingresa una descripción'); setSaving(false); return; }
-        await onAdd({ descripcion: descLibre.trim(), cantidad, precioUnitario: precio });
+        await onAdd({ descripcion: descLibre.trim(), cantidad, precioUnitario: precio, ...ripsLimpio });
       }
     } catch (e: any) {
       setError(e.message || 'Error al agregar');
@@ -533,7 +590,7 @@ function AgregarCargoModal({ onClose, onAdd }: { onClose: () => void; onAdd: (bo
   };
 
   return (
-    <ModalShell title="Adicionar cargo" onClose={onClose}>
+    <ModalShell title="Adicionar cargo" onClose={onClose} wide>
       {error && <div className="mb-3 text-xs text-red-400 bg-red-500/10 border border-red-500/30 rounded px-3 py-2">{error}</div>}
 
       <div className="flex gap-2 mb-3">
@@ -547,17 +604,17 @@ function AgregarCargoModal({ onClose, onAdd }: { onClose: () => void; onAdd: (bo
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
               <input autoFocus value={q} onChange={(e) => setQ(e.target.value)}
-                placeholder="Buscar por descripción, código o CUPS…"
+                placeholder="Buscar por descripción o código CUPS…"
                 className="w-full pl-9 pr-3 py-2 bg-slate-900 border border-white/10 rounded text-white text-sm focus:border-yellow-500 outline-none" />
             </div>
             <div className="mt-2 max-h-56 overflow-y-auto divide-y divide-white/5">
               {resultados.map((c) => (
-                <button key={c.id} onClick={() => { setSel(c); setPrecio(c.precioSugerido); setResultados([]); }}
+                <button key={c.id} onClick={() => { setSel(c); setPrecio(c.precioSugerido); setResultados([]); setR('tipoRips', c.tipoRips || 'AP'); }}
                   className="w-full text-left px-3 py-2 hover:bg-slate-700/50 rounded">
                   <div className="text-white text-sm">{c.descripcion}</div>
                   <div className="text-xs text-gray-400 flex justify-between">
-                    <span>{c.codigo}{c.cupsCodigoStr ? ` · CUPS ${c.cupsCodigoStr}` : ''}</span>
-                    <span className="text-emerald-400">{cop(c.precioSugerido)}</span>
+                    <span>{c.codigo}{c.cupsCodigoStr ? ` · ${c.cupsCodigoStr}` : ''}</span>
+                    <span className="text-indigo-400">{c.tipoRips}</span>
                   </div>
                 </button>
               ))}
@@ -576,6 +633,7 @@ function AgregarCargoModal({ onClose, onAdd }: { onClose: () => void; onAdd: (bo
               <button onClick={() => setSel(null)} className="text-gray-400 hover:text-white"><X size={16} /></button>
             </div>
             <CantidadPrecio cantidad={cantidad} setCantidad={setCantidad} precio={precio} setPrecio={setPrecio} />
+            <CamposRipsPorComponente rips={rips} setR={setR} />
             <FooterBtns onClose={onClose} onSave={guardar} saving={saving} />
           </div>
         )
@@ -588,10 +646,109 @@ function AgregarCargoModal({ onClose, onAdd }: { onClose: () => void; onAdd: (bo
               className="w-full mt-1 px-3 py-2 bg-slate-900 border border-white/10 rounded text-white text-sm focus:border-yellow-500 outline-none" />
           </div>
           <CantidadPrecio cantidad={cantidad} setCantidad={setCantidad} precio={precio} setPrecio={setPrecio} />
+          <CamposRipsPorComponente rips={rips} setR={setR} />
           <FooterBtns onClose={onClose} onSave={guardar} saving={saving} />
         </div>
       )}
     </ModalShell>
+  );
+}
+
+// Sección de campos RIPS que cambia según el componente (AC/AP/AH/AU/AT).
+// El componente se sugiere automáticamente al elegir un cargo del catálogo
+// (códigos "89xxxx" → Consulta, el resto → Procedimiento por defecto) pero
+// siempre es editable, porque Urgencias/Hospitalización/Otros servicios
+// dependen del contexto de atención y no solo del código CUPS.
+function CamposRipsPorComponente({ rips, setR }: { rips: typeof RIPS_FORM_INICIAL; setR: (k: string, v: string) => void }) {
+  const t = rips.tipoRips;
+  return (
+    <div className="border-t border-white/10 pt-3 space-y-3">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-semibold text-gray-300 uppercase tracking-wide">Información RIPS</span>
+        <select value={t} onChange={(e) => setR('tipoRips', e.target.value)}
+          className="px-2 py-1 bg-slate-900 border border-white/10 rounded text-white text-xs focus:border-yellow-500 outline-none">
+          {TIPOS_RIPS.map((op) => <option key={op.value} value={op.value}>{op.label}</option>)}
+        </select>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        {(t === 'AC' || t === 'AP') && (
+          <>
+            <RipsInput label="Diagnóstico principal (CIE-10)" value={rips.codDiagnosticoPrincipal} onChange={(v) => setR('codDiagnosticoPrincipal', v)} placeholder="Ej. C402" />
+            <RipsSelect label="Tipo diagnóstico principal" value={rips.tipoDiagnosticoPrincipal} onChange={(v) => setR('tipoDiagnosticoPrincipal', v)}
+              opciones={[['01', '01 Impresión diagnóstica'], ['02', '02 Confirmado nuevo'], ['03', '03 Confirmado repetido']]} />
+            <RipsInput label="Finalidad tecnología en salud" value={rips.finalidadTecnologiaSalud} onChange={(v) => setR('finalidadTecnologiaSalud', v)} placeholder="Código Anexo Técnico" />
+            <RipsInput label="Causa / motivo de atención" value={rips.causaMotivoAtencion} onChange={(v) => setR('causaMotivoAtencion', v)} placeholder="Código Anexo Técnico" />
+          </>
+        )}
+        {t === 'AC' && (
+          <RipsInput label="Fecha de la consulta" type="datetime-local" value={rips.fechaAtencion} onChange={(v) => setR('fechaAtencion', v)} />
+        )}
+        {t === 'AP' && (
+          <>
+            <RipsSelect label="Ámbito de realización" value={rips.ambitoRealizacionProcedimiento} onChange={(v) => setR('ambitoRealizacionProcedimiento', v)}
+              opciones={[['01', '01 Ambulatorio'], ['02', '02 Hospitalario'], ['03', '03 Urgencias']]} />
+            <RipsInput label="Fecha del procedimiento" type="datetime-local" value={rips.fechaAtencion} onChange={(v) => setR('fechaAtencion', v)} />
+            <RipsInput label="Vía de acceso quirúrgico (opcional)" value={rips.viaAccesoQuirurgico} onChange={(v) => setR('viaAccesoQuirurgico', v)} />
+            <RipsInput label="MIPRES (opcional)" value={rips.numMipres} onChange={(v) => setR('numMipres', v)} />
+          </>
+        )}
+        {(t === 'AH' || t === 'AU') && (
+          <>
+            {t === 'AH' && (
+              <RipsInput label="Vía de ingreso al servicio" value={rips.viaIngresoServicioSalud} onChange={(v) => setR('viaIngresoServicioSalud', v)} placeholder="Código Anexo Técnico" />
+            )}
+            <RipsInput label="Causa / motivo de atención" value={rips.causaMotivoAtencion} onChange={(v) => setR('causaMotivoAtencion', v)} placeholder="Código Anexo Técnico" />
+            <RipsInput label="Fecha y hora de ingreso" type="datetime-local" value={rips.fechaIngreso} onChange={(v) => setR('fechaIngreso', v)} />
+            <RipsInput label="Fecha y hora de salida" type="datetime-local" value={rips.fechaSalida} onChange={(v) => setR('fechaSalida', v)} />
+            <RipsInput label="Diagnóstico de ingreso" value={rips.codDiagnosticoIngreso} onChange={(v) => setR('codDiagnosticoIngreso', v)} placeholder="CIE-10" />
+            <RipsInput label="Diagnóstico de salida" value={rips.codDiagnosticoSalida} onChange={(v) => setR('codDiagnosticoSalida', v)} placeholder="CIE-10" />
+            <RipsSelect label="Estado de salida" value={rips.estadoSalida} onChange={(v) => setR('estadoSalida', v)}
+              opciones={[['1', '1 Vivo(a)'], ['2', '2 Muerto(a)']]} />
+            <RipsInput label="Destino al egreso" value={rips.destinoUsuarioEgreso} onChange={(v) => setR('destinoUsuarioEgreso', v)} placeholder="Código Anexo Técnico" />
+            {rips.estadoSalida === '2' && (
+              <RipsInput label="Diagnóstico causa de muerte" value={rips.codDiagnosticoMuerte} onChange={(v) => setR('codDiagnosticoMuerte', v)} placeholder="CIE-10" />
+            )}
+          </>
+        )}
+        {t === 'AT' && (
+          <>
+            <RipsInput label="Tipo de otro servicio" value={rips.tipoOtroServicio} onChange={(v) => setR('tipoOtroServicio', v)} placeholder="Código Anexo Técnico" />
+            <RipsInput label="Fecha del servicio" type="datetime-local" value={rips.fechaAtencion} onChange={(v) => setR('fechaAtencion', v)} />
+            <RipsInput label="MIPRES (opcional)" value={rips.numMipres} onChange={(v) => setR('numMipres', v)} />
+          </>
+        )}
+        <RipsInput label="Número de autorización (opcional)" value={rips.numAutorizacion} onChange={(v) => setR('numAutorizacion', v)} />
+        <RipsInput label="Código del prestador (opcional)" value={rips.codPrestador} onChange={(v) => setR('codPrestador', v)} />
+      </div>
+    </div>
+  );
+}
+
+function RipsInput({ label, value, onChange, placeholder, type = 'text' }: {
+  label: string; value: string; onChange: (v: string) => void; placeholder?: string; type?: string;
+}) {
+  return (
+    <div>
+      <label className="text-[11px] text-gray-400">{label}</label>
+      <input type={type} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder}
+        className="w-full mt-0.5 px-2.5 py-1.5 bg-slate-900 border border-white/10 rounded text-white text-xs focus:border-yellow-500 outline-none" />
+    </div>
+  );
+}
+
+function RipsSelect({ label, value, onChange, opciones }: {
+  label: string; value: string; onChange: (v: string) => void; opciones: [string, string][];
+}) {
+  return (
+    <div>
+      <label className="text-[11px] text-gray-400">{label}</label>
+      <select value={value} onChange={(e) => onChange(e.target.value)}
+        className="w-full mt-0.5 px-2.5 py-1.5 bg-slate-900 border border-white/10 rounded text-white text-xs focus:border-yellow-500 outline-none">
+        <option value="">Seleccionar...</option>
+        {opciones.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+      </select>
+    </div>
   );
 }
 
@@ -707,6 +864,10 @@ function FacturasTab({ onChange }: { onChange: () => void }) {
       )}
 
       {verId && <FacturaModal facturaId={verId} onClose={() => setVerId(null)} />}
+
+      <div className="mt-6">
+        <FevRipsPanel />
+      </div>
     </div>
   );
 }
@@ -904,6 +1065,73 @@ function facturaQrTexto(f: any, clinica: Record<string, string>): string {
     f.paciente?.numeroDocumento ? `Doc: ${f.paciente.tipoDocumento || ''} ${f.paciente.numeroDocumento}` : '',
     `Total: ${cop(f.total)}`,
   ].filter(Boolean).join('\n');
+}
+
+// ════════════════════════════════════════════════════════════════
+//  Modal: Reporte de validación RIPS antes de cuadrar/facturar
+// ════════════════════════════════════════════════════════════════
+function ValidacionRipsModal({ reporte, facturando, onFacturarIgual, onClose }: {
+  reporte: ReporteValidacionRips;
+  facturando: boolean;
+  onFacturarIgual: () => void;
+  onClose: () => void;
+}) {
+  const ok = reporte.puedeFacturar;
+  return (
+    <ModalShell title="Validación RIPS de la cuenta" onClose={onClose} wide>
+      <div className={`flex items-center gap-3 p-3 rounded-lg border mb-4 ${
+        ok ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-red-500/10 border-red-500/30'
+      }`}>
+        {ok ? <ShieldCheck className="text-emerald-400 shrink-0" size={22} /> : <ShieldAlert className="text-red-400 shrink-0" size={22} />}
+        <div className="text-sm">
+          <div className={`font-semibold ${ok ? 'text-emerald-300' : 'text-red-300'}`}>
+            {ok ? 'La cuenta está lista para facturar' : 'Hay información RIPS pendiente por corregir'}
+          </div>
+          <div className="text-xs text-gray-400">
+            {reporte.totalErrores} rechazo(s) · {reporte.totalNotificaciones} notificación(es)
+          </div>
+        </div>
+      </div>
+
+      {reporte.resultados.length === 0 ? (
+        <div className="text-center py-6 text-gray-500 text-sm">Sin observaciones. Todos los campos RIPS obligatorios están diligenciados.</div>
+      ) : (
+        <div className="space-y-2 max-h-[50vh] overflow-y-auto">
+          {reporte.resultados.map((r, i) => {
+            const esRechazo = r.clase === 'RECHAZADO';
+            return (
+              <div key={i} className={`rounded-lg border p-3 text-xs ${
+                esRechazo ? 'bg-red-500/10 border-red-500/30' : 'bg-amber-500/10 border-amber-500/30'
+              }`}>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                    esRechazo ? 'bg-red-600 text-white' : 'bg-amber-500 text-slate-900'
+                  }`}>{r.clase}</span>
+                  <span className="font-mono text-gray-400">{r.codigo}</span>
+                  <span className="text-gray-500">· {r.fuente}</span>
+                </div>
+                <div className="text-gray-200">{r.descripcion}</div>
+                {r.observaciones && <div className="text-gray-400 mt-1">{r.observaciones}</div>}
+                {r.pathFuente && <div className="text-gray-500 font-mono mt-1 truncate">Ruta: {r.pathFuente}</div>}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <div className="flex justify-end gap-2 mt-4">
+        {!ok && (
+          <button onClick={onFacturarIgual} disabled={facturando}
+            className="px-3 py-2 text-xs bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-slate-900 font-semibold rounded-lg">
+            {facturando ? 'Facturando...' : 'Facturar de todas formas'}
+          </button>
+        )}
+        <button onClick={onClose} className="px-3 py-2 text-xs bg-slate-700 hover:bg-slate-600 text-white rounded-lg">
+          Cerrar
+        </button>
+      </div>
+    </ModalShell>
+  );
 }
 
 // ════════════════════════════════════════════════════════════════
