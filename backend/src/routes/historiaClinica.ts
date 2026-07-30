@@ -15,21 +15,21 @@ const router = Router();
 router.use(authenticateToken);
 
 // GET /api/historia-clinica/por-medico - Obtener historias del médico (DEBE ir antes de /:id)
-router.get('/por-medico', authorizeRole('MEDICO'), getPorMedico);
+router.get('/por-medico', authorizeRole('SUPER_ADMIN', 'MEDICO'), getPorMedico);
 
 // GET /api/historia-clinica/paciente/:pacienteId - Obtener historias del paciente (DEBE ir antes de /:id)
 router.get('/paciente/:pacienteId', getPorPaciente);
 
 // POST /api/historia-clinica - Crear historia clínica (solo médicos)
-router.post('/', authorizeRole('MEDICO'), create);
+router.post('/', authorizeRole('SUPER_ADMIN', 'MEDICO'), create);
 
 // GET /api/historia-clinica/:id - Obtener historia clínica por ID
 router.get('/:id', getById);
 
 // PUT /api/historia-clinica/:id - Actualizar historia clínica
-router.put('/:id', authorizeRole('MEDICO'), update);
+router.put('/:id', authorizeRole('SUPER_ADMIN', 'MEDICO'), update);
 
 // POST /api/historia-clinica/:id/entregar - Entregar historia clínica al paciente
-router.post('/:id/entregar', authorizeRole('MEDICO'), entregar);
+router.post('/:id/entregar', authorizeRole('SUPER_ADMIN', 'MEDICO'), entregar);
 
 export default router;

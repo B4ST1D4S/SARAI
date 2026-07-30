@@ -24,6 +24,7 @@ import UsuariosPage from './pages/UsuariosPage';
 import AdminPage from './pages/AdminPage';
 import CentralImpresionPage from './pages/CentralImpresionPage';
 import CotizacionesPage from './pages/CotizacionesPage';
+import ContratacionPage from './pages/ContratacionPage';
 import SaraiAssistant from './components/SaraiAssistant';
 import ManualPage from './pages/ManualPage';
 import saraiLogo from './assets/logo1.png';
@@ -81,6 +82,9 @@ const NAV_SECTIONS = [
   {
     label: 'GESTION',
     items: [
+      { id: 'consentimiento', label: 'Consentimiento', sym: 'K' },
+      { id: 'cotizaciones',   label: 'Cotizaciones',   sym: 'O' },
+      { id: 'contratacion',   label: 'Contratacion',   sym: 'N' },
       { id: 'consentimiento', label: 'Consentimiento', sym: 'S' },
       { id: 'cotizaciones',   label: 'Cotizaciones',   sym: 'T' },
       { id: 'crm',            label: 'CRM',            sym: 'R' },
@@ -533,6 +537,7 @@ function App() {
           {currentPage === 'followup'            && <FollowUpPage />}
           {currentPage === 'crm'                 && <CRMPage onNavegar={setCurrentPage} />}
           {currentPage === 'cotizaciones'        && <CotizacionesPage />}
+          {currentPage === 'contratacion'        && <ContratacionPage />}
           {currentPage === 'facturacion'         && <FacturacionPage />}
           {currentPage === 'plantillas'          && <PlantillasPage />}
           {currentPage === 'impresion'           && <CentralImpresionPage />}

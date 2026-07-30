@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model User {
@@ -50,6 +51,7 @@ model User {
   Perfil                                                  Perfil?                 @relation(fields: [perfilId], references: [id])
   Sede                                                    Sede?                   @relation(fields: [sedeId], references: [id])
   UsuarioIamRol                                           UsuarioIamRol[]
+  contratosCreados                                        Contrato[]              @relation("ContratoCreadoPor")
 
   @@index([rol])
   @@index([email])
@@ -95,26 +97,27 @@ model Paciente {
   creadoPor         String?
   createdAt         DateTime                  @default(now())
   updatedAt         DateTime                  @updatedAt
-  alergias          Alergia[]
-  alertas           Alerta[]
-  antecedentes      AntecedentesQuirurgicos[]
-  citas             Cita[]
-  consentimientos   Consentimiento[]
-  cotizaciones      Cotizacion[]
-  crmLeads          CrmLead[]
-  facturas          Factura[]
-  fotos             FotoClinica[]
-  historiasClinicas HistoriaClinica[]
-  ingresos          Ingreso[]
-  mapaCorporal      MapaCorporal[]
-  medicacionActual  Medicamento[]
-  odontoEvoluciones OdontoEvolucion[]
-  odontoPlanItems   OdontoPlanItem[]
-  odontogramas      Odontograma[]
-  creadoBy          User?                     @relation(fields: [creadoPor], references: [id])
-  procedimientos    Procedimiento[]
-  seguimientos      SeguimientoPostOp[]
-  transacciones     Transaccion[]
+  alergias              Alergia[]
+  alertas               Alerta[]
+  antecedentes          AntecedentesQuirurgicos[]
+  citas                 Cita[]
+  consentimientos       Consentimiento[]
+  cotizaciones          Cotizacion[]
+  crmLeads              CrmLead[]
+  facturas              Factura[]
+  fotos                 FotoClinica[]
+  historiasClinicas     HistoriaClinica[]
+  ingresos              Ingreso[]
+  mapaCorporal          MapaCorporal[]
+  medicacionActual      Medicamento[]
+  odontoEvoluciones     OdontoEvolucion[]
+  odontoPlanItems       OdontoPlanItem[]
+  odontogramas          Odontograma[]
+  creadoBy              User?                     @relation(fields: [creadoPor], references: [id])
+  procedimientos        Procedimiento[]
+  seguimientos          SeguimientoPostOp[]
+  transacciones         Transaccion[]
+  contratosBeneficiario ContratoBeneficiario[]
 
   @@unique([numeroDocumento, tipoDocumento])
   @@index([nombreCompleto])
@@ -1076,6 +1079,35 @@ model CuentaItem {
   cantidad       Float        @default(1)
   precioUnitario Float        @default(0)
   valorTotal     Float        @default(0)
+  // Campos RIPS (Resolución 2275/2023), diligenciados por ítem para poder
+  // pre-validar la cuenta antes de facturar. El componente (tipoRips)
+  // determina cuáles de estos campos son exigibles — ver ripsValidacionService.
+  tipoRips                     String? // AC=Consulta, AP=Procedimiento, AH=Hospitalizacion, AU=Urgencias, AT=Otros servicios
+  codDiagnosticoPrincipal      String?
+  tipoDiagnosticoPrincipal     String? // 01 Impresion diagnostica, 02 Confirmado nuevo, 03 Confirmado repetido
+  finalidadTecnologiaSalud     String?
+  causaMotivoAtencion          String?
+  viaIngresoServicioSalud      String?
+  modalidadGrupoServicioTecSal String?
+  numAutorizacion              String?
+  codPrestador                 String?
+  conceptoRecaudo              String? // 01-05, define si aplica copago/cuota moderadora
+  valorPagoModerador           Float?
+  // Específicos de Procedimientos (AP)
+  ambitoRealizacionProcedimiento String? // 01 Ambulatorio, 02 Hospitalario, 03 Urgencias
+  viaAccesoQuirurgico            String?
+  numMipres                      String?
+  // Específicos de Hospitalización (AH) / Urgencias (AU)
+  fechaAtencion        DateTime?
+  fechaIngreso         DateTime?
+  fechaSalida          DateTime?
+  estadoSalida         String? // 1 Vivo, 2 Muerto
+  destinoUsuarioEgreso String?
+  codDiagnosticoIngreso String?
+  codDiagnosticoSalida  String?
+  codDiagnosticoMuerte  String?
+  // Específico de Otros Servicios (AT)
+  tipoOtroServicio String?
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
   cargo          TarifaCargo? @relation(fields: [cargoId], references: [id])
@@ -1108,6 +1140,185 @@ model Factura {
   @@index([fecha])
 }
 
+// ─────────────────────────────────────────────
+//  MÓDULO DE CONTRATACIÓN
+// ─────────────────────────────────────────────
+
+// Empresa cliente/contratante (aseguradoras, convenios, y la propia clínica
+// vía esClinicaPropia). Distinta de Empresa (tenant/organización de IAM,
+// más abajo en este archivo) — colisión de nombres detectada al mergear
+// contratación con el módulo de IAM/seguridad; se renombra esta para no
+// tocar la infraestructura de multi-tenancy ya migrada.
+model EmpresaContratante {
+  id                 String     @id @default(cuid())
+  razonSocial        String
+  nombreComercial    String?
+  nit                String     @unique
+  tipo               String     @default("EMPRESA") // EMPRESA, ASEGURADORA, CONVENIO, CLINICA_PROPIA
+  contactoNombre     String?
+  contactoCargo      String?
+  contactoEmail      String?
+  contactoTelefono   String?
+  direccion          String?
+  ciudad             String?
+  estado             Boolean    @default(true)
+  esClinicaPropia    Boolean    @default(false)
+  sitioWeb           String?
+  regimenTributario  String?
+  logoUrl            String?
+  contratos          Contrato[]
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+
+  @@index([nit])
+  @@index([estado])
+  @@map("Empresa")
+}
+
+model Contrato {
+  id                  String                 @id @default(cuid())
+  numero              Int                    @unique @default(autoincrement())
+  descripcion         String
+  empresaId           String
+  empresa             EmpresaContratante     @relation(fields: [empresaId], references: [id])
+  tipo                String                 @default("CONVENIO") // CONVENIO, CORPORATIVO, COLECTIVO
+  estado              String                 @default("BORRADOR") // BORRADOR, ACTIVO, SUSPENDIDO, VENCIDO, CANCELADO
+  fechaInicio         DateTime
+  fechaFin            DateTime
+  montoTotal          Float?
+  montoMensual        Float?
+  diasCredito         Int                    @default(30)
+  porcentajeDescuento Float                  @default(0)
+  porcentajeCobertura Float                  @default(100)
+  observaciones       String?
+  // Vinculación FEV-RIPS/Registro de Contratos SISPRO: es obligatorio uno de los dos.
+  tieneCucon          Boolean                @default(false)
+  codigoCucon         String? // hash SHA-256 de 64 caracteres hex, requerido si tieneCucon = true
+  facturaSinContrato  String? // codigo 01-06, requerido si tieneCucon = false (ver FACTURA_SIN_CONTRATO)
+  creadoPorId         String
+  creadoPor           User                   @relation("ContratoCreadoPor", fields: [creadoPorId], references: [id])
+  tarifas             ContratoTarifa[]
+  paquetes            ContratoPaquete[]
+  beneficiarios       ContratoBeneficiario[]
+  excepciones         ContratoExcepcion[]
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
+
+  @@index([empresaId])
+  @@index([estado])
+  @@index([fechaFin])
+}
+
+model ContratoTarifa {
+  id                  String              @id @default(cuid())
+  contratoId          String
+  contrato            Contrato            @relation(fields: [contratoId], references: [id], onDelete: Cascade)
+  codigoCUPS          String
+  descripcionCUPS     String
+  precioBase          Float
+  precioNegociado     Float
+  porcentajeDescuento Float               @default(0)
+  porcentajeCobertura Float               @default(100)
+  activo              Boolean             @default(true)
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  excepciones         ContratoExcepcion[]
+
+  @@unique([contratoId, codigoCUPS])
+  @@index([contratoId])
+  @@index([codigoCUPS])
+}
+
+// Rangos por tipo de afiliado, copagos y cuotas moderadoras (equivalente a las
+// "excepciones adicionales" del sistema IPSOFT: reglas finas sobre una tarifa
+// o sobre todo el contrato, según edad/sexo/tipo de afiliado).
+model ContratoExcepcion {
+  id                        String          @id @default(cuid())
+  contratoId                String
+  contrato                  Contrato        @relation(fields: [contratoId], references: [id], onDelete: Cascade)
+  tarifaId                  String? // null = aplica a todo el contrato; si se define, aplica solo a esa tarifa/CUPS
+  tarifa                    ContratoTarifa? @relation(fields: [tarifaId], references: [id], onDelete: Cascade)
+  tipoAfiliado              String          @default("AMBOS") // TITULAR, BENEFICIARIO, COTIZANTE, AMBOS
+  edadMinima                Int?
+  edadMaxima                Int?
+  sexo                      String          @default("AMBOS") // M, F, AMBOS
+  aplicaCopago              Boolean         @default(false)
+  porcentajeCopago          Float           @default(0)
+  aplicaCuotaModeradora     Boolean         @default(false)
+  porcentajeCuotaModeradora Float           @default(0)
+  numVecesMaximo            Int?
+  excluyePorEdad            Boolean         @default(false)
+  excluyePorCotizar         Boolean         @default(false)
+  activo                    Boolean         @default(true)
+  observaciones             String?
+  createdAt                 DateTime        @default(now())
+  updatedAt                 DateTime        @updatedAt
+
+  @@index([contratoId])
+  @@index([tarifaId])
+}
+
+model ContratoPaquete {
+  id          String               @id @default(cuid())
+  contratoId  String
+  contrato    Contrato             @relation(fields: [contratoId], references: [id], onDelete: Cascade)
+  nombre      String
+  descripcion String?
+  precio      Float
+  activo      Boolean              @default(true)
+  items       ContratoPaqueteItem[]
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  @@index([contratoId])
+}
+
+model ContratoPaqueteItem {
+  id          String          @id @default(cuid())
+  paqueteId   String
+  paquete     ContratoPaquete @relation(fields: [paqueteId], references: [id], onDelete: Cascade)
+  codigoCUPS  String?
+  descripcion String
+  cantidad    Float           @default(1)
+  precioUnit  Float           @default(0)
+  esPrincipal Boolean         @default(false)
+  createdAt   DateTime        @default(now())
+
+  @@index([paqueteId])
+}
+
+model ContratoBeneficiario {
+  id         String    @id @default(cuid())
+  contratoId String
+  contrato   Contrato  @relation(fields: [contratoId], references: [id], onDelete: Cascade)
+  pacienteId String?
+  paciente   Paciente? @relation(fields: [pacienteId], references: [id])
+  nombre     String
+  documento  String
+  tipoDoc    String    @default("CC")
+  email      String?
+  telefono   String?
+  tipo       String    @default("BENEFICIARIO") // TITULAR, BENEFICIARIO
+  estado     String    @default("ACTIVO") // ACTIVO, INACTIVO
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([contratoId])
+  @@index([pacienteId])
+  @@index([documento])
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+//  MÓDULO DE ODONTOLOGÍA (Odontograma Primera Vez + Tratamiento)
+//  Cumplimiento: Res. 1995/1999, Ley 2015/2020, Res. 866/2021, Habeas Data.
+//  - Catálogos parametrizables: hallazgos, estados clínicos, prioridades, riesgo
+//  - Odontograma: valoración por paciente (PRIMERA_VEZ | TRATAMIENTO)
+//  - Hallazgos por pieza/superficie (numeración FDI)
+//  - Plan de tratamiento → procedimiento CUPS (TarifaCargo) → facturación
+//  - Evolución / línea de tiempo clínica
+// ──────────────────────────────────────────────────────────────────────────
+
+// Catálogo de hallazgos odontológicos (caries, fractura, ausente, corona, etc.)
 model OdontoHallazgo {
   id                String                     @id @default(cuid())
   codigo            String                     @unique
@@ -1388,6 +1599,7 @@ model Empresa {
   User              User[]
 
   @@index([activo])
+  @@map("EmpresaTenant")
 }
 
 model EventoSeguridad {
@@ -1675,4 +1887,44 @@ enum TipoRecurso {
   COMPONENTE
   CAMPO
   API
+}
+
+// ─────────────────────────────────────────
+// Integración FEV-RIPS (Docker API MSPS) — datos de prueba
+// ─────────────────────────────────────────
+
+model UsuarioSispro {
+  id                   String   @id @default(cuid())
+  nombre               String // etiqueta descriptiva, ej "Usuario pruebas SARAI"
+  tipoIdentificacion   String   @default("CC")
+  numeroIdentificacion String
+  clave                String // credencial real de SISPRO, requerida por LoginSISPRO; no es password de SARAI
+  nit                  String // NIT del prestador/obligado a facturar
+  tipoUsuario          String? // RE, PIN, PINx, PIE (ver manual FEV-RIPS 8.1 LoginSispro)
+  ambiente             String   @default("STAGE") // STAGE, PRODUCCION
+  activo               Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@unique([numeroIdentificacion, nit, ambiente])
+  @@index([nit])
+}
+
+model RipsPrueba {
+  id                     String   @id @default(cuid())
+  nombre                 String // etiqueta descriptiva, ej "RIPS prueba consulta simple"
+  modulo                 String   @default("FacturaElectronica") // FacturaElectronica, NotaCredito, NotaDebito, NotaAjuste, RipsSinFactura, CapitaInicial, CapitaPeriodo, CapitaFinal, NCAcuerdoVoluntades, NCCapita
+  numDocumentoIdObligado String
+  numFactura             String?
+  tipoNota               String?
+  numNota                String?
+  ripsJson               Json
+  xmlFevFile             String? // Base64 del AttachedDocument, cuando aplica
+  ultimoResultado        Json? // Response crudo de la última prueba de cargue
+  cuv                    String?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  @@index([numFactura])
+  @@index([modulo])
 }

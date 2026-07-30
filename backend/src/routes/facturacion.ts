@@ -9,6 +9,7 @@ import {
   deleteCuentaItem,
   buscarCargos,
   facturarCuenta,
+  validarRips,
   getFacturas,
   getFacturaById,
   anularFactura,
@@ -39,6 +40,7 @@ router.get('/cuentas/:id', getCuentaById);
 router.post('/cuentas/:id/items', onlyStaff, addCuentaItem);
 router.put('/cuentas/:id/items/:itemId', onlyStaff, updateCuentaItem);
 router.delete('/cuentas/:id/items/:itemId', onlyStaff, deleteCuentaItem);
+router.get('/cuentas/:id/validar-rips', onlyStaff, validarRips);
 router.post('/cuentas/:id/facturar', onlyStaff, facturarCuenta);
 
 // Facturas
