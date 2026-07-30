@@ -275,6 +275,7 @@ export interface CreateUserRequest {
   registroProfesional?: string;
   registroMedico?: string;
   firmaBase64?: string;
+  perfilId?: string;
 }
 
 export interface UpdateUserRequest extends Partial<Omit<CreateUserRequest, 'password'>> {

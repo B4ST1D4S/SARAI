@@ -14,9 +14,11 @@ import {
   AlertTriangle, ChevronDown, FolderOpen, LayoutGrid, BookOpen, GitBranch,
   ClipboardList, Eye, EyeOff, Star, RotateCcw,
   FileText, List, SlidersHorizontal, Stethoscope, Calendar, MessageSquare, Palette,
+  Sparkles,
 } from 'lucide-react';
 import * as svc from '../services/adminService';
 import { useTheme, ThemeId } from '../hooks/useTheme';
+import TabOdontologia from './admin/TabOdontologia';
 
 // ─── CSV helpers ──────────────────────────────────────────────
 function csvToObjects(text: string): any[] {
@@ -414,8 +416,14 @@ function TabEspecialidades() {
         {(modal === 'create' || modal === 'edit') && (
           <Modal title={modal === 'create' ? 'Nueva Especialidad' : 'Editar Especialidad'} onClose={() => setModal(null)}>
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <Field label="Código" value={form.codigo||''} onChange={f('codigo')} required placeholder="Ej: ESP-001" />
+              <div className={modal === 'edit' ? 'grid grid-cols-2 gap-4' : ''}>
+                {modal === 'edit' && (
+                  <div>
+                    <label className="block text-xs text-gray-400 mb-1">Código</label>
+                    <input readOnly value={form.codigo||''}
+                      className="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-3 py-2 text-sm text-gray-400 cursor-not-allowed" />
+                  </div>
+                )}
                 <Field label="Nombre" value={form.nombre||''} onChange={f('nombre')} required placeholder="Ej: Cirugía Plástica" />
               </div>
               <Field label="Descripción" value={form.descripcion||''} onChange={f('descripcion')} type="textarea" />
@@ -527,6 +535,21 @@ function TabTiposConsulta() {
     finally { savingRef.current = false; setSaving(false); }
   };
 
+  // Guarda y queda en modo edición para poder asociar servicios CUPS
+  const saveAndContinue = async () => {
+    if (savingRef.current) return;
+    savingRef.current = true;
+    setSaving(true); setErr('');
+    try {
+      const result = await svc.createTipoConsulta(form) as any;
+      setForm((p: any) => ({ ...p, id: result.id }));
+      setModal('edit');
+      loadSvcs(result.id);
+      load();
+    } catch(e: any) { setErr(e.message); }
+    finally { savingRef.current = false; setSaving(false); }
+  };
+
   const del = async (r: any) => {
     if (!confirm(`¿Desactivar "${r.nombre}"?`)) return;
     try { await svc.deleteTipoConsulta(r.id); load(); } catch(e: any) { alert(e.message); }
@@ -549,6 +572,14 @@ function TabTiposConsulta() {
     try { await svc.removeServicioDeConsulta(confId); await loadSvcs(form.id); }
     catch(e: any) { setSvcErr(e?.message || 'Error al quitar'); }
   };
+
+  // Auto-guarda al entrar al tab Servicios en modo crear
+  useEffect(() => {
+    if (wiz === 2 && modal === 'create' && form.nombre && !savingRef.current) {
+      saveAndContinue();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wiz]);
 
   const f = (k: string) => (v: any) => setForm((p: any) => ({...p, [k]: v}));
   const TABS = ['General', 'Clínica', 'Servicios'];
@@ -715,7 +746,10 @@ function TabTiposConsulta() {
                     {svcErr && <ErrBox msg={svcErr} />}
                   </>
                 ) : (
-                  <p className="text-xs text-gray-500 py-3">Guarda el tipo de consulta primero para poder asociar servicios CUPS.</p>
+                  <div className="flex items-center gap-2 text-xs text-gray-400 py-4">
+                    <span className="w-4 h-4 border-2 border-gray-500 border-t-yellow-400 rounded-full animate-spin" />
+                    Guardando tipo de consulta…
+                  </div>
                 )}
               </div>
             )}
@@ -726,12 +760,13 @@ function TabTiposConsulta() {
               <div>{wiz > 0 && <button onClick={() => setWiz(w => w - 1)} className="px-3 py-2 text-xs text-gray-400 border border-white/10 rounded-lg hover:text-white transition">← Anterior</button>}</div>
               <div className="flex gap-2">
                 <button onClick={() => setModal(null)} className="px-4 py-2 text-xs text-gray-400 hover:text-white border border-white/10 rounded-lg transition">Cancelar</button>
-                {wiz < TABS.length - 1
-                  ? <button onClick={() => setWiz(w => w + 1)} className="flex items-center gap-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white text-xs rounded-lg transition">Siguiente <ChevronRight size={13} /></button>
-                  : wiz === 2
-                    ? <button onClick={() => setModal(null)} className="px-4 py-2 text-xs text-gray-400 hover:text-white border border-white/10 rounded-lg transition">Cerrar</button>
-                    : <button onClick={save} disabled={saving} className="flex items-center gap-2 px-4 py-2 bg-yellow-600 hover:bg-yellow-500 text-white text-xs font-semibold rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none">{saving ? <><span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Guardando…</> : <><Save size={13} /> Guardar</>}</button>
-                }
+                {wiz < TABS.length - 1 ? (
+                  <button onClick={() => setWiz(w => w + 1)} className="flex items-center gap-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white text-xs rounded-lg transition">Siguiente <ChevronRight size={13} /></button>
+                ) : modal === 'edit' ? (
+                  <button onClick={() => setModal(null)} className="px-4 py-2 text-xs text-gray-400 hover:text-white border border-white/10 rounded-lg transition">Cerrar</button>
+                ) : (
+                  <button onClick={save} disabled={saving} className="flex items-center gap-2 px-4 py-2 bg-yellow-600 hover:bg-yellow-500 text-white text-xs font-semibold rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed">{saving ? <><span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Guardando…</> : <><Save size={13} /> Guardar</>}</button>
+                )}
               </div>
             </div>
           </Modal>
@@ -2194,6 +2229,84 @@ function TabTemasistema() {
       swatches: ['#030712', '#06b6d4', '#091525', '#7c3aed'],
       ideal: ['Dirección médica', 'Tecnología avanzada', 'Uso ejecutivo'],
     },
+    {
+      id: 'rose-care',
+      name: 'Rose Care',
+      tagline: 'Rosa · Estética · Dermatología',
+      desc: 'Paleta rosa suave ideal para clínicas de estética, dermatología y medicina cosmética. Transmite calidez y cuidado.',
+      bg: ['#fdf2f5', '#fff5f7', '#ffffff'],
+      accent: '#e11d48',
+      card: '#ffffff',
+      txt: '#3d0f1a',
+      border: 'rgba(61,15,26,0.10)',
+      swatches: ['#fdf2f5', '#e11d48', '#ffffff', '#f43f5e'],
+      ideal: ['Clínicas de estética', 'Dermatología', 'Medicina cosmética'],
+    },
+    {
+      id: 'fuchsia-premium',
+      name: 'Fuchsia Premium',
+      tagline: 'Fucsia · Tecnología · Innovación',
+      desc: 'Diseño vibrante y moderno con acentos fucsia. Perfecto para clínicas que quieren transmitir innovación y vanguardia.',
+      bg: ['#fdf4ff', '#faf0ff', '#ffffff'],
+      accent: '#a21caf',
+      card: '#ffffff',
+      txt: '#2e0a35',
+      border: 'rgba(46,10,53,0.10)',
+      swatches: ['#fdf4ff', '#a21caf', '#ffffff', '#c026d3'],
+      ideal: ['Tecnología médica', 'Centros de innovación', 'Clínicas modernas'],
+    },
+    {
+      id: 'purple-care',
+      name: 'Purple Care',
+      tagline: 'Violeta · IA · Psicología',
+      desc: 'Tonos violeta sofisticados inspirados en IA y salud mental. Ideal para psicología, neurología y terapias cognitivas.',
+      bg: ['#f5f3ff', '#f8f6ff', '#ffffff'],
+      accent: '#7c3aed',
+      card: '#ffffff',
+      txt: '#1e1040',
+      border: 'rgba(30,16,64,0.10)',
+      swatches: ['#f5f3ff', '#7c3aed', '#ffffff', '#8b5cf6'],
+      ideal: ['Psicología clínica', 'Neurología', 'Salud mental'],
+    },
+    {
+      id: 'arctic-blue',
+      name: 'Arctic Blue',
+      tagline: 'Azul Ártico · Ciencia · Precisión',
+      desc: 'Azul cielo frío y preciso. Evoca confianza médica, tecnología de punta y entornos clínicos de alta precisión.',
+      bg: ['#f0f9ff', '#f5fbff', '#ffffff'],
+      accent: '#0284c7',
+      card: '#ffffff',
+      txt: '#0c2d48',
+      border: 'rgba(12,45,72,0.10)',
+      swatches: ['#f0f9ff', '#0284c7', '#ffffff', '#0ea5e9'],
+      ideal: ['Laboratorios clínicos', 'Radiología', 'Diagnóstico por imágenes'],
+    },
+    {
+      id: 'mint-premium',
+      name: 'Mint Premium',
+      tagline: 'Menta · Odontología · Frescura',
+      desc: 'Verde menta y teal refrescantes. Diseñado para odontología, fisioterapia y servicios de bienestar integral.',
+      bg: ['#f0fdfa', '#f5fffe', '#ffffff'],
+      accent: '#0d9488',
+      card: '#ffffff',
+      txt: '#0f2d2a',
+      border: 'rgba(15,45,42,0.10)',
+      swatches: ['#f0fdfa', '#0d9488', '#ffffff', '#14b8a6'],
+      ideal: ['Odontología', 'Fisioterapia', 'Bienestar integral'],
+    },
+    {
+      id: 'sunset-care',
+      name: 'Sunset Care',
+      tagline: 'Ámbar Cálido · Calidez · Premium',
+      desc: 'Tonos cálidos ámbar y dorado para consultorios que buscan transmitir cercanía, lujo y atención personalizada.',
+      bg: ['#fffbf0', '#fff8e8', '#ffffff'],
+      accent: '#d97706',
+      card: '#ffffff',
+      txt: '#2d1a0a',
+      border: 'rgba(45,26,10,0.10)',
+      swatches: ['#fffbf0', '#d97706', '#ffffff', '#f59e0b'],
+      ideal: ['Consultorios premium', 'Medicina holística', 'Centros de relajación'],
+    },
   ];
 
   return (
@@ -2373,7 +2486,7 @@ function TabTemasistema() {
                     background: active ? `${t.accent}18` : t.accent,
                     color: active
                       ? t.accent
-                      : (t.id === 'premium-light' || t.id === 'soft-medical' ? '#ffffff' : '#0a0a0f'),
+                      : (['premium-light','soft-medical','rose-care','fuchsia-premium','purple-care','arctic-blue','mint-premium','sunset-care'].includes(t.id) ? '#ffffff' : '#0a0a0f'),
                   }}
                 >
                   {active ? '✓ Tema activo' : 'Activar tema'}
@@ -3374,6 +3487,14 @@ const MODULOS = [
     ],
   },
   {
+    id: 'odontologia',
+    label: 'Odontología',
+    icon: Sparkles,
+    submodulos: [
+      { id:'odonto-catalogos',  label:'Catálogos Clínicos',   icon:Sparkles,      component:TabOdontologia         },
+    ],
+  },
+  {
     id: 'config-general',
     label: 'Configuración General',
     icon: SlidersHorizontal,
@@ -3399,7 +3520,7 @@ const MODULOS = [
 export default function AdminPage() {
   const [activeMod, setActiveMod] = useState('consulta-externa');
   const [activeSub, setActiveSub] = useState('especialidades');
-  const [expanded,  setExpanded]  = useState('consulta-externa');
+  const [expanded,  setExpanded]  = useState('');
 
   // Precarga los datos más comunes en paralelo al montar la página
   // para que el cache esté caliente cuando el usuario navegue a cada tab

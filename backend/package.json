@@ -13,6 +13,7 @@
     "migrate": "prisma migrate dev",
     "seed": "node --loader ts-node/esm prisma/seed.ts",
     "seed-cups": "node prisma/seedCups.mjs",
+    "seed-odontologia": "node --loader ts-node/esm prisma/seedOdontologia.ts",
     "setup-disp": "node --loader ts-node/esm setup-disponibilidad.ts",
     "generate": "prisma generate",
     "test": "node --experimental-vm-modules --no-warnings node_modules/jest/bin/jest.js --config jest.config.cjs",
