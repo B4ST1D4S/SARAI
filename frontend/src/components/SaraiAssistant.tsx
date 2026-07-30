@@ -109,6 +109,7 @@ export default function SaraiAssistant({ onCamposDetectados, token, contexto, on
   const [ultimoSTT, setUltimoSTT] = useState('');  // último texto bruto del STT
   const [estadoComandos, setEstadoComandos] = useState<'idle' | 'starting' | 'active' | 'blocked' | 'unsupported'>('idle');
   const [inputComandoTexto, setInputComandoTexto] = useState(''); // fallback comandos por texto
+  const [nivelPostGrabacion, setNivelPostGrabacion] = useState<{ pct: number; label: string; color: string } | null>(null);
   // Para hacer el widget arrastrable — persistente en sessionStorage
   // Posicionar junto al panel ONLINE/Disponible del Dashboard (top-right)
   // En pantallas lg+: calcula la x para quedar a la izquierda del panel ONLINE
@@ -297,7 +298,7 @@ export default function SaraiAssistant({ onCamposDetectados, token, contexto, on
         const n = Object.keys(data.campos).length;
         setResultado(`✓ ${n} campos completados`);
         setEst('listo');
-        setTimeout(() => { setEst('esperando'); setResultado(''); setTranscripcion(''); }, 7000);
+        setTimeout(() => { setEst('esperando'); setResultado(''); }, 7000);
       } else {
         setError('Sin campos detectados. Habla con más detalle clínico.');
         setEst('error');
@@ -333,6 +334,7 @@ export default function SaraiAssistant({ onCamposDetectados, token, contexto, on
     setError('');
     setResultado('');
     setTranscripcion('');
+    setNivelPostGrabacion(null);
     chunksRef.current = [];
     peakLevelRef.current = 0;   // reset nivel máximo
 
@@ -481,6 +483,15 @@ export default function SaraiAssistant({ onCamposDetectados, token, contexto, on
       const blob = new Blob(capturedChunks, { type: mimeType });
 
       console.log(`[SARAI] Blob: ${blob.size} bytes | Peak mic: ${(peakCapturado * 100).toFixed(1)}%`);
+
+      // Guardar nivel post-grabación para mostrar indicador en UI
+      const pct = Math.round(peakCapturado * 100);
+      setNivelPostGrabacion(
+        pct === 0   ? { pct, label: '🔴 Micrófono silenciado (0%)', color: 'text-red-400 border-red-500/20 bg-red-500/10' } :
+        pct < 2     ? { pct, label: `🔴 Voz muy baja (${pct}%) — sube el volumen`, color: 'text-red-400 border-red-500/20 bg-red-500/10' } :
+        pct < 5     ? { pct, label: `🟡 Señal débil (${pct}%) — habla más fuerte`, color: 'text-yellow-400 border-yellow-500/20 bg-yellow-500/10' } :
+                      { pct, label: `🟢 Nivel OK (${pct}%)`, color: 'text-emerald-400 border-emerald-500/20 bg-emerald-500/10' }
+      );
 
       if (blob.size < 500) {
         setError('No se grabó audio. Verifica el micrófono y habla al menos 2 segundos.');
@@ -946,6 +957,9 @@ export default function SaraiAssistant({ onCamposDetectados, token, contexto, on
   return (
     <div
       ref={widgetRef}
+      data-sarai-panel
+      data-sarai-estado={estado}
+      data-sarai-escuchando={escuchandoComandos ? 'true' : 'false'}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
@@ -1359,10 +1373,22 @@ export default function SaraiAssistant({ onCamposDetectados, token, contexto, on
                 </motion.p>
               )}
 
-              {/* Transcripción Whisper */}
+              {/* Indicador nivel de voz post-grabación */}
+              {nivelPostGrabacion && estado !== 'grabando' && (
+                <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
+                  className={`flex items-center justify-between px-3 py-1.5 rounded-lg border text-[10px] font-mono ${nivelPostGrabacion.color}`}>
+                  <span>{nivelPostGrabacion.label}</span>
+                  <button onClick={() => setNivelPostGrabacion(null)} className="text-gray-600 hover:text-white ml-2">✕</button>
+                </motion.div>
+              )}
+
+              {/* Transcripción Whisper — persiste hasta la próxima grabación */}
               {transcripcion && (
                 <div className="bg-white/5 rounded-lg p-3 border border-white/10">
-                  <p className="text-[10px] text-gray-600 uppercase tracking-wider mb-1">Transcripción Whisper</p>
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-[10px] text-gray-500 uppercase tracking-wider">Whisper escuchó:</p>
+                    <button onClick={() => setTranscripcion('')} className="text-[9px] text-gray-700 hover:text-gray-400">✕</button>
+                  </div>
                   <p className="text-gray-300 text-xs leading-relaxed italic">"{transcripcion.slice(-500)}"</p>
                 </div>
               )}

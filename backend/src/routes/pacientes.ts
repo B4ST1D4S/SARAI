@@ -22,7 +22,7 @@ router.get('/search', search);
 router.get('/verificar-duplicados', verificarDuplicados);
 
 // POST /api/pacientes - Crear paciente (solo médicos, auxiliares, recepcionistas)
-router.post('/', authorizeRole('MEDICO', 'AUXILIAR', 'RECEPCIONISTA'), create);
+router.post('/', authorizeRole('SUPER_ADMIN', 'MEDICO', 'AUXILIAR', 'RECEPCIONISTA'), create);
 
 // GET /api/pacientes - Listar pacientes
 router.get('/', getAll);
@@ -31,7 +31,7 @@ router.get('/', getAll);
 router.get('/:id', getById);
 
 // PUT /api/pacientes/:id - Actualizar paciente
-router.put('/:id', authorizeRole('MEDICO', 'AUXILIAR', 'RECEPCIONISTA'), update);
+router.put('/:id', authorizeRole('SUPER_ADMIN', 'MEDICO', 'AUXILIAR', 'RECEPCIONISTA'), update);
 
 // DELETE /api/pacientes/:id - Eliminar paciente
 router.delete('/:id', authorizeRole('MEDICO', 'SUPER_ADMIN'), deletePac);

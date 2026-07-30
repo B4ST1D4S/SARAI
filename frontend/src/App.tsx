@@ -17,37 +17,66 @@ import CRMPage from './pages/CRMPage';
 import FacturacionPage from './pages/FacturacionPage';
 import PlantillasPage from './pages/PlantillasPage';
 import MapaCorporalPage from './pages/MapaCorporalPage';
+import OdontogramaPage from './pages/OdontogramaPage';
+import SeguridadPage   from './pages/SeguridadPage';
 import { Body3DTestPage } from './pages/Body3DTestPage';
 import UsuariosPage from './pages/UsuariosPage';
 import AdminPage from './pages/AdminPage';
 import CentralImpresionPage from './pages/CentralImpresionPage';
 import CotizacionesPage from './pages/CotizacionesPage';
+import ContratacionPage from './pages/ContratacionPage';
 import SaraiAssistant from './components/SaraiAssistant';
 import ManualPage from './pages/ManualPage';
 import saraiLogo from './assets/logo1.png';
 import { getParametrosSistema } from './services/adminService';
 import { useTheme } from './hooks/useTheme';
+import { useIam } from './context/IamContext';
+
+// Mapeo id de nav → código de recurso IAM
+// Items sin entrada siempre son visibles (no tienen recurso IAM asignado)
+const NAV_RECURSO: Record<string, string> = {
+  dashboard:          'DASHBOARD',
+  pacientes:          'CLINICA.PACIENTES',
+  historia:           'CLINICA.HISTORIA',
+  fotos:              'CLINICA.VISUAL',
+  odontograma:        'CLINICA.ODONTOGRAMA',
+  'mapa-corporal':    'CLINICA.MAPA',
+  agenda:             'AGENDA.CITAS',
+  admision:           'AGENDA.ADMISION',
+  agendaProfesional:  'AGENDA.PROFESIONAL',
+  'config-agenda':    'AGENDA.CONFIG',
+  'vista-cirujano':   'AGENDA.CIRUGIA',
+  cotizaciones:       'GESTION.COTIZACIONES',
+  crm:                'GESTION.CRM',
+  facturacion:        'GESTION.FACTURACION',
+  plantillas:         'GESTION.PLANTILLAS',
+  impresion:          'GESTION.IMPRESION',
+  admin:              'ADMIN.PARAMETRIZACION',
+  usuarios:           'ADMIN.USUARIOS',
+  seguridad:          'SEGURIDAD',
+};
 
 const NAV_SECTIONS = [
   {
     label: 'CLINICA',
     items: [
-      { id: 'dashboard',     label: 'Dashboard',          sym: 'M' },
+      { id: 'dashboard',     label: 'Dashboard',          sym: 'D' },
       { id: 'pacientes',     label: 'Pacientes',          sym: 'P' },
       { id: 'historia',      label: 'Historia Clinica',   sym: 'H' },
       { id: 'fotos',         label: 'Visual Clínico',     sym: 'V' },
-      { id: 'mapa-corporal', label: 'Mapa Corporal',      sym: 'C' },
+      { id: 'odontograma',   label: 'Odontograma',        sym: 'O' },
+      { id: 'mapa-corporal', label: 'Mapa Corporal',      sym: 'M' },
     ],
   },
   {
     label: 'AGENDA',
     items: [
       { id: 'agenda',            label: 'Agenda Paciente',    sym: 'A' },
-      { id: 'admision',          label: 'Admisión',           sym: 'D' },
+      { id: 'admision',          label: 'Admisión',           sym: 'N' },
       { id: 'agendaProfesional', label: 'Agenda Profesional', sym: 'G' },
-      { id: 'config-agenda',     label: 'Config Agenda',      sym: 'Z' },
+      { id: 'config-agenda',     label: 'Config Agenda',      sym: 'C' },
       { id: 'vista-cirujano',    label: 'Quirofano',          sym: 'Q' },
-      { id: 'followup',          label: 'Follow-up',          sym: 'U' },
+      { id: 'followup',          label: 'Follow-up',          sym: 'W' },
     ],
   },
   {
@@ -55,8 +84,11 @@ const NAV_SECTIONS = [
     items: [
       { id: 'consentimiento', label: 'Consentimiento', sym: 'K' },
       { id: 'cotizaciones',   label: 'Cotizaciones',   sym: 'O' },
+      { id: 'contratacion',   label: 'Contratacion',   sym: 'N' },
+      { id: 'consentimiento', label: 'Consentimiento', sym: 'S' },
+      { id: 'cotizaciones',   label: 'Cotizaciones',   sym: 'T' },
       { id: 'crm',            label: 'CRM',            sym: 'R' },
-      { id: 'facturacion',    label: 'Facturacion',    sym: 'B' },
+      { id: 'facturacion',    label: 'Facturacion',    sym: 'F' },
       { id: 'plantillas',     label: 'Plantillas',     sym: 'L' },
       { id: 'impresion',      label: 'Central Impresión', sym: 'I' },
     ],
@@ -64,9 +96,10 @@ const NAV_SECTIONS = [
   {
     label: 'ADMINISTRACIÓN',
     items: [
-      { id: 'admin', label: 'Parametrización', sym: 'X' },
-      { id: 'usuarios', label: 'Usuarios', sym: 'V' },
-      { id: 'manual', label: 'Manual de Usuario', sym: '?' },
+      { id: 'admin',    label: 'Parametrización',   sym: 'Z' },
+      { id: 'usuarios', label: 'Usuarios',          sym: 'U' },
+      { id: 'seguridad', label: 'Seguridad & IAM',  sym: 'E' },
+      { id: 'manual',   label: 'Manual de Usuario', sym: '?' },
     ],
   },
 ];
@@ -92,6 +125,14 @@ function Sidebar({
 }) {
   // En móvil el sidebar siempre se muestra expandido cuando está abierto
   const effectiveCollapsed = mobileOpen ? false : collapsed;
+  const { canDo } = useIam();
+
+  // Filtra un item según permisos IAM (mapa null = sin perfil = acceso total)
+  const itemVisible = (id: string) => {
+    const recurso = NAV_RECURSO[id];
+    if (!recurso) return true;       // sin código IAM → siempre visible
+    return canDo(recurso, 'VER');
+  };
 
   const handleNavClick = (id: string) => {
     setCurrentPage(id);
@@ -165,7 +206,7 @@ function Sidebar({
               </AnimatePresence>
               {effectiveCollapsed && <div className="mx-3 mb-1 border-t border-white/5" />}
 
-              {section.items.map((item) => {
+              {section.items.filter(item => itemVisible(item.id)).map((item) => {
                 const active = currentPage === item.id;
                 return (
                   <button
@@ -268,9 +309,36 @@ function App() {
     } catch { return { nombre: '', logoUrl: '' }; }
   });
   const { theme } = useTheme();
+  const [hotkeyToast, setHotkeyToast] = useState<string | null>(null);
   // Ref para currentPage — evita stale closure en callbacks de SARAI
   const currentPageRef = useRef(currentPage);
   useEffect(() => { currentPageRef.current = currentPage; }, [currentPage]);
+
+  // ── Atajos de teclado globales Alt + sym ─────────────────────────────────
+  useEffect(() => {
+    if (!user) return;
+    const handler = (e: KeyboardEvent) => {
+      if (!e.altKey || e.ctrlKey || e.metaKey) return;
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      // Bloquear si SARAI está grabando/procesando
+      const saraiRoot = document.querySelector('[data-sarai-estado]');
+      if (saraiRoot) {
+        const estado = saraiRoot.getAttribute('data-sarai-estado') || '';
+        if (['grabando', 'transcribiendo', 'procesando'].includes(estado)) return;
+      }
+      const key = e.key.toUpperCase();
+      const allItems = NAV_SECTIONS.flatMap((s) => s.items);
+      const match = allItems.find((item) => item.sym.toUpperCase() === key);
+      if (!match) return;
+      e.preventDefault();
+      setCurrentPage(match.id);
+      setHotkeyToast(match.label);
+      setTimeout(() => setHotkeyToast(null), 1800);
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [user]);
 
   useEffect(() => {
     const token = localStorage.getItem('accessToken');
@@ -316,6 +384,31 @@ function App() {
   return (
     <div className="min-h-screen bg-[#080a0f] flex">
       <NeuralCanvas opacity={0.13} nodeCount={100} />
+
+      {/* Toast de atajos de teclado */}
+      {hotkeyToast && (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: '2rem',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: 'linear-gradient(135deg, #d4af37, #f0c040)',
+            color: '#0a0a0f',
+            padding: '0.55rem 1.4rem',
+            borderRadius: '999px',
+            fontWeight: 700,
+            fontSize: '0.88rem',
+            letterSpacing: '0.03em',
+            boxShadow: '0 4px 24px rgba(212,175,55,0.45)',
+            zIndex: 99999,
+            pointerEvents: 'none',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          ⌨️ {hotkeyToast}
+        </div>
+      )}
       <Sidebar
         currentPage={currentPage}
         setCurrentPage={setCurrentPage}
@@ -343,10 +436,16 @@ function App() {
         {/* ══════ TOPBAR PREMIUM ══════ */}
         {(() => {
           const T = {
-            'dark':          { bg: 'bg-[#0a0c13]',    border: 'border-white/[0.06]',  nameGrad: 'from-yellow-300 via-amber-400 to-yellow-500', sub: 'text-yellow-500/50', date: 'text-gray-400',    dateSub: 'text-gray-600'    },
-            'premium-light': { bg: 'bg-white',         border: 'border-slate-200',     nameGrad: 'from-blue-700 via-indigo-600 to-blue-800',    sub: 'text-blue-500/60',   date: 'text-slate-600',   dateSub: 'text-slate-400'   },
-            'soft-medical':  { bg: 'bg-slate-50',      border: 'border-slate-200',     nameGrad: 'from-teal-600 via-cyan-600 to-teal-700',      sub: 'text-teal-500/60',   date: 'text-slate-500',   dateSub: 'text-slate-400'   },
-            'executive-ai':  { bg: 'bg-[#0c1220]',     border: 'border-blue-400/12',   nameGrad: 'from-blue-400 via-violet-400 to-blue-500',    sub: 'text-blue-400/45',   date: 'text-blue-300/70', dateSub: 'text-blue-400/40' },
+            'dark':             { bg: 'bg-[#0a0c13]',    border: 'border-white/[0.06]',   nameGrad: 'from-yellow-300 via-amber-400 to-yellow-500',     sub: 'text-yellow-500/50',   date: 'text-gray-400',    dateSub: 'text-gray-600'    },
+            'premium-light':    { bg: 'bg-white',         border: 'border-slate-200',      nameGrad: 'from-blue-700 via-indigo-600 to-blue-800',         sub: 'text-blue-500/60',     date: 'text-slate-600',   dateSub: 'text-slate-400'   },
+            'soft-medical':     { bg: 'bg-slate-50',      border: 'border-slate-200',      nameGrad: 'from-teal-600 via-cyan-600 to-teal-700',           sub: 'text-teal-500/60',     date: 'text-slate-500',   dateSub: 'text-slate-400'   },
+            'executive-ai':     { bg: 'bg-[#0c1220]',     border: 'border-blue-400/12',    nameGrad: 'from-blue-400 via-violet-400 to-blue-500',         sub: 'text-blue-400/45',     date: 'text-blue-300/70', dateSub: 'text-blue-400/40' },
+            'rose-care':        { bg: 'bg-white',         border: 'border-rose-200',       nameGrad: 'from-rose-600 via-pink-500 to-rose-700',           sub: 'text-rose-500/60',     date: 'text-slate-500',   dateSub: 'text-slate-400'   },
+            'fuchsia-premium':  { bg: 'bg-white',         border: 'border-fuchsia-200',    nameGrad: 'from-fuchsia-600 via-purple-500 to-fuchsia-700',   sub: 'text-fuchsia-500/60',  date: 'text-slate-500',   dateSub: 'text-slate-400'   },
+            'purple-care':      { bg: 'bg-white',         border: 'border-violet-200',     nameGrad: 'from-violet-700 via-purple-600 to-violet-800',     sub: 'text-violet-500/60',   date: 'text-slate-500',   dateSub: 'text-slate-400'   },
+            'arctic-blue':      { bg: 'bg-white',         border: 'border-sky-200',        nameGrad: 'from-sky-700 via-blue-600 to-sky-800',             sub: 'text-sky-500/60',      date: 'text-slate-500',   dateSub: 'text-slate-400'   },
+            'mint-premium':     { bg: 'bg-white',         border: 'border-teal-200',       nameGrad: 'from-teal-700 via-emerald-600 to-teal-800',        sub: 'text-teal-500/60',     date: 'text-slate-500',   dateSub: 'text-slate-400'   },
+            'sunset-care':      { bg: 'bg-white',         border: 'border-amber-200',      nameGrad: 'from-amber-600 via-orange-500 to-amber-700',       sub: 'text-amber-500/60',    date: 'text-slate-500',   dateSub: 'text-slate-400'   },
           }[theme] ?? { bg: 'bg-[#0a0c13]', border: 'border-white/[0.06]', nameGrad: 'from-yellow-300 via-amber-400 to-yellow-500', sub: 'text-yellow-500/50', date: 'text-gray-400', dateSub: 'text-gray-600' };
 
           const hoy = new Date();
@@ -384,7 +483,7 @@ function App() {
                 </h1>
                 {/* Línea decorativa bajo el nombre */}
                 <div className="mt-[5px] h-[2px] w-48 sm:w-64 rounded-full"
-                  style={{ background: `linear-gradient(90deg, transparent, ${theme === 'premium-light' || theme === 'soft-medical' ? 'rgba(99,102,241,0.45)' : 'rgba(212,175,55,0.55)'}, transparent)` }} />
+                  style={{ background: `linear-gradient(90deg, transparent, ${{ 'premium-light': 'rgba(37,99,235,0.45)', 'soft-medical': 'rgba(5,150,105,0.45)', 'rose-care': 'rgba(225,29,72,0.45)', 'fuchsia-premium': 'rgba(162,28,175,0.45)', 'purple-care': 'rgba(124,58,237,0.45)', 'arctic-blue': 'rgba(2,132,199,0.45)', 'mint-premium': 'rgba(13,148,136,0.45)', 'sunset-care': 'rgba(217,119,6,0.45)' }[theme] ?? 'rgba(212,175,55,0.55)'}, transparent)` }} />
               </div>
 
               {/* ── DERECHA: fecha + online ── */}
@@ -438,13 +537,16 @@ function App() {
           {currentPage === 'followup'            && <FollowUpPage />}
           {currentPage === 'crm'                 && <CRMPage onNavegar={setCurrentPage} />}
           {currentPage === 'cotizaciones'        && <CotizacionesPage />}
+          {currentPage === 'contratacion'        && <ContratacionPage />}
           {currentPage === 'facturacion'         && <FacturacionPage />}
           {currentPage === 'plantillas'          && <PlantillasPage />}
           {currentPage === 'impresion'           && <CentralImpresionPage />}
           {currentPage === 'mapa-corporal'       && <MapaCorporalPage />}
+          {currentPage === 'odontograma'         && <OdontogramaPage />}
           {currentPage === 'body3d-test'         && <Body3DTestPage />}
           {currentPage === 'usuarios'            && <UsuariosPage />}
           {currentPage === 'admin'               && <AdminPage />}
+          {currentPage === 'seguridad'            && <SeguridadPage />}
           {currentPage === 'manual'              && <ManualPage />}
         </div>
         </div>

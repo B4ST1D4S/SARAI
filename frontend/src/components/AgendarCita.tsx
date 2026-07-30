@@ -1,7 +1,6 @@
 ﻿import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { X, Calendar, Clock, User, FileText, Check, AlertCircle, RefreshCw } from 'lucide-react';
-import { API_BASE_URL } from '../config';
 
 interface AgendarCitaProps {
   pacienteId?: string;
@@ -58,7 +57,7 @@ export default function AgendarCita({
     const mId = getEfectiveMedicoId();
     if (!mId) return;
     setLoadingTipos(true);
-    fetch(`${API_BASE_URL}/disponibilidad/tipos-consulta/${mId}`, {
+    fetch(`/api/disponibilidad/tipos-consulta/${mId}`, {
       headers: { Authorization: `Bearer ${getToken()}` },
     })
       .then(r => r.json())
@@ -129,8 +128,8 @@ export default function AgendarCita({
         const token = getToken();
         const duracion = duracionTipoActual();
         const url = duracion
-          ? `${API_BASE_URL}/disponibilidad/slots?medicoId=${medicoId}&fecha=${formData.fecha}&duracion=${duracion}`
-          : `${API_BASE_URL}/disponibilidad/slots?medicoId=${medicoId}&fecha=${formData.fecha}`;
+          ? `/api/disponibilidad/slots?medicoId=${medicoId}&fecha=${formData.fecha}&duracion=${duracion}`
+          : `/api/disponibilidad/slots?medicoId=${medicoId}&fecha=${formData.fecha}`;
 
         const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
 
@@ -193,7 +192,7 @@ export default function AgendarCita({
 
       const fechaHora = new Date(`${formData.fecha}T${formData.hora}:00`);
 
-      const response = await fetch(`${API_BASE_URL}/citas`, {
+      const response = await fetch('/api/citas', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -440,5 +439,3 @@ export default function AgendarCita({
     </div>
   );
 }
-
-

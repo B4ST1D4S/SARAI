@@ -11,6 +11,7 @@ import {
   completarCita,
   enviarRecordatorios24h,
 } from '../services/citasService.js';
+import { crearIngresoYCuentaDesdeCita } from './facturacionController.js';
 
 // Crear cita
 export async function create(req: Request, res: Response): Promise<void> {
@@ -66,8 +67,17 @@ export async function getMedico(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    const { estado, fechaInicio, fechaFin } = req.query;
-    const citas = await getCitasByMedico(req.user.userId, estado as string, fechaInicio as string, fechaFin as string);
+    const { estado, fechaInicio, fechaFin, medicoId } = req.query;
+    // Un MEDICO siempre ve su propia agenda. SUPER_ADMIN ve TODO siempre,
+    // sin excepción (ignora cualquier ?medicoId= que llegue). El resto de
+    // roles (recepción, auxiliares) ven la agenda de todos los profesionales
+    // por defecto, pero sí respetan un filtro puntual con ?medicoId=.
+    const medicoIdFiltro = req.user.rol === 'MEDICO'
+      ? req.user.userId
+      : req.user.rol === 'SUPER_ADMIN'
+        ? null
+        : (medicoId as string) || null;
+    const citas = await getCitasByMedico(medicoIdFiltro, estado as string, fechaInicio as string, fechaFin as string);
 
     res.json({
       success: true,
@@ -197,10 +207,20 @@ export async function completar(req: Request, res: Response): Promise<void> {
 
     const cita = await completarCita(id, notas);
 
+    // Al completar la cita se genera automáticamente el ingreso + cuenta
+    // para poder facturar. No debe bloquear el cierre de la cita si falla.
+    let ingreso = null;
+    try {
+      ingreso = await crearIngresoYCuentaDesdeCita(id);
+    } catch (facturacionError: any) {
+      console.error('No se pudo crear el ingreso de facturación:', facturacionError?.message);
+    }
+
     res.json({
       success: true,
       message: 'Cita completada exitosamente',
       cita,
+      ingreso,
     });
   } catch (error: any) {
     console.error('Error en completar:', error);
@@ -266,7 +286,19 @@ export async function admision(req: Request, res: Response): Promise<void> {
       data: { estado: 'EN_SALA', asistencia: true },
       include: { paciente: true, medico: true },
     });
-    res.json({ success: true, message: 'Paciente en sala de espera', cita });
+
+    // Igual que al completar la cita: desde que el paciente llega se puede
+    // empezar a cargar cuenta (consulta, insumos, etc.), así que la cuenta
+    // debe existir desde la admisión, no solo al cerrar la atención. No debe
+    // bloquear el registro de llegada si falla.
+    let ingreso = null;
+    try {
+      ingreso = await crearIngresoYCuentaDesdeCita(id);
+    } catch (facturacionError: any) {
+      console.error('No se pudo crear el ingreso de facturación en admisión:', facturacionError?.message);
+    }
+
+    res.json({ success: true, message: 'Paciente en sala de espera', cita, ingreso });
   } catch (error: any) {
     console.error('Error en admision:', error);
     res.status(500).json({ error: error.message || 'Error al registrar admisión' });

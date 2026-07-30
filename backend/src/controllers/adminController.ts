@@ -21,14 +21,23 @@ export async function getEspecialidades(req: Request, res: Response) {
 
 export async function createEspecialidad(req: Request, res: Response) {
   try {
-    const { codigo, nombre, descripcion, aplicaAnestesia, aplicaPediatria,
+    const { nombre, descripcion, aplicaAnestesia, aplicaPediatria,
             aplicaCirugia, aplicaInstrumentacion, aplicaMedicoFamiliar } = req.body;
 
-    if (!codigo || !nombre) return res.status(400).json({ error: 'codigo y nombre son requeridos' });
+    if (!nombre) return res.status(400).json({ error: 'nombre es requerido' });
 
-    const existe = await prisma.especialidad.findFirst({ where: { OR: [{ codigo }, { nombre }] } });
-    if (existe) return res.status(400).json({ error: 'Código o nombre ya existe' });
+    // Auto-generar código incremental (max existente + 1, formato 2 dígitos)
+    const todas = await prisma.especialidad.findMany({ select: { codigo: true } });
+    const maxNum = todas.reduce((acc, e) => {
+      const n = parseInt(e.codigo, 10);
+      return isNaN(n) ? acc : Math.max(acc, n);
+    }, 0);
+    const codigo = String(maxNum + 1).padStart(2, '0');
 
+    const existeNombre = await prisma.especialidad.findFirst({ where: { nombre } });
+    if (existeNombre) return res.status(400).json({ error: 'Ya existe una especialidad con ese nombre' });
+
+    const now = new Date();
     const item = await prisma.especialidad.create({
       data: {
         codigo, nombre, descripcion,
@@ -38,10 +47,12 @@ export async function createEspecialidad(req: Request, res: Response) {
         aplicaInstrumentacion: aplicaInstrumentacion ?? false,
         aplicaMedicoFamiliar: aplicaMedicoFamiliar ?? false,
         usuarioCreacion: (req as any).user?.id,
+        updatedAt: now,
       },
     });
     res.status(201).json(item);
-  } catch {
+  } catch (err) {
+    console.error('createEspecialidad error:', err);
     res.status(500).json({ error: 'Error al crear especialidad' });
   }
 }
@@ -183,16 +194,31 @@ export async function deleteDepartamento(req: Request, res: Response) {
 
 export async function getServicios(req: Request, res: Response) {
   try {
-    const { search, categoria } = req.query;
-    const where: any = { estado: true };
-    if (search) where.OR = [
-      { codigoCups: { contains: String(search), mode: 'insensitive' } },
-      { nombre: { contains: String(search), mode: 'insensitive' } },
-    ];
-    if (categoria) where.categoria = categoria;
-    const items = await prisma.servicioFacturable.findMany({ where, orderBy: { nombre: 'asc' }, take: 100 });
-    res.json(items);
-  } catch {
+    const { search } = req.query;
+    // Si no hay búsqueda o es muy corta devolvemos vacío
+    if (!search || String(search).trim().length < 2) { res.json([]); return; }
+    const s = String(search).trim();
+    // Buscar en el catálogo CUPS (solo SUBCATEGORIA = procedimientos facturables)
+    const items = await prisma.cupsCodigo.findMany({
+      where: {
+        nivel: 'SUBCATEGORIA',
+        OR: [
+          { codigo:       { contains: s, mode: 'insensitive' } },
+          { codigoFormato:{ contains: s, mode: 'insensitive' } },
+          { descripcion:  { contains: s, mode: 'insensitive' } },
+        ],
+      },
+      orderBy: { codigo: 'asc' },
+      take: 30,
+    });
+    // Devolver en el formato que espera el frontend ({ id, codigoCups, nombre })
+    res.json(items.map(c => ({
+      id:        c.id,
+      codigoCups: c.codigo,          // sin puntos
+      nombre:    c.descripcion,
+    })));
+  } catch (err) {
+    console.error('getServicios error:', err);
     res.status(500).json({ error: 'Error al obtener servicios' });
   }
 }
@@ -316,6 +342,7 @@ export async function createTipoConsulta(req: Request, res: Response) {
 
     const tipoConsulta = await prisma.tipoConsulta.create({
       data: {
+        id: randomUUID(),
         nombre, descripcion,
         especialidadId: especialidadId || null,
         departamentoId: departamentoId || null,
@@ -333,6 +360,7 @@ export async function createTipoConsulta(req: Request, res: Response) {
         duracionMinutos: duracionMinutos ?? 30,
         bodegaId: bodegaId || null,
         usuarioCreacion: (req as any).user?.id,
+        updatedAt: new Date(),
       },
     });
 
@@ -365,7 +393,8 @@ export async function createTipoConsulta(req: Request, res: Response) {
       },
     });
     res.status(201).json(result);
-  } catch {
+  } catch (err) {
+    console.error('createTipoConsulta error:', err);
     res.status(500).json({ error: 'Error al crear tipo de consulta' });
   }
 }
@@ -467,6 +496,30 @@ export async function addServicioAConsulta(req: Request, res: Response) {
 
     if (!servicioId) return res.status(400).json({ error: 'servicioId es requerido' });
 
+    // Resolver el ID: puede ser un ServicioFacturable.id o un CupsCodigo.id
+    let sfId = servicioId;
+    const existeSF = await prisma.servicioFacturable.findUnique({ where: { id: servicioId } });
+    if (!existeSF) {
+      // Intentar como CupsCodigo.id → auto-crear ServicioFacturable
+      const cups = await prisma.cupsCodigo.findUnique({ where: { id: servicioId } });
+      if (!cups) return res.status(404).json({ error: 'Servicio / código CUPS no encontrado' });
+      const codigoCups = cups.codigoFormato || cups.codigo;
+      const sf = await prisma.servicioFacturable.upsert({
+        where: { codigoCups: cups.codigo },
+        create: {
+          id: randomUUID(),
+          codigoCups: cups.codigo,
+          nombre: cups.descripcion || cups.codigo,
+          descripcion: cups.descripcion,
+          categoria:   cups.capitulo   || null,
+          subcategoria: cups.subgrupo  || null,
+          updatedAt: new Date(),
+        },
+        update: {},
+      });
+      sfId = sf.id;
+    }
+
     // Si se marca como principal, desmarcar los demás
     if (esPrincipal) {
       await prisma.configServicioConsulta.updateMany({
@@ -475,9 +528,10 @@ export async function addServicioAConsulta(req: Request, res: Response) {
     }
 
     const item = await prisma.configServicioConsulta.upsert({
-      where: { tipoConsultaId_servicioId: { tipoConsultaId, servicioId } },
+      where: { tipoConsultaId_servicioId: { tipoConsultaId, servicioId: sfId } },
       create: {
-        tipoConsultaId, servicioId,
+        id: randomUUID(),
+        tipoConsultaId, servicioId: sfId,
         esPrincipal: esPrincipal ?? false,
         generaAutomatico: generaAutomatico ?? false,
         requiereOrden: requiereOrden ?? false,
@@ -496,7 +550,8 @@ export async function addServicioAConsulta(req: Request, res: Response) {
       },
     });
     res.status(201).json(item);
-  } catch {
+  } catch (err) {
+    console.error('addServicioAConsulta error:', err);
     res.status(500).json({ error: 'Error al agregar servicio a consulta' });
   }
 }
@@ -1122,18 +1177,65 @@ async function seedParamGroup(grupo: string, defaults: any[]) {
     await prisma.parametroSistema.upsert({
       where: { grupo_clave: { grupo, clave: p.clave } },
       update: {},
-      create: { grupo, ...p },
+      create: { id: randomUUID(), grupo, ...p, updatedAt: new Date() },
     });
   }
+}
+
+// "Datos de la Clínica" vive en Empresa (esClinicaPropia: true) en vez de ParametroSistema,
+// para que la clínica propia y las empresas contratantes compartan el mismo modelo.
+const EMPRESA_FIELD_MAP: Record<string, string> = {
+  nombre_clinica: 'razonSocial',
+  nit: 'nit',
+  direccion: 'direccion',
+  ciudad: 'ciudad',
+  telefono: 'contactoTelefono',
+  email_contacto: 'contactoEmail',
+  sitio_web: 'sitioWeb',
+  representante_legal: 'contactoNombre',
+  regimen_tributario: 'regimenTributario',
+  logo_url: 'logoUrl',
+};
+
+async function getOrCreateClinicaPropia() {
+  let empresa = await prisma.empresa.findFirst({ where: { esClinicaPropia: true } });
+  if (!empresa) {
+    empresa = await prisma.empresa.create({
+      data: {
+        razonSocial: 'EstetIA Clínica',
+        nit: '',
+        tipo: 'CLINICA_PROPIA',
+        esClinicaPropia: true,
+      },
+    });
+  }
+  return empresa;
 }
 
 export async function getParametrosSistema(req: Request, res: Response) {
   try {
     const { grupo } = req.params;
+
+    if (grupo === 'clinica') {
+      const empresa = await getOrCreateClinicaPropia();
+      const items = PARAMS_CLINICA.map((p) => ({
+        id: empresa.id,
+        grupo: 'clinica',
+        clave: p.clave,
+        valor: (empresa as any)[EMPRESA_FIELD_MAP[p.clave]] ?? '',
+        etiqueta: p.etiqueta,
+        tipo: p.tipo,
+        orden: p.orden,
+        estado: true,
+        updatedAt: empresa.updatedAt,
+      }));
+      res.json(items);
+      return;
+    }
+
     const count = await prisma.parametroSistema.count({ where: { grupo } });
     if (count === 0) {
-      if (grupo === 'clinica') await seedParamGroup('clinica', PARAMS_CLINICA);
-      else if (grupo === 'agenda') await seedParamGroup('agenda', PARAMS_AGENDA);
+      if (grupo === 'agenda') await seedParamGroup('agenda', PARAMS_AGENDA);
     }
     const items = await prisma.parametroSistema.findMany({
       where: { grupo, estado: true },
@@ -1149,6 +1251,22 @@ export async function updateParametroSistema(req: Request, res: Response) {
   try {
     const { grupo, clave } = req.params;
     const { valor } = req.body;
+
+    if (grupo === 'clinica') {
+      const field = EMPRESA_FIELD_MAP[clave];
+      if (!field) {
+        res.status(400).json({ error: 'Clave no válida' });
+        return;
+      }
+      const empresa = await getOrCreateClinicaPropia();
+      const updated = await prisma.empresa.update({
+        where: { id: empresa.id },
+        data: { [field]: valor },
+      });
+      res.json({ grupo, clave, valor: (updated as any)[field] ?? '', updatedAt: updated.updatedAt });
+      return;
+    }
+
     const now = new Date();
     const item = await prisma.parametroSistema.upsert({
       where: { grupo_clave: { grupo, clave } },

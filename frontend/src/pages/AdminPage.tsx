@@ -14,9 +14,11 @@ import {
   AlertTriangle, ChevronDown, FolderOpen, LayoutGrid, BookOpen, GitBranch,
   ClipboardList, Eye, EyeOff, Star, RotateCcw,
   FileText, List, SlidersHorizontal, Stethoscope, Calendar, MessageSquare, Palette,
+  Sparkles,
 } from 'lucide-react';
 import * as svc from '../services/adminService';
 import { useTheme, ThemeId } from '../hooks/useTheme';
+import TabOdontologia from './admin/TabOdontologia';
 
 // ─── CSV helpers ──────────────────────────────────────────────
 function csvToObjects(text: string): any[] {
@@ -414,8 +416,14 @@ function TabEspecialidades() {
         {(modal === 'create' || modal === 'edit') && (
           <Modal title={modal === 'create' ? 'Nueva Especialidad' : 'Editar Especialidad'} onClose={() => setModal(null)}>
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <Field label="Código" value={form.codigo||''} onChange={f('codigo')} required placeholder="Ej: ESP-001" />
+              <div className={modal === 'edit' ? 'grid grid-cols-2 gap-4' : ''}>
+                {modal === 'edit' && (
+                  <div>
+                    <label className="block text-xs text-gray-400 mb-1">Código</label>
+                    <input readOnly value={form.codigo||''}
+                      className="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-3 py-2 text-sm text-gray-400 cursor-not-allowed" />
+                  </div>
+                )}
                 <Field label="Nombre" value={form.nombre||''} onChange={f('nombre')} required placeholder="Ej: Cirugía Plástica" />
               </div>
               <Field label="Descripción" value={form.descripcion||''} onChange={f('descripcion')} type="textarea" />
@@ -527,6 +535,21 @@ function TabTiposConsulta() {
     finally { savingRef.current = false; setSaving(false); }
   };
 
+  // Guarda y queda en modo edición para poder asociar servicios CUPS
+  const saveAndContinue = async () => {
+    if (savingRef.current) return;
+    savingRef.current = true;
+    setSaving(true); setErr('');
+    try {
+      const result = await svc.createTipoConsulta(form) as any;
+      setForm((p: any) => ({ ...p, id: result.id }));
+      setModal('edit');
+      loadSvcs(result.id);
+      load();
+    } catch(e: any) { setErr(e.message); }
+    finally { savingRef.current = false; setSaving(false); }
+  };
+
   const del = async (r: any) => {
     if (!confirm(`¿Desactivar "${r.nombre}"?`)) return;
     try { await svc.deleteTipoConsulta(r.id); load(); } catch(e: any) { alert(e.message); }
@@ -549,6 +572,14 @@ function TabTiposConsulta() {
     try { await svc.removeServicioDeConsulta(confId); await loadSvcs(form.id); }
     catch(e: any) { setSvcErr(e?.message || 'Error al quitar'); }
   };
+
+  // Auto-guarda al entrar al tab Servicios en modo crear
+  useEffect(() => {
+    if (wiz === 2 && modal === 'create' && form.nombre && !savingRef.current) {
+      saveAndContinue();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wiz]);
 
   const f = (k: string) => (v: any) => setForm((p: any) => ({...p, [k]: v}));
   const TABS = ['General', 'Clínica', 'Servicios'];
@@ -715,7 +746,10 @@ function TabTiposConsulta() {
                     {svcErr && <ErrBox msg={svcErr} />}
                   </>
                 ) : (
-                  <p className="text-xs text-gray-500 py-3">Guarda el tipo de consulta primero para poder asociar servicios CUPS.</p>
+                  <div className="flex items-center gap-2 text-xs text-gray-400 py-4">
+                    <span className="w-4 h-4 border-2 border-gray-500 border-t-yellow-400 rounded-full animate-spin" />
+                    Guardando tipo de consulta…
+                  </div>
                 )}
               </div>
             )}
@@ -726,12 +760,13 @@ function TabTiposConsulta() {
               <div>{wiz > 0 && <button onClick={() => setWiz(w => w - 1)} className="px-3 py-2 text-xs text-gray-400 border border-white/10 rounded-lg hover:text-white transition">← Anterior</button>}</div>
               <div className="flex gap-2">
                 <button onClick={() => setModal(null)} className="px-4 py-2 text-xs text-gray-400 hover:text-white border border-white/10 rounded-lg transition">Cancelar</button>
-                {wiz < TABS.length - 1
-                  ? <button onClick={() => setWiz(w => w + 1)} className="flex items-center gap-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white text-xs rounded-lg transition">Siguiente <ChevronRight size={13} /></button>
-                  : wiz === 2
-                    ? <button onClick={() => setModal(null)} className="px-4 py-2 text-xs text-gray-400 hover:text-white border border-white/10 rounded-lg transition">Cerrar</button>
-                    : <button onClick={save} disabled={saving} className="flex items-center gap-2 px-4 py-2 bg-yellow-600 hover:bg-yellow-500 text-white text-xs font-semibold rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none">{saving ? <><span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Guardando…</> : <><Save size={13} /> Guardar</>}</button>
-                }
+                {wiz < TABS.length - 1 ? (
+                  <button onClick={() => setWiz(w => w + 1)} className="flex items-center gap-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white text-xs rounded-lg transition">Siguiente <ChevronRight size={13} /></button>
+                ) : modal === 'edit' ? (
+                  <button onClick={() => setModal(null)} className="px-4 py-2 text-xs text-gray-400 hover:text-white border border-white/10 rounded-lg transition">Cerrar</button>
+                ) : (
+                  <button onClick={save} disabled={saving} className="flex items-center gap-2 px-4 py-2 bg-yellow-600 hover:bg-yellow-500 text-white text-xs font-semibold rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed">{saving ? <><span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Guardando…</> : <><Save size={13} /> Guardar</>}</button>
+                )}
               </div>
             </div>
           </Modal>
@@ -2194,6 +2229,84 @@ function TabTemasistema() {
       swatches: ['#030712', '#06b6d4', '#091525', '#7c3aed'],
       ideal: ['Dirección médica', 'Tecnología avanzada', 'Uso ejecutivo'],
     },
+    {
+      id: 'rose-care',
+      name: 'Rose Care',
+      tagline: 'Rosa · Estética · Dermatología',
+      desc: 'Paleta rosa suave ideal para clínicas de estética, dermatología y medicina cosmética. Transmite calidez y cuidado.',
+      bg: ['#fdf2f5', '#fff5f7', '#ffffff'],
+      accent: '#e11d48',
+      card: '#ffffff',
+      txt: '#3d0f1a',
+      border: 'rgba(61,15,26,0.10)',
+      swatches: ['#fdf2f5', '#e11d48', '#ffffff', '#f43f5e'],
+      ideal: ['Clínicas de estética', 'Dermatología', 'Medicina cosmética'],
+    },
+    {
+      id: 'fuchsia-premium',
+      name: 'Fuchsia Premium',
+      tagline: 'Fucsia · Tecnología · Innovación',
+      desc: 'Diseño vibrante y moderno con acentos fucsia. Perfecto para clínicas que quieren transmitir innovación y vanguardia.',
+      bg: ['#fdf4ff', '#faf0ff', '#ffffff'],
+      accent: '#a21caf',
+      card: '#ffffff',
+      txt: '#2e0a35',
+      border: 'rgba(46,10,53,0.10)',
+      swatches: ['#fdf4ff', '#a21caf', '#ffffff', '#c026d3'],
+      ideal: ['Tecnología médica', 'Centros de innovación', 'Clínicas modernas'],
+    },
+    {
+      id: 'purple-care',
+      name: 'Purple Care',
+      tagline: 'Violeta · IA · Psicología',
+      desc: 'Tonos violeta sofisticados inspirados en IA y salud mental. Ideal para psicología, neurología y terapias cognitivas.',
+      bg: ['#f5f3ff', '#f8f6ff', '#ffffff'],
+      accent: '#7c3aed',
+      card: '#ffffff',
+      txt: '#1e1040',
+      border: 'rgba(30,16,64,0.10)',
+      swatches: ['#f5f3ff', '#7c3aed', '#ffffff', '#8b5cf6'],
+      ideal: ['Psicología clínica', 'Neurología', 'Salud mental'],
+    },
+    {
+      id: 'arctic-blue',
+      name: 'Arctic Blue',
+      tagline: 'Azul Ártico · Ciencia · Precisión',
+      desc: 'Azul cielo frío y preciso. Evoca confianza médica, tecnología de punta y entornos clínicos de alta precisión.',
+      bg: ['#f0f9ff', '#f5fbff', '#ffffff'],
+      accent: '#0284c7',
+      card: '#ffffff',
+      txt: '#0c2d48',
+      border: 'rgba(12,45,72,0.10)',
+      swatches: ['#f0f9ff', '#0284c7', '#ffffff', '#0ea5e9'],
+      ideal: ['Laboratorios clínicos', 'Radiología', 'Diagnóstico por imágenes'],
+    },
+    {
+      id: 'mint-premium',
+      name: 'Mint Premium',
+      tagline: 'Menta · Odontología · Frescura',
+      desc: 'Verde menta y teal refrescantes. Diseñado para odontología, fisioterapia y servicios de bienestar integral.',
+      bg: ['#f0fdfa', '#f5fffe', '#ffffff'],
+      accent: '#0d9488',
+      card: '#ffffff',
+      txt: '#0f2d2a',
+      border: 'rgba(15,45,42,0.10)',
+      swatches: ['#f0fdfa', '#0d9488', '#ffffff', '#14b8a6'],
+      ideal: ['Odontología', 'Fisioterapia', 'Bienestar integral'],
+    },
+    {
+      id: 'sunset-care',
+      name: 'Sunset Care',
+      tagline: 'Ámbar Cálido · Calidez · Premium',
+      desc: 'Tonos cálidos ámbar y dorado para consultorios que buscan transmitir cercanía, lujo y atención personalizada.',
+      bg: ['#fffbf0', '#fff8e8', '#ffffff'],
+      accent: '#d97706',
+      card: '#ffffff',
+      txt: '#2d1a0a',
+      border: 'rgba(45,26,10,0.10)',
+      swatches: ['#fffbf0', '#d97706', '#ffffff', '#f59e0b'],
+      ideal: ['Consultorios premium', 'Medicina holística', 'Centros de relajación'],
+    },
   ];
 
   return (
@@ -2373,7 +2486,7 @@ function TabTemasistema() {
                     background: active ? `${t.accent}18` : t.accent,
                     color: active
                       ? t.accent
-                      : (t.id === 'premium-light' || t.id === 'soft-medical' ? '#ffffff' : '#0a0a0f'),
+                      : (['premium-light','soft-medical','rose-care','fuchsia-premium','purple-care','arctic-blue','mint-premium','sunset-care'].includes(t.id) ? '#ffffff' : '#0a0a0f'),
                   }}
                 >
                   {active ? '✓ Tema activo' : 'Activar tema'}
@@ -2405,6 +2518,933 @@ function TabTemasistema() {
 
 // ════════════════════════════════════════════════
 
+// ════════════════════════════════════════════════
+// TAB: CATÁLOGO CUPS (Resolución 2706 de 2025)
+// ════════════════════════════════════════════════
+
+const NIVELES_CUPS = [
+  { value: 'GRUPO',        label: 'Grupo',        cls: 'bg-purple-500/20 text-purple-300' },
+  { value: 'SUBGRUPO',     label: 'Subgrupo',     cls: 'bg-blue-500/20 text-blue-300' },
+  { value: 'CATEGORIA',    label: 'Categoría',    cls: 'bg-cyan-500/20 text-cyan-300' },
+  { value: 'SUBCATEGORIA', label: 'Subcategoría', cls: 'bg-emerald-500/20 text-emerald-300' },
+];
+
+function nivelBadge(nivel: string) {
+  const n = NIVELES_CUPS.find(x => x.value === nivel);
+  return (
+    <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap ${n?.cls || 'bg-slate-700 text-gray-300'}`}>
+      {n?.label || nivel}
+    </span>
+  );
+}
+
+function TabCatalogoCUPS() {
+  const [items,    setItems]    = useState<any[]>([]);
+  const [total,    setTotal]    = useState(0);
+  const [page,     setPage]     = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loading,  setLoading]  = useState(true);
+  const [loadErr,  setLoadErr]  = useState('');
+  const [search,   setSearch]   = useState('');
+  const [debounced, setDebounced] = useState('');
+  const [nivel,    setNivel]    = useState('');
+  const [stats,    setStats]    = useState<any>(null);
+  const [modal,    setModal]    = useState<null|'create'|'edit'|'bulk'>(null);
+  const [form,     setForm]     = useState<any>({});
+  const [err,      setErr]      = useState('');
+  const [saving,   setSaving]   = useState(false);
+  const savingRef = useRef(false);
+  const pageSize = 50;
+
+  // Debounce de la búsqueda
+  useEffect(() => {
+    const t = setTimeout(() => { setDebounced(search.trim()); setPage(1); }, 350);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  const loadStats = useCallback(async () => {
+    try { setStats(await svc.getCupsCodigosStats()); } catch { /* noop */ }
+  }, []);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setLoadErr('');
+    try {
+      const qs = new URLSearchParams();
+      qs.set('page', String(page));
+      qs.set('pageSize', String(pageSize));
+      if (debounced) qs.set('search', debounced);
+      if (nivel) qs.set('nivel', nivel);
+      const res = await svc.getCupsCodigos(qs.toString()) as any;
+      setItems(res.items || []);
+      setTotal(res.total || 0);
+      setTotalPages(res.totalPages || 1);
+    } catch (e: any) {
+      setLoadErr(e?.message || 'Error al cargar el catálogo');
+    } finally {
+      setLoading(false);
+    }
+  }, [page, debounced, nivel]);
+
+  useEffect(() => { load(); }, [load]);
+  useEffect(() => { loadStats(); }, [loadStats]);
+
+  const f = (k: string) => (v: any) => setForm((p: any) => ({ ...p, [k]: v }));
+
+  const openCreate = () => { setForm({}); setErr(''); setModal('create'); };
+  const openEdit   = (row: any) => { setForm({ ...row }); setErr(''); setModal('edit'); };
+
+  const toggleActivo = async (row: any) => {
+    try { await svc.updateCupsCodigo(row.id, { activo: !row.activo }); load(); loadStats(); } catch { /* noop */ }
+  };
+
+  const save = async () => {
+    if (savingRef.current) return;
+    savingRef.current = true; setSaving(true); setErr('');
+    try {
+      if (modal === 'create') {
+        if (!form.codigo?.trim())      throw new Error('El código es requerido');
+        if (!form.descripcion?.trim()) throw new Error('La descripción es requerida');
+        await svc.createCupsCodigo({
+          codigo: form.codigo, descripcion: form.descripcion,
+          seccion: form.seccion, capitulo: form.capitulo,
+          incluye: form.incluye, excluye: form.excluye, nota: form.nota,
+        });
+      } else {
+        await svc.updateCupsCodigo(form.id, {
+          descripcion: form.descripcion, seccion: form.seccion, capitulo: form.capitulo,
+          incluye: form.incluye, excluye: form.excluye, nota: form.nota,
+          esFacturable: form.esFacturable,
+        });
+      }
+      setModal(null); load(); loadStats();
+    } catch (e: any) { setErr(e.message || 'Error al guardar'); }
+    finally { savingRef.current = false; setSaving(false); }
+  };
+
+  const del = async (row: any) => {
+    if (!confirm(`¿Desactivar el código ${row.codigoFormato}?`)) return;
+    try { await svc.deleteCupsCodigo(row.id); load(); loadStats(); } catch { /* noop */ }
+  };
+
+  return (
+    <>
+      {/* Estadísticas */}
+      {stats && (
+        <div className="flex flex-wrap gap-2 mb-4">
+          <div className="px-3 py-1.5 rounded-lg bg-slate-800/70 border border-white/5 text-xs">
+            <span className="text-gray-400">Total: </span>
+            <span className="text-white font-bold">{stats.total?.toLocaleString('es-CO')}</span>
+          </div>
+          {NIVELES_CUPS.map(n => (
+            <div key={n.value} className="px-3 py-1.5 rounded-lg bg-slate-800/70 border border-white/5 text-xs">
+              <span className="text-gray-400">{n.label}: </span>
+              <span className="text-white font-semibold">{(stats.niveles?.[n.value] || 0).toLocaleString('es-CO')}</span>
+            </div>
+          ))}
+          <div className="px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-xs">
+            <span className="text-emerald-400/80">Facturables: </span>
+            <span className="text-emerald-300 font-semibold">{(stats.facturables || 0).toLocaleString('es-CO')}</span>
+          </div>
+        </div>
+      )}
+
+      <SecHeader title="Catálogo CUPS — Resolución 2706 de 2025" onNew={openCreate} onBulk={() => setModal('bulk')} />
+
+      {/* Búsqueda y filtros */}
+      <div className="flex flex-col sm:flex-row gap-2 mb-4">
+        <div className="relative flex-1">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+          <input
+            value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="Buscar por código sin puntos (ej. 010101) o descripción…"
+            className="w-full pl-9 pr-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white focus:border-yellow-500 focus:outline-none"
+          />
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          <button onClick={() => { setNivel(''); setPage(1); }}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${nivel === '' ? 'bg-yellow-600 text-white' : 'bg-slate-800 text-gray-400 hover:text-white border border-white/5'}`}>
+            Todos
+          </button>
+          {NIVELES_CUPS.map(n => (
+            <button key={n.value} onClick={() => { setNivel(n.value); setPage(1); }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${nivel === n.value ? 'bg-yellow-600 text-white' : 'bg-slate-800 text-gray-400 hover:text-white border border-white/5'}`}>
+              {n.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {loadErr && <ErrBanner msg={loadErr} onRetry={load} />}
+
+      {/* Tabla */}
+      {loading && !items.length
+        ? <TableSkeleton cols={4} />
+        : !items.length
+        ? <p className="text-center text-gray-500 py-14 text-sm">Sin resultados. Ajusta la búsqueda o usa <span className="text-yellow-500">Cargue Masivo</span>.</p>
+        : (
+          <div className="overflow-x-auto rounded-xl border border-white/5">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-slate-800/70">
+                  <th className="text-left px-4 py-2.5 font-semibold text-gray-400 uppercase tracking-wider">Código</th>
+                  <th className="text-left px-3 py-2.5 font-semibold text-gray-400 uppercase tracking-wider">Nivel</th>
+                  <th className="text-left px-4 py-2.5 font-semibold text-gray-400 uppercase tracking-wider">Descripción</th>
+                  <th className="text-center px-3 py-2.5 font-semibold text-gray-400 uppercase tracking-wider">Fact.</th>
+                  <th className="text-center px-3 py-2.5 font-semibold text-gray-400 uppercase tracking-wider">Activo</th>
+                  <th className="text-right px-4 py-2.5 font-semibold text-gray-400 uppercase tracking-wider">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {items.map((row: any) => (
+                  <tr key={row.id} className={`hover:bg-slate-800/30 transition ${!row.activo ? 'opacity-40' : ''}`}>
+                    <td className="px-4 py-2.5">
+                      <code className="text-[11px] text-yellow-300 bg-slate-800/80 px-2 py-0.5 rounded border border-white/5 whitespace-nowrap">{row.codigo}</code>
+                      <div className="text-[10px] text-gray-500 mt-0.5">{row.codigoFormato}</div>
+                    </td>
+                    <td className="px-3 py-2.5">{nivelBadge(row.nivel)}</td>
+                    <td className="px-4 py-2.5 text-gray-200">{row.descripcion}</td>
+                    <td className="px-3 py-2.5 text-center">
+                      {row.esFacturable ? <CheckCircle size={14} className="text-emerald-400 inline" /> : <span className="text-gray-600">—</span>}
+                    </td>
+                    <td className="px-3 py-2.5 text-center">
+                      <button onClick={() => toggleActivo(row)}
+                        className={`p-1 rounded-lg transition ${row.activo ? 'text-emerald-400 hover:bg-emerald-500/10' : 'text-gray-600 hover:bg-gray-500/10'}`}>
+                        {row.activo ? <ToggleRight size={16} /> : <ToggleLeft size={16} />}
+                      </button>
+                    </td>
+                    <td className="px-4 py-2.5 text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <button onClick={() => openEdit(row)}
+                          className="p-1.5 rounded-lg text-gray-400 hover:text-yellow-400 hover:bg-yellow-500/10 transition">
+                          <Edit2 size={13} />
+                        </button>
+                        <button onClick={() => del(row)}
+                          className="p-1.5 rounded-lg text-gray-400 hover:text-red-400 hover:bg-red-500/10 transition">
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )
+      }
+
+      {/* Paginación */}
+      {total > pageSize && (
+        <div className="flex items-center justify-between gap-3 mt-3 text-xs text-gray-400">
+          <span>{total.toLocaleString('es-CO')} registros · página {page} de {totalPages}</span>
+          <div className="flex gap-2">
+            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}
+              className="px-3 py-1.5 rounded-lg bg-slate-800 border border-white/5 text-gray-300 hover:text-white disabled:opacity-40 disabled:pointer-events-none transition">
+              Anterior
+            </button>
+            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages}
+              className="px-3 py-1.5 rounded-lg bg-slate-800 border border-white/5 text-gray-300 hover:text-white disabled:opacity-40 disabled:pointer-events-none transition">
+              Siguiente
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal crear/editar */}
+      <AnimatePresence>
+        {(modal === 'create' || modal === 'edit') && (
+          <Modal title={modal === 'create' ? 'Nuevo código CUPS' : `Editar código ${form.codigoFormato || ''}`} onClose={() => setModal(null)}>
+            <div className="space-y-4">
+              {modal === 'create'
+                ? (
+                  <>
+                    <Field label="Código (solo dígitos: 2, 3, 4 o 6)" value={form.codigo || ''} onChange={f('codigo')} required placeholder="Ej: 01 · 010 · 0101 · 010101" />
+                    <p className="text-[11px] text-gray-500 -mt-2">El nivel (Grupo/Subgrupo/Categoría/Subcategoría) se deduce de la cantidad de dígitos.</p>
+                  </>
+                )
+                : (
+                  <div className="flex items-center gap-2 p-3 bg-slate-800/60 rounded-xl border border-white/5">
+                    <code className="text-xs text-yellow-400">{form.codigoFormato}</code>
+                    {nivelBadge(form.nivel)}
+                  </div>
+                )
+              }
+              <Field label="Descripción *" value={form.descripcion || ''} onChange={f('descripcion')} required type="textarea" placeholder="Nombre del procedimiento" />
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Sección" value={form.seccion || ''} onChange={f('seccion')} placeholder="Opcional" />
+                <Field label="Capítulo" value={form.capitulo || ''} onChange={f('capitulo')} placeholder="Opcional" />
+              </div>
+              <Field label="Incluye" value={form.incluye || ''} onChange={f('incluye')} type="textarea" placeholder="Notas de inclusión (opcional)" />
+              <Field label="Excluye" value={form.excluye || ''} onChange={f('excluye')} type="textarea" placeholder="Notas de exclusión (opcional)" />
+              <Field label="Nota" value={form.nota || ''} onChange={f('nota')} type="textarea" placeholder="Nota aclaratoria (opcional)" />
+              {modal === 'edit' && (
+                <Sw value={!!form.esFacturable} onChange={f('esFacturable')} label="Es facturable" />
+              )}
+              {err && <ErrBox msg={err} />}
+              <FormFooter onCancel={() => setModal(null)} onSave={save} saving={saving} />
+            </div>
+          </Modal>
+        )}
+      </AnimatePresence>
+
+      {/* Cargue masivo por archivo plano */}
+      <AnimatePresence>
+        {modal === 'bulk' && (
+          <BulkModal
+            title="Cargue masivo de códigos CUPS"
+            headers={['codigo', 'descripcion', 'seccion', 'capitulo', 'incluye', 'excluye', 'nota']}
+            filename="plantilla_cups.csv"
+            onUpload={async (rows) => { const r = await svc.bulkCupsCodigos(rows) as any; load(); loadStats(); return r; }}
+            onClose={() => setModal(null)}
+          />
+        )}
+      </AnimatePresence>
+    </>
+  );
+}
+
+// ════════════════════════════════════════════════
+// TAB: TARIFAS — Clasificación (Grupos y Tipos de cargo)
+// ════════════════════════════════════════════════
+function TabTarifaClasificacion() {
+  const [grupos, setGrupos] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadErr, setLoadErr] = useState('');
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [modal, setModal] = useState<null | 'grupo' | 'tipo'>(null);
+  const [form, setForm] = useState<any>({});
+  const [err, setErr] = useState('');
+  const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
+
+  const load = useCallback(async () => {
+    setLoading(true); setLoadErr('');
+    try { setGrupos(await svc.getTarifaGrupos() as any[]); }
+    catch (e: any) { setLoadErr(e?.message || 'Error al cargar la clasificación'); }
+    finally { setLoading(false); }
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  const f = (k: string) => (v: any) => setForm((p: any) => ({ ...p, [k]: v }));
+  const openGrupo = (g?: any) => { setForm(g ? { ...g } : {}); setErr(''); setModal('grupo'); };
+  const openTipo = (grupoId: string, t?: any) => { setForm(t ? { ...t } : { grupoId }); setErr(''); setModal('tipo'); };
+
+  const save = async () => {
+    if (savingRef.current) return;
+    savingRef.current = true; setSaving(true); setErr('');
+    try {
+      if (modal === 'grupo') {
+        if (!form.codigo?.trim()) throw new Error('El código es requerido');
+        if (!form.nombre?.trim()) throw new Error('El nombre es requerido');
+        if (form.id) await svc.updateTarifaGrupo(form.id, { nombre: form.nombre });
+        else await svc.createTarifaGrupo({ codigo: form.codigo, nombre: form.nombre });
+      } else {
+        if (!form.codigo?.trim()) throw new Error('El código es requerido');
+        if (!form.nombre?.trim()) throw new Error('El nombre es requerido');
+        if (form.id) await svc.updateTarifaTipo(form.id, { nombre: form.nombre });
+        else await svc.createTarifaTipo({ grupoId: form.grupoId, codigo: form.codigo, nombre: form.nombre });
+      }
+      setModal(null); load();
+    } catch (e: any) { setErr(e.message || 'Error al guardar'); }
+    finally { savingRef.current = false; setSaving(false); }
+  };
+
+  const toggleGrupo = async (g: any) => { try { await svc.updateTarifaGrupo(g.id, { activo: !g.activo }); load(); } catch { /* */ } };
+  const toggleTipo = async (t: any) => { try { await svc.updateTarifaTipo(t.id, { activo: !t.activo }); load(); } catch { /* */ } };
+
+  return (
+    <>
+      <SecHeader title="Clasificación de cargos — Grupos y Tipos" onNew={() => openGrupo()} />
+      {loadErr && <ErrBanner msg={loadErr} onRetry={load} />}
+      {loading
+        ? <TableSkeleton cols={3} />
+        : !grupos.length
+        ? <p className="text-center text-gray-500 py-14 text-sm">Aún no hay grupos. Crea el primero con <span className="text-yellow-500">Nuevo</span>.</p>
+        : (
+          <div className="space-y-2">
+            {grupos.map((g: any) => (
+              <div key={g.id} className={`rounded-xl border border-white/5 bg-slate-800/40 ${!g.activo ? 'opacity-50' : ''}`}>
+                <div className="flex items-center gap-2 px-4 py-2.5">
+                  <button onClick={() => setExpanded(p => ({ ...p, [g.id]: !p[g.id] }))} className="text-gray-400 hover:text-white">
+                    {expanded[g.id] ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+                  </button>
+                  <code className="text-[11px] text-yellow-300 bg-slate-800/80 px-2 py-0.5 rounded border border-white/5">{g.codigo}</code>
+                  <span className="text-sm text-white font-semibold flex-1">{g.nombre}</span>
+                  <span className="text-[11px] text-gray-500">{g.tipos?.length || 0} tipos · {g._count?.cargos || 0} cargos</span>
+                  <button onClick={() => openTipo(g.id)} className="p-1.5 rounded-lg text-gray-400 hover:text-emerald-400 hover:bg-emerald-500/10 transition" title="Agregar tipo"><Plus size={13} /></button>
+                  <button onClick={() => openGrupo(g)} className="p-1.5 rounded-lg text-gray-400 hover:text-yellow-400 hover:bg-yellow-500/10 transition"><Edit2 size={13} /></button>
+                  <button onClick={() => toggleGrupo(g)} className={`p-1.5 rounded-lg transition ${g.activo ? 'text-emerald-400 hover:bg-emerald-500/10' : 'text-gray-600 hover:bg-gray-500/10'}`}>{g.activo ? <ToggleRight size={15} /> : <ToggleLeft size={15} />}</button>
+                </div>
+                {expanded[g.id] && (
+                  <div className="px-4 pb-3 pl-12 space-y-1">
+                    {(!g.tipos || !g.tipos.length)
+                      ? <p className="text-[11px] text-gray-500 py-1">Sin tipos. Usa el botón <span className="text-emerald-400">+</span> para agregar.</p>
+                      : g.tipos.map((t: any) => (
+                        <div key={t.id} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800/60 ${!t.activo ? 'opacity-50' : ''}`}>
+                          <code className="text-[10px] text-gray-300 bg-slate-900/80 px-1.5 py-0.5 rounded">{t.codigo}</code>
+                          <span className="text-xs text-gray-200 flex-1">{t.nombre}</span>
+                          <button onClick={() => openTipo(g.id, t)} className="p-1 rounded text-gray-400 hover:text-yellow-400 transition"><Edit2 size={12} /></button>
+                          <button onClick={() => toggleTipo(t)} className={`p-1 rounded transition ${t.activo ? 'text-emerald-400' : 'text-gray-600'}`}>{t.activo ? <ToggleRight size={14} /> : <ToggleLeft size={14} />}</button>
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+      <AnimatePresence>
+        {modal && (
+          <Modal title={modal === 'grupo' ? (form.id ? 'Editar grupo' : 'Nuevo grupo') : (form.id ? 'Editar tipo' : 'Nuevo tipo de cargo')} onClose={() => setModal(null)} maxW="max-w-md">
+            <div className="space-y-4">
+              <div className="grid grid-cols-3 gap-3">
+                <div className="col-span-1">
+                  <Field label="Código" value={form.codigo || ''} onChange={f('codigo')} required placeholder="Ej: PROC" />
+                </div>
+                <div className="col-span-2">
+                  <Field label="Nombre" value={form.nombre || ''} onChange={f('nombre')} required placeholder="Ej: Procedimientos" />
+                </div>
+              </div>
+              {form.id && <p className="text-[11px] text-gray-500 -mt-2">El código no se puede cambiar.</p>}
+              {err && <ErrBox msg={err} />}
+              <FormFooter onCancel={() => setModal(null)} onSave={save} saving={saving} />
+            </div>
+          </Modal>
+        )}
+      </AnimatePresence>
+    </>
+  );
+}
+
+// ════════════════════════════════════════════════
+// TAB: TARIFAS — Cargos (catálogo interno + equivalencia CUPS)
+// ════════════════════════════════════════════════
+function TabCargosTarifa() {
+  const [items, setItems] = useState<any[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [loadErr, setLoadErr] = useState('');
+  const [search, setSearch] = useState('');
+  const [debounced, setDebounced] = useState('');
+  const [grupoId, setGrupoId] = useState('');
+  const [grupos, setGrupos] = useState<any[]>([]);
+  const [stats, setStats] = useState<any>(null);
+  const [modal, setModal] = useState<null | 'create' | 'edit' | 'bulk'>(null);
+  const [form, setForm] = useState<any>({});
+  const [err, setErr] = useState('');
+  const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
+  const pageSize = 50;
+
+  useEffect(() => { const t = setTimeout(() => { setDebounced(search.trim()); setPage(1); }, 350); return () => clearTimeout(t); }, [search]);
+
+  const load = useCallback(async () => {
+    setLoading(true); setLoadErr('');
+    try {
+      const qs = new URLSearchParams();
+      qs.set('page', String(page)); qs.set('pageSize', String(pageSize));
+      if (debounced) qs.set('search', debounced);
+      if (grupoId) qs.set('grupoId', grupoId);
+      const res = await svc.getCargosTarifa(qs.toString()) as any;
+      setItems(res.items || []); setTotal(res.total || 0); setTotalPages(res.totalPages || 1);
+    } catch (e: any) { setLoadErr(e?.message || 'Error al cargar los cargos'); }
+    finally { setLoading(false); }
+  }, [page, debounced, grupoId]);
+  useEffect(() => { load(); }, [load]);
+  useEffect(() => { svc.getTarifaGrupos().then(g => setGrupos(g as any[])).catch(() => {}); svc.getCargosTarifaStats().then(setStats).catch(() => {}); }, []);
+
+  const f = (k: string) => (v: any) => setForm((p: any) => ({ ...p, [k]: v }));
+  const tiposDelGrupo = (gid: string) => grupos.find(g => g.id === gid)?.tipos || [];
+  const openCreate = () => { setForm({}); setErr(''); setModal('create'); };
+  const openEdit = (row: any) => { setForm({ ...row, cupsCodigo: row.cupsCodigoStr || '', grupoId: row.grupoId || '', tipoId: row.tipoId || '' }); setErr(''); setModal('edit'); };
+
+  const save = async () => {
+    if (savingRef.current) return;
+    savingRef.current = true; setSaving(true); setErr('');
+    try {
+      if (modal === 'create') {
+        if (!form.codigo?.trim()) throw new Error('El código es requerido');
+        if (!form.descripcion?.trim()) throw new Error('La descripción es requerida');
+        await svc.createCargoTarifa({
+          codigo: form.codigo, descripcion: form.descripcion, cupsCodigo: form.cupsCodigo,
+          grupoId: form.grupoId, tipoId: form.tipoId, nivel: form.nivel, tipoUnidad: form.tipoUnidad, conceptoRips: form.conceptoRips,
+        });
+      } else {
+        await svc.updateCargoTarifa(form.id, {
+          descripcion: form.descripcion, cupsCodigo: form.cupsCodigo,
+          grupoId: form.grupoId, tipoId: form.tipoId, nivel: form.nivel, tipoUnidad: form.tipoUnidad, conceptoRips: form.conceptoRips,
+        });
+      }
+      setModal(null); load(); svc.getCargosTarifaStats().then(setStats).catch(() => {});
+    } catch (e: any) { setErr(e.message || 'Error al guardar'); }
+    finally { savingRef.current = false; setSaving(false); }
+  };
+
+  const toggleActivo = async (row: any) => { try { await svc.updateCargoTarifa(row.id, { activo: !row.activo }); load(); } catch { /* */ } };
+  const del = async (row: any) => { if (!confirm(`¿Desactivar el cargo ${row.codigo}?`)) return; try { await svc.deleteCargoTarifa(row.id); load(); } catch { /* */ } };
+
+  return (
+    <>
+      {stats && (
+        <div className="flex flex-wrap gap-2 mb-4">
+          <div className="px-3 py-1.5 rounded-lg bg-slate-800/70 border border-white/5 text-xs"><span className="text-gray-400">Total: </span><span className="text-white font-bold">{stats.total?.toLocaleString('es-CO')}</span></div>
+          <div className="px-3 py-1.5 rounded-lg bg-slate-800/70 border border-white/5 text-xs"><span className="text-gray-400">Activos: </span><span className="text-white font-semibold">{stats.activos?.toLocaleString('es-CO')}</span></div>
+          <div className="px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-xs"><span className="text-emerald-400/80">Con CUPS: </span><span className="text-emerald-300 font-semibold">{stats.conCups?.toLocaleString('es-CO')}</span></div>
+          <div className="px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs"><span className="text-amber-400/80">Sin equivalencia: </span><span className="text-amber-300 font-semibold">{stats.sinCups?.toLocaleString('es-CO')}</span></div>
+        </div>
+      )}
+
+      <SecHeader title="Cargos / Servicios — equivalencia con CUPS" onNew={openCreate} onBulk={() => setModal('bulk')} />
+
+      <div className="flex flex-col sm:flex-row gap-2 mb-4">
+        <div className="relative flex-1">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar por código, descripción o CUPS…"
+            className="w-full pl-9 pr-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white focus:border-yellow-500 focus:outline-none" />
+        </div>
+        <select value={grupoId} onChange={e => { setGrupoId(e.target.value); setPage(1); }}
+          className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:border-yellow-500 focus:outline-none">
+          <option value="">Todos los grupos</option>
+          {grupos.map(g => <option key={g.id} value={g.id}>{g.nombre}</option>)}
+        </select>
+      </div>
+
+      {loadErr && <ErrBanner msg={loadErr} onRetry={load} />}
+
+      {loading && !items.length
+        ? <TableSkeleton cols={5} />
+        : !items.length
+        ? <p className="text-center text-gray-500 py-14 text-sm">Sin resultados. Ajusta la búsqueda o usa <span className="text-yellow-500">Cargue Masivo</span>.</p>
+        : (
+          <div className="overflow-x-auto rounded-xl border border-white/5">
+            <table className="w-full text-xs">
+              <thead><tr className="bg-slate-800/70">
+                <th className="text-left px-4 py-2.5 font-semibold text-gray-400 uppercase tracking-wider">Código</th>
+                <th className="text-left px-4 py-2.5 font-semibold text-gray-400 uppercase tracking-wider">Descripción</th>
+                <th className="text-left px-3 py-2.5 font-semibold text-gray-400 uppercase tracking-wider">Equivalencia CUPS</th>
+                <th className="text-left px-3 py-2.5 font-semibold text-gray-400 uppercase tracking-wider">Clasificación</th>
+                <th className="text-center px-3 py-2.5 font-semibold text-gray-400 uppercase tracking-wider">Activo</th>
+                <th className="text-right px-4 py-2.5 font-semibold text-gray-400 uppercase tracking-wider">Acciones</th>
+              </tr></thead>
+              <tbody className="divide-y divide-white/5">
+                {items.map((row: any) => (
+                  <tr key={row.id} className={`hover:bg-slate-800/30 transition ${!row.activo ? 'opacity-40' : ''}`}>
+                    <td className="px-4 py-2.5"><code className="text-[11px] text-yellow-300 bg-slate-800/80 px-2 py-0.5 rounded border border-white/5 whitespace-nowrap">{row.codigo}</code></td>
+                    <td className="px-4 py-2.5 text-gray-200">{row.descripcion}</td>
+                    <td className="px-3 py-2.5">
+                      {row.cupsCodigo
+                        ? <span className="inline-flex items-center gap-1.5"><code className="text-[10px] text-emerald-300 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">{row.cupsCodigo.codigoFormato}</code><span className="text-[10px] text-gray-500 max-w-[180px] truncate">{row.cupsCodigo.descripcion}</span></span>
+                        : <span className="text-gray-600 text-[11px]">— sin equivalencia</span>}
+                    </td>
+                    <td className="px-3 py-2.5 text-[11px] text-gray-400">{row.grupo ? `${row.grupo.nombre}${row.tipo ? ' · ' + row.tipo.nombre : ''}` : '—'}</td>
+                    <td className="px-3 py-2.5 text-center">
+                      <button onClick={() => toggleActivo(row)} className={`p-1 rounded-lg transition ${row.activo ? 'text-emerald-400 hover:bg-emerald-500/10' : 'text-gray-600 hover:bg-gray-500/10'}`}>{row.activo ? <ToggleRight size={16} /> : <ToggleLeft size={16} />}</button>
+                    </td>
+                    <td className="px-4 py-2.5 text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <button onClick={() => openEdit(row)} className="p-1.5 rounded-lg text-gray-400 hover:text-yellow-400 hover:bg-yellow-500/10 transition"><Edit2 size={13} /></button>
+                        <button onClick={() => del(row)} className="p-1.5 rounded-lg text-gray-400 hover:text-red-400 hover:bg-red-500/10 transition"><Trash2 size={13} /></button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+      {total > pageSize && (
+        <div className="flex items-center justify-between gap-3 mt-3 text-xs text-gray-400">
+          <span>{total.toLocaleString('es-CO')} registros · página {page} de {totalPages}</span>
+          <div className="flex gap-2">
+            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1} className="px-3 py-1.5 rounded-lg bg-slate-800 border border-white/5 text-gray-300 hover:text-white disabled:opacity-40 disabled:pointer-events-none transition">Anterior</button>
+            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages} className="px-3 py-1.5 rounded-lg bg-slate-800 border border-white/5 text-gray-300 hover:text-white disabled:opacity-40 disabled:pointer-events-none transition">Siguiente</button>
+          </div>
+        </div>
+      )}
+
+      <AnimatePresence>
+        {(modal === 'create' || modal === 'edit') && (
+          <Modal title={modal === 'create' ? 'Nuevo cargo' : `Editar cargo ${form.codigo || ''}`} onClose={() => setModal(null)}>
+            <div className="space-y-4">
+              <div className="grid grid-cols-3 gap-3">
+                <div className="col-span-1">{modal === 'create'
+                  ? <Field label="Código interno *" value={form.codigo || ''} onChange={f('codigo')} required placeholder="Ej: SRV-001" />
+                  : <div><label className="block text-xs text-gray-400 mb-1">Código</label><div className="px-3 py-2 bg-slate-800/60 rounded-lg border border-white/5"><code className="text-xs text-yellow-400">{form.codigo}</code></div></div>}
+                </div>
+                <div className="col-span-2"><Field label="Descripción *" value={form.descripcion || ''} onChange={f('descripcion')} required placeholder="Nombre del servicio/cargo" /></div>
+              </div>
+              <Field label="Equivalencia CUPS (código sin puntos)" value={form.cupsCodigo || ''} onChange={f('cupsCodigo')} placeholder="Ej: 010101 (opcional)" />
+              <p className="text-[11px] text-gray-500 -mt-2">Si el código existe en el catálogo CUPS (Res. 2706), se vincula automáticamente.</p>
+              <div className="grid grid-cols-2 gap-3">
+                <Sel label="Grupo" value={form.grupoId || ''} onChange={v => setForm((p: any) => ({ ...p, grupoId: v, tipoId: '' }))} options={[{ value: '', label: '— Sin grupo —' }, ...grupos.map(g => ({ value: g.id, label: g.nombre }))]} />
+                <Sel label="Tipo" value={form.tipoId || ''} onChange={f('tipoId')} options={[{ value: '', label: '— Sin tipo —' }, ...tiposDelGrupo(form.grupoId).map((t: any) => ({ value: t.id, label: t.nombre }))]} />
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <Field label="Nivel" value={form.nivel || ''} onChange={f('nivel')} placeholder="Opc." />
+                <Field label="Unidad" value={form.tipoUnidad || ''} onChange={f('tipoUnidad')} placeholder="Opc." />
+                <Field label="Concepto RIPS" value={form.conceptoRips || ''} onChange={f('conceptoRips')} placeholder="Opc." />
+              </div>
+              {err && <ErrBox msg={err} />}
+              <FormFooter onCancel={() => setModal(null)} onSave={save} saving={saving} />
+            </div>
+          </Modal>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {modal === 'bulk' && (
+          <BulkModal title="Cargue masivo de cargos"
+            headers={['codigo', 'descripcion', 'cupsCodigo', 'grupo', 'tipo', 'nivel', 'tipoUnidad', 'conceptoRips']}
+            filename="plantilla_cargos.csv"
+            onUpload={async (rows) => { const r = await svc.bulkCargosTarifa(rows) as any; load(); svc.getCargosTarifaStats().then(setStats).catch(() => {}); return r; }}
+            onClose={() => setModal(null)} />
+        )}
+      </AnimatePresence>
+    </>
+  );
+}
+
+// ════════════════════════════════════════════════
+// TAB: TARIFAS — Tarifarios (listas de precios)
+// ════════════════════════════════════════════════
+function TabTarifarios() {
+  const [list, setList] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadErr, setLoadErr] = useState('');
+  const [sel, setSel] = useState<any>(null); // tarifario seleccionado (vista de precios)
+  const [modal, setModal] = useState<null | 'create' | 'edit'>(null);
+  const [form, setForm] = useState<any>({});
+  const [err, setErr] = useState('');
+  const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
+
+  const load = useCallback(async () => {
+    setLoading(true); setLoadErr('');
+    try { setList(await svc.getTarifarios() as any[]); }
+    catch (e: any) { setLoadErr(e?.message || 'Error al cargar los tarifarios'); }
+    finally { setLoading(false); }
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  const f = (k: string) => (v: any) => setForm((p: any) => ({ ...p, [k]: v }));
+  const toDateInput = (d: any) => d ? new Date(d).toISOString().slice(0, 10) : '';
+  const openCreate = () => { setForm({}); setErr(''); setModal('create'); };
+  const openEdit = (t: any) => { setForm({ ...t, baseId: t.baseId || '', vigenciaDesde: toDateInput(t.vigenciaDesde), vigenciaHasta: toDateInput(t.vigenciaHasta) }); setErr(''); setModal('edit'); };
+
+  const save = async () => {
+    if (savingRef.current) return;
+    savingRef.current = true; setSaving(true); setErr('');
+    try {
+      if (!form.codigo?.trim()) throw new Error('El código es requerido');
+      if (!form.nombre?.trim()) throw new Error('El nombre es requerido');
+      const body = {
+        codigo: form.codigo, nombre: form.nombre, descripcion: form.descripcion, tipo: form.tipo,
+        baseId: form.baseId, porcentaje: form.porcentaje, vigenciaDesde: form.vigenciaDesde, vigenciaHasta: form.vigenciaHasta,
+      };
+      if (modal === 'create') await svc.createTarifario(body);
+      else await svc.updateTarifario(form.id, body);
+      setModal(null); load();
+    } catch (e: any) { setErr(e.message || 'Error al guardar'); }
+    finally { savingRef.current = false; setSaving(false); }
+  };
+
+  const toggleActivo = async (t: any) => { try { await svc.updateTarifario(t.id, { activo: !t.activo }); load(); } catch { /* */ } };
+  const del = async (t: any) => { if (!confirm(`¿Desactivar el tarifario ${t.nombre}?`)) return; try { await svc.deleteTarifario(t.id); load(); } catch { /* */ } };
+
+  if (sel) return <TarifarioDetalle tarifario={sel} onBack={() => { setSel(null); load(); }} tarifarios={list} />;
+
+  return (
+    <>
+      <SecHeader title="Tarifarios — listas de precios" onNew={openCreate} />
+      {loadErr && <ErrBanner msg={loadErr} onRetry={load} />}
+      {loading
+        ? <TableSkeleton cols={4} />
+        : !list.length
+        ? <p className="text-center text-gray-500 py-14 text-sm">Aún no hay tarifarios. Crea el primero con <span className="text-yellow-500">Nuevo</span>.</p>
+        : (
+          <div className="grid gap-2 sm:grid-cols-2">
+            {list.map((t: any) => (
+              <div key={t.id} className={`rounded-xl border border-white/5 bg-slate-800/40 p-4 ${!t.activo ? 'opacity-50' : ''}`}>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <code className="text-[11px] text-yellow-300 bg-slate-800/80 px-2 py-0.5 rounded border border-white/5">{t.codigo}</code>
+                      {t.tipo && <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-700/70 text-gray-300">{t.tipo}</span>}
+                    </div>
+                    <h3 className="text-sm text-white font-semibold mt-1.5 truncate">{t.nombre}</h3>
+                    <p className="text-[11px] text-gray-500 mt-0.5">
+                      {t._count?.items || 0} ítems
+                      {t.base && <span> · base: {t.base.nombre}{t.porcentaje != null ? ` (${t.porcentaje}%)` : ''}</span>}
+                    </p>
+                  </div>
+                  <button onClick={() => toggleActivo(t)} className={`p-1 rounded-lg transition flex-shrink-0 ${t.activo ? 'text-emerald-400 hover:bg-emerald-500/10' : 'text-gray-600 hover:bg-gray-500/10'}`}>{t.activo ? <ToggleRight size={16} /> : <ToggleLeft size={16} />}</button>
+                </div>
+                <div className="flex items-center gap-2 mt-3 pt-3 border-t border-white/5">
+                  <button onClick={() => setSel(t)} className="flex items-center gap-1.5 px-3 py-1.5 bg-yellow-600/90 hover:bg-yellow-500 text-white rounded-lg text-xs font-semibold transition"><DollarSign size={13} /> Gestionar precios</button>
+                  <button onClick={() => openEdit(t)} className="p-1.5 rounded-lg text-gray-400 hover:text-yellow-400 hover:bg-yellow-500/10 transition"><Edit2 size={13} /></button>
+                  <button onClick={() => del(t)} className="p-1.5 rounded-lg text-gray-400 hover:text-red-400 hover:bg-red-500/10 transition"><Trash2 size={13} /></button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+      <AnimatePresence>
+        {modal && (
+          <Modal title={modal === 'create' ? 'Nuevo tarifario' : `Editar ${form.nombre || ''}`} onClose={() => setModal(null)}>
+            <div className="space-y-4">
+              <div className="grid grid-cols-3 gap-3">
+                <div className="col-span-1">{modal === 'create'
+                  ? <Field label="Código *" value={form.codigo || ''} onChange={f('codigo')} required placeholder="Ej: PART" />
+                  : <div><label className="block text-xs text-gray-400 mb-1">Código</label><div className="px-3 py-2 bg-slate-800/60 rounded-lg border border-white/5"><code className="text-xs text-yellow-400">{form.codigo}</code></div></div>}
+                </div>
+                <div className="col-span-2"><Field label="Nombre *" value={form.nombre || ''} onChange={f('nombre')} required placeholder="Ej: Particular 2026" /></div>
+              </div>
+              <Field label="Descripción" value={form.descripcion || ''} onChange={f('descripcion')} placeholder="Opcional" />
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Tipo" value={form.tipo || ''} onChange={f('tipo')} placeholder="PARTICULAR, EPS, SOAT…" />
+                <Sel label="Tarifario base (opcional)" value={form.baseId || ''} onChange={f('baseId')} options={[{ value: '', label: '— Ninguno —' }, ...list.filter(x => x.id !== form.id).map(x => ({ value: x.id, label: x.nombre }))]} />
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <Field label="% sobre base" value={form.porcentaje != null ? String(form.porcentaje) : ''} onChange={f('porcentaje')} type="number" placeholder="Ej: 110" />
+                <Field label="Vigencia desde" value={form.vigenciaDesde || ''} onChange={f('vigenciaDesde')} type="date" />
+                <Field label="Vigencia hasta" value={form.vigenciaHasta || ''} onChange={f('vigenciaHasta')} type="date" />
+              </div>
+              <p className="text-[11px] text-gray-500 -mt-2">El % se aplica al generar precios desde la base (110 = +10%). Lo haces dentro de "Gestionar precios".</p>
+              {err && <ErrBox msg={err} />}
+              <FormFooter onCancel={() => setModal(null)} onSave={save} saving={saving} />
+            </div>
+          </Modal>
+        )}
+      </AnimatePresence>
+    </>
+  );
+}
+
+// ─── Vista de detalle: precios (ítems) de un tarifario ─────────
+function TarifarioDetalle({ tarifario, onBack, tarifarios }: { tarifario: any; onBack: () => void; tarifarios: any[] }) {
+  const [items, setItems] = useState<any[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [loadErr, setLoadErr] = useState('');
+  const [search, setSearch] = useState('');
+  const [debounced, setDebounced] = useState('');
+  const [modal, setModal] = useState<null | 'add' | 'bulk' | 'base'>(null);
+  const [edicion, setEdicion] = useState<Record<string, string>>({});
+  const pageSize = 50;
+  const base = tarifarios.find(x => x.id === tarifario.baseId);
+
+  useEffect(() => { const t = setTimeout(() => { setDebounced(search.trim()); setPage(1); }, 350); return () => clearTimeout(t); }, [search]);
+
+  const load = useCallback(async () => {
+    setLoading(true); setLoadErr('');
+    try {
+      const qs = new URLSearchParams(); qs.set('page', String(page)); qs.set('pageSize', String(pageSize));
+      if (debounced) qs.set('search', debounced);
+      const res = await svc.getTarifarioItems(tarifario.id, qs.toString()) as any;
+      setItems(res.items || []); setTotal(res.total || 0); setTotalPages(res.totalPages || 1);
+    } catch (e: any) { setLoadErr(e?.message || 'Error al cargar los precios'); }
+    finally { setLoading(false); }
+  }, [tarifario.id, page, debounced]);
+  useEffect(() => { load(); }, [load]);
+
+  const guardarPrecio = async (item: any) => {
+    const val = edicion[item.id];
+    if (val === undefined) return;
+    const precio = Number(val);
+    if (!Number.isFinite(precio) || precio < 0) return;
+    try { await svc.upsertTarifarioItem(tarifario.id, { cargoId: item.cargo.id, precio }); setEdicion(p => { const n = { ...p }; delete n[item.id]; return n; }); load(); } catch { /* */ }
+  };
+  const delItem = async (item: any) => { if (!confirm(`¿Quitar ${item.cargo.codigo} del tarifario?`)) return; try { await svc.deleteTarifarioItem(tarifario.id, item.id); load(); } catch { /* */ } };
+
+  return (
+    <>
+      <button onClick={onBack} className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-white mb-3 transition"><ChevronRight size={14} className="rotate-180" /> Volver a tarifarios</button>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+        <div>
+          <h2 className="text-sm font-bold text-white flex items-center gap-2"><DollarSign size={15} className="text-yellow-500" /> {tarifario.nombre}</h2>
+          <p className="text-[11px] text-gray-500 mt-0.5">Código {tarifario.codigo}{tarifario.tipo ? ` · ${tarifario.tipo}` : ''}{base ? ` · base: ${base.nombre} (${tarifario.porcentaje ?? 100}%)` : ''}</p>
+        </div>
+        <div className="flex gap-2">
+          {tarifario.baseId && <button onClick={() => setModal('base')} className="flex items-center gap-1.5 px-3 py-2 bg-slate-700 hover:bg-slate-600 text-gray-300 hover:text-white rounded-lg text-xs font-semibold border border-white/10 transition"><RotateCcw size={13} /> Generar desde base</button>}
+          <button onClick={() => setModal('bulk')} className="flex items-center gap-1.5 px-3 py-2 bg-slate-700 hover:bg-slate-600 text-gray-300 hover:text-white rounded-lg text-xs font-semibold border border-white/10 transition"><Upload size={13} /> Cargue Masivo</button>
+          <button onClick={() => setModal('add')} className="flex items-center gap-1.5 px-3 py-2 bg-yellow-600 hover:bg-yellow-500 text-white rounded-lg text-xs font-semibold transition"><Plus size={13} /> Agregar cargo</button>
+        </div>
+      </div>
+
+      <div className="relative mb-4">
+        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar cargo por código, descripción o CUPS…"
+          className="w-full pl-9 pr-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white focus:border-yellow-500 focus:outline-none" />
+      </div>
+
+      {loadErr && <ErrBanner msg={loadErr} onRetry={load} />}
+
+      {loading && !items.length
+        ? <TableSkeleton cols={4} />
+        : !items.length
+        ? <p className="text-center text-gray-500 py-14 text-sm">Este tarifario no tiene precios aún. Agrega cargos o usa <span className="text-yellow-500">Cargue Masivo</span>.</p>
+        : (
+          <div className="overflow-x-auto rounded-xl border border-white/5">
+            <table className="w-full text-xs">
+              <thead><tr className="bg-slate-800/70">
+                <th className="text-left px-4 py-2.5 font-semibold text-gray-400 uppercase tracking-wider">Cargo</th>
+                <th className="text-left px-4 py-2.5 font-semibold text-gray-400 uppercase tracking-wider">Descripción</th>
+                <th className="text-left px-3 py-2.5 font-semibold text-gray-400 uppercase tracking-wider">CUPS</th>
+                <th className="text-right px-4 py-2.5 font-semibold text-gray-400 uppercase tracking-wider">Precio (COP)</th>
+                <th className="text-right px-4 py-2.5 font-semibold text-gray-400 uppercase tracking-wider">Acciones</th>
+              </tr></thead>
+              <tbody className="divide-y divide-white/5">
+                {items.map((it: any) => (
+                  <tr key={it.id} className="hover:bg-slate-800/30 transition">
+                    <td className="px-4 py-2.5"><code className="text-[11px] text-yellow-300 bg-slate-800/80 px-2 py-0.5 rounded border border-white/5 whitespace-nowrap">{it.cargo.codigo}</code></td>
+                    <td className="px-4 py-2.5 text-gray-200">{it.cargo.descripcion}</td>
+                    <td className="px-3 py-2.5">{it.cargo.cupsCodigoStr ? <code className="text-[10px] text-emerald-300 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">{it.cargo.cupsCodigoStr}</code> : <span className="text-gray-600">—</span>}</td>
+                    <td className="px-4 py-2.5 text-right">
+                      <input type="number" value={edicion[it.id] ?? String(it.precio)}
+                        onChange={e => setEdicion(p => ({ ...p, [it.id]: e.target.value }))}
+                        onBlur={() => guardarPrecio(it)} onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+                        className={`w-28 text-right bg-slate-800 border rounded-lg px-2 py-1 text-white focus:outline-none ${edicion[it.id] !== undefined ? 'border-yellow-500' : 'border-slate-700 focus:border-yellow-500'}`} />
+                    </td>
+                    <td className="px-4 py-2.5 text-right"><button onClick={() => delItem(it)} className="p-1.5 rounded-lg text-gray-400 hover:text-red-400 hover:bg-red-500/10 transition"><Trash2 size={13} /></button></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+      {total > pageSize && (
+        <div className="flex items-center justify-between gap-3 mt-3 text-xs text-gray-400">
+          <span>{total.toLocaleString('es-CO')} ítems · página {page} de {totalPages}</span>
+          <div className="flex gap-2">
+            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1} className="px-3 py-1.5 rounded-lg bg-slate-800 border border-white/5 text-gray-300 hover:text-white disabled:opacity-40 disabled:pointer-events-none transition">Anterior</button>
+            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages} className="px-3 py-1.5 rounded-lg bg-slate-800 border border-white/5 text-gray-300 hover:text-white disabled:opacity-40 disabled:pointer-events-none transition">Siguiente</button>
+          </div>
+        </div>
+      )}
+
+      <AnimatePresence>
+        {modal === 'add' && <AgregarCargoModal tarifarioId={tarifario.id} onClose={() => setModal(null)} onSaved={() => { setModal(null); load(); }} />}
+        {modal === 'base' && <GenerarBaseModal tarifario={tarifario} onClose={() => setModal(null)} onDone={() => { setModal(null); load(); }} />}
+        {modal === 'bulk' && (
+          <BulkModal title="Cargue masivo de precios"
+            headers={['cargo', 'precio']} filename="plantilla_precios.csv"
+            onUpload={async (rows) => { const r = await svc.bulkTarifarioItems(tarifario.id, rows) as any; load(); return { created: r.created, skipped: r.updated, errors: r.errors }; }}
+            onClose={() => setModal(null)} />
+        )}
+      </AnimatePresence>
+    </>
+  );
+}
+
+// ─── Modal: buscar y agregar un cargo con precio ───────────────
+function AgregarCargoModal({ tarifarioId, onClose, onSaved }: { tarifarioId: string; onClose: () => void; onSaved: () => void }) {
+  const [q, setQ] = useState('');
+  const [results, setResults] = useState<any[]>([]);
+  const [cargo, setCargo] = useState<any>(null);
+  const [precio, setPrecio] = useState('');
+  const [err, setErr] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (cargo || q.trim().length < 2) { setResults([]); return; }
+    const t = setTimeout(async () => {
+      try { const r = await svc.getCargosTarifa(`search=${encodeURIComponent(q.trim())}&pageSize=8&activo=true`) as any; setResults(r.items || []); } catch { /* */ }
+    }, 300);
+    return () => clearTimeout(t);
+  }, [q, cargo]);
+
+  const save = async () => {
+    setErr('');
+    if (!cargo) { setErr('Selecciona un cargo'); return; }
+    const p = Number(precio);
+    if (!Number.isFinite(p) || p < 0) { setErr('Precio inválido'); return; }
+    setSaving(true);
+    try { await svc.upsertTarifarioItem(tarifarioId, { cargoId: cargo.id, precio: p }); onSaved(); }
+    catch (e: any) { setErr(e.message || 'Error al guardar'); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <Modal title="Agregar cargo al tarifario" onClose={onClose} maxW="max-w-md">
+      <div className="space-y-4">
+        {!cargo ? (
+          <div>
+            <label className="block text-xs text-gray-400 mb-1">Buscar cargo</label>
+            <div className="relative">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+              <input value={q} onChange={e => setQ(e.target.value)} autoFocus placeholder="Código, descripción o CUPS…"
+                className="w-full pl-9 pr-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white focus:border-yellow-500 focus:outline-none" />
+            </div>
+            {results.length > 0 && (
+              <div className="mt-2 rounded-lg border border-white/5 divide-y divide-white/5 max-h-56 overflow-y-auto">
+                {results.map(r => (
+                  <button key={r.id} onClick={() => { setCargo(r); setResults([]); }} className="w-full text-left px-3 py-2 hover:bg-slate-800/60 transition flex items-center gap-2">
+                    <code className="text-[10px] text-yellow-300 bg-slate-800/80 px-1.5 py-0.5 rounded">{r.codigo}</code>
+                    <span className="text-xs text-gray-200 flex-1 truncate">{r.descripcion}</span>
+                    {r.cupsCodigoStr && <code className="text-[10px] text-emerald-300">{r.cupsCodigoStr}</code>}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 p-3 bg-slate-800/60 rounded-xl border border-white/5">
+            <code className="text-[11px] text-yellow-300 bg-slate-800/80 px-2 py-0.5 rounded">{cargo.codigo}</code>
+            <span className="text-xs text-gray-200 flex-1 truncate">{cargo.descripcion}</span>
+            <button onClick={() => setCargo(null)} className="text-gray-500 hover:text-white"><X size={14} /></button>
+          </div>
+        )}
+        <Field label="Precio (COP)" value={precio} onChange={setPrecio} type="number" placeholder="Ej: 150000" />
+        {err && <ErrBox msg={err} />}
+        <FormFooter onCancel={onClose} onSave={save} saving={saving} />
+      </div>
+    </Modal>
+  );
+}
+
+// ─── Modal: generar precios desde el tarifario base ────────────
+function GenerarBaseModal({ tarifario, onClose, onDone }: { tarifario: any; onClose: () => void; onDone: () => void }) {
+  const [sobrescribir, setSobrescribir] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [result, setResult] = useState<any>(null);
+  const [err, setErr] = useState('');
+
+  const generar = async () => {
+    setSaving(true); setErr('');
+    try { const r = await svc.generarTarifarioBase(tarifario.id, { sobrescribir }) as any; setResult(r); }
+    catch (e: any) { setErr(e.message || 'Error al generar'); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <Modal title="Generar precios desde la base" onClose={onClose} maxW="max-w-md">
+      <div className="space-y-4">
+        <p className="text-xs text-gray-300">Se copiarán los precios del tarifario base aplicando el <span className="text-yellow-400 font-semibold">{tarifario.porcentaje ?? 100}%</span> configurado.</p>
+        <Sw value={sobrescribir} onChange={setSobrescribir} label="Sobrescribir precios que ya existen en este tarifario" />
+        {result && (
+          <div className="flex items-start gap-2 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-xs text-emerald-300">
+            <CheckCircle size={16} className="text-emerald-400 mt-0.5 flex-shrink-0" />
+            <div><p className="font-semibold">¡Listo!</p><p>Creados: {result.creados} · Actualizados: {result.actualizados} · Omitidos: {result.omitidos}</p></div>
+          </div>
+        )}
+        {err && <ErrBox msg={err} />}
+        <div className="flex justify-end gap-3 pt-3 border-t border-white/5">
+          <button onClick={result ? onDone : onClose} className="px-4 py-2 text-sm text-gray-400 hover:text-white border border-white/10 rounded-lg transition">{result ? 'Cerrar' : 'Cancelar'}</button>
+          {!result && <button onClick={generar} disabled={saving} className="flex items-center gap-2 px-4 py-2 bg-yellow-600 hover:bg-yellow-500 disabled:opacity-50 text-white text-sm font-semibold rounded-lg transition">{saving ? 'Generando…' : <><RotateCcw size={14} /> Generar</>}</button>}
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 const MODULOS = [
   {
     id: 'consulta-externa',
@@ -2426,6 +3466,32 @@ const MODULOS = [
     submodulos: [
       { id:'campos-paciente',   label:'Campos del Paciente', icon:ClipboardList, component:TabCamposPaciente      },
       { id:'listas-seleccion',  label:'Listas de Selección', icon:List,          component:TabListasSeleccion     },
+    ],
+  },
+  {
+    id: 'catalogo-cups',
+    label: 'Catálogo CUPS',
+    icon: BookOpen,
+    submodulos: [
+      { id:'cups-codigos',      label:'Códigos CUPS (Res. 2706/2025)', icon:Layers, component:TabCatalogoCUPS },
+    ],
+  },
+  {
+    id: 'tarifas',
+    label: 'Tarifas y Tarifarios',
+    icon: DollarSign,
+    submodulos: [
+      { id:'tarifa-clasificacion', label:'Clasificación (Grupos/Tipos)', icon:GitBranch,    component:TabTarifaClasificacion },
+      { id:'cargos-tarifa',        label:'Cargos / Equivalencia CUPS',  icon:List,         component:TabCargosTarifa       },
+      { id:'tarifarios',           label:'Tarifarios (Listas de precio)', icon:DollarSign,  component:TabTarifarios         },
+    ],
+  },
+  {
+    id: 'odontologia',
+    label: 'Odontología',
+    icon: Sparkles,
+    submodulos: [
+      { id:'odonto-catalogos',  label:'Catálogos Clínicos',   icon:Sparkles,      component:TabOdontologia         },
     ],
   },
   {
@@ -2454,7 +3520,7 @@ const MODULOS = [
 export default function AdminPage() {
   const [activeMod, setActiveMod] = useState('consulta-externa');
   const [activeSub, setActiveSub] = useState('especialidades');
-  const [expanded,  setExpanded]  = useState('consulta-externa');
+  const [expanded,  setExpanded]  = useState('');
 
   // Precarga los datos más comunes en paralelo al montar la página
   // para que el cache esté caliente cuando el usuario navegue a cada tab
