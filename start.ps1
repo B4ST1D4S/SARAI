@@ -28,11 +28,21 @@ $job1 = Start-Job -Name "Backend" -ArgumentList $pathBackend -ScriptBlock {
 $job2 = Start-Job -Name "Frontend" -ArgumentList $pathFrontend -ScriptBlock {
     param($p); Set-Location $p; npm run dev 2>&1
 }
-$pythonExe = "C:\Users\SOPORTE\AppData\Local\Programs\Python\Python313\python.exe"
-$job3 = Start-Job -Name "Whisper" -ArgumentList $pathWhisper, $pythonExe -ScriptBlock {
-    param($p, $py); Set-Location $p; & $py main.py 2>&1
+$pythonExe = $null
+$pythonCmd = Get-Command python -ErrorAction SilentlyContinue
+if (-not $pythonCmd) { $pythonCmd = Get-Command py -ErrorAction SilentlyContinue }
+if ($pythonCmd) { $pythonExe = $pythonCmd.Source }
+
+$jobs = @($job1, $job2)
+if ($pythonExe) {
+    $job3 = Start-Job -Name "Whisper" -ArgumentList $pathWhisper, $pythonExe -ScriptBlock {
+        param($p, $py); Set-Location $p; & $py main.py 2>&1
+    }
+    $jobs += $job3
+} else {
+    Write-Host "[AVISO] No se encontro Python en el PATH. El servicio Whisper no se iniciara." -ForegroundColor Yellow
+    Write-Host "        Instala Python o agregalo al PATH y vuelve a correr .\start.ps1" -ForegroundColor Yellow
 }
-$jobs = @($job1, $job2, $job3)
 
 $colors = @{
     "Backend"  = "Cyan"
@@ -40,7 +50,7 @@ $colors = @{
     "Whisper"  = "Green"
 }
 
-Write-Host "[OK] Los 3 servicios arrancaron en segundo plano" -ForegroundColor Green
+Write-Host "[OK] $($jobs.Count) servicio(s) arrancaron en segundo plano" -ForegroundColor Green
 Write-Host ""
 
 try {
