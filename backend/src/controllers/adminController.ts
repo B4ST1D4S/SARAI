@@ -1,8 +1,6 @@
 import { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
 import { randomUUID } from 'crypto';
-
-const prisma = new PrismaClient();
+import prisma from '../lib/prisma.js';
 
 // ─────────────────────────────────────────
 // 1. ESPECIALIDADES

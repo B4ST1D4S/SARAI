@@ -12,17 +12,17 @@ function headers() {
 
 async function req<T>(url: string, options: RequestInit = {}): Promise<T> {
   const r = await fetch(`${API}/facturacion${url}`, { headers: headers(), ...options });
-  const data = await r.json();
+  const data = await r.json().catch(() => ({}));
   if (!r.ok) {
     if (r.status === 401 || r.status === 403) {
-      const msg = (data.error || '').toLowerCase();
+      const msg = ((data as any).error || '').toLowerCase();
       if (msg.includes('token') || msg.includes('expirad') || msg.includes('inválid') || msg.includes('autenticad')) {
         localStorage.removeItem('accessToken');
         localStorage.removeItem('user');
         window.location.reload();
       }
     }
-    throw new Error(data.error || 'Error en la solicitud');
+    throw new Error((data as any).error || 'Error en la solicitud');
   }
   return data as T;
 }

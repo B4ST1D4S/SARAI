@@ -122,6 +122,8 @@ model Paciente {
   @@unique([numeroDocumento, tipoDocumento])
   @@index([nombreCompleto])
   @@index([estado])
+  @@index([email])
+  @@index([creadoPor])
 }
 
 model Alergia {
@@ -218,6 +220,7 @@ model HistoriaClinica {
   procedimiento      Procedimiento?     @relation(fields: [procedimientoId], references: [id])
 
   @@index([pacienteId])
+  @@index([editadoPor])
   @@index([procedimientoId])
   @@index([plantillaId])
   @@index([tipoHistoria])
@@ -898,6 +901,8 @@ model CrmLead {
   @@index([calificacion])
   @@index([pacienteId])
   @@index([creadoPor])
+  @@index([proximoContacto])
+  @@index([ultimaInteraccion])
 }
 
 model CupsCodigo {
@@ -1050,6 +1055,9 @@ model Ingreso {
 
   @@index([pacienteId])
   @@index([citaId])
+  @@index([medicoId])
+  @@index([tipoIngreso])
+  @@index([fechaIngreso])
   @@index([estado])
 }
 
@@ -1207,6 +1215,9 @@ model Contrato {
   @@index([empresaId])
   @@index([estado])
   @@index([fechaFin])
+  @@index([fechaInicio])
+  @@index([tipo])
+  @@index([creadoPorId])
 }
 
 model ContratoTarifa {
@@ -1482,6 +1493,10 @@ model OdontoPlanItem {
   @@index([pacienteId])
   @@index([estadoTratamiento])
   @@index([cargoId])
+  @@index([medicoId])
+  @@index([facturado])
+  @@index([fechaProgramada])
+  @@index([fechaEjecucion])
 }
 
 model OdontoEvolucion {

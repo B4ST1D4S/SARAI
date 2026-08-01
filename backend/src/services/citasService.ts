@@ -51,8 +51,10 @@ export async function createCita(data: CreateCitaRequest) {
       },
     });
 
-    // Enviar email de confirmación automático
-    await sendCitaConfirmation(cita);
+    // Enviar email de confirmación en background (no bloquea la respuesta)
+    sendCitaConfirmation(cita).catch((err: unknown) => {
+      console.error('Error enviando email de confirmación:', err);
+    });
 
     return cita;
   } catch (error: any) {
@@ -331,9 +333,7 @@ export async function enviarRecordatorios24h() {
       },
     });
 
-    for (const cita of citas) {
-      await sendRecordatorio(cita);
-    }
+    await Promise.all(citas.map(cita => sendRecordatorio(cita)));
 
     console.log(`✅ ${citas.length} recordatorios enviados`);
     return citas.length;

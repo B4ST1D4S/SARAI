@@ -4,11 +4,10 @@
  * Permisos temporales · Delegaciones · MFA · Auditoría completa
  */
 import { Request, Response } from 'express';
-import { PrismaClient, TipoAccion, EfectoPermiso, TipoRecurso, TipoEventoSeg } from '@prisma/client';
+import { TipoAccion, EfectoPermiso, TipoRecurso, TipoEventoSeg } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { randomUUID } from 'crypto';
-
-const prisma = new PrismaClient();
+import prisma from '../lib/prisma.js';
 
 // ═══════════════════════════════════════════════════════
 //  ALGORITMO DE RESOLUCIÓN DE PERMISOS

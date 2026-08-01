@@ -1,7 +1,6 @@
 import { Request, Response } from 'express';
-import { PrismaClient, CupsNivel } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { CupsNivel } from '@prisma/client';
+import prisma from '../lib/prisma.js';
 
 // ════════════════════════════════════════════════
 // CATÁLOGO CUPS — Resolución 2706 de 2025

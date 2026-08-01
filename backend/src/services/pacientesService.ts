@@ -122,12 +122,14 @@ export async function deletePaciente(id: string) {
 
 export async function searchPacientes(query: string) {
   try {
+    if (!query || query.trim().length < 2) return [];
+    const q = query.trim();
     const pacientes = await prisma.paciente.findMany({
       where: {
         OR: [
-          { nombreCompleto: { contains: query, mode: 'insensitive' } },
-          { numeroDocumento: { contains: query } },
-          { email: { contains: query, mode: 'insensitive' } },
+          { nombreCompleto: { contains: q, mode: 'insensitive' } },
+          { numeroDocumento: { contains: q } },
+          { email: { contains: q, mode: 'insensitive' } },
         ],
       },
       take: 20,
