@@ -133,25 +133,15 @@ export default function AgendarCitaWizard({
       { headers: { Authorization: `Bearer ${getToken()}` } })
       .then(r => r.json())
       .then(d => {
-        const raw = d.slots ?? [];
-        // Soporte formato nuevo { hora, estado } y antiguo string[]
-        const normalized = raw.map((s: any) =>
-          typeof s === 'string' ? { hora: s, estado: 'libre' as const } : s
-        );
-        if (normalized.length === 0) {
-          const fallback = [];
-          for (let h = 9; h < 17; h++) fallback.push({ hora: `${String(h).padStart(2,"0")}:00`, estado: 'libre' as const });
-          setSlots(fallback);
-        } else {
-          setSlots(normalized);
-        }
-        scrollToBottom();
+      const raw = d.slots ?? [];
+      // Soporte formato nuevo { hora, estado } y antiguo string[]
+      const normalized = raw.map((s: any) =>
+        typeof s === 'string' ? { hora: s, estado: 'libre' as const } : s
+      );
+      setSlots(normalized);
+      scrollToBottom();
       })
-      .catch(() => {
-        const fallback = [];
-        for (let h = 9; h < 17; h++) fallback.push({ hora: `${String(h).padStart(2,"0")}:00`, estado: 'libre' as const });
-        setSlots(fallback);
-      })
+      .catch(() => setSlots([]))
       .finally(() => setLoadSlots(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [diaSel]);
@@ -329,10 +319,10 @@ export default function AgendarCitaWizard({
                           const disponible = diasDisp.includes(dia);
                           return (
                             <button key={dia} type="button"
-                              disabled={pasado || (!disponible && !loadDias)}
+                              disabled={pasado || loadDias || !disponible}
                               onClick={() => setDiaSel(dia)}
                               className={`relative aspect-square rounded-md text-[11px] font-medium transition-all flex items-center justify-center
-                                ${disponible && !pasado
+                                ${disponible && !pasado && !loadDias
                                   ? "bg-yellow-500/12 text-yellow-300 hover:bg-yellow-500/28 border border-yellow-500/30 hover:scale-105"
                                   : pasado
                                     ? "text-slate-700 cursor-default"
@@ -340,7 +330,7 @@ export default function AgendarCitaWizard({
                                 ${esHoy ? "ring-1 ring-yellow-500/70" : ""}`}
                             >
                               {dia}
-                              {disponible && !pasado && (
+                              {disponible && !pasado && !loadDias && (
                                 <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-yellow-400/80" />
                               )}
                             </button>
@@ -354,9 +344,19 @@ export default function AgendarCitaWizard({
                           Con disponibilidad
                         </span>
                         {diasDisp.length===0 && !loadDias && (
-                          <span className="ml-auto text-slate-600">Sin disponibilidad este mes</span>
+                          <span className="ml-auto text-amber-500/80 font-medium">Sin disponibilidad este mes</span>
                         )}
                       </div>
+                      {/* Alerta cuando médico no tiene agenda en todo el mes */}
+                      {diasDisp.length === 0 && !loadDias && (
+                        <div className="mt-3 flex items-start gap-2 bg-amber-500/10 border border-amber-500/30 rounded-xl px-3 py-2.5 text-xs text-amber-300">
+                          <AlertCircle size={14} className="mt-0.5 flex-shrink-0 text-amber-400" />
+                          <span>
+                            El profesional seleccionado no tiene agenda configurada para <strong>{MESES[calMes-1]} {calAnio}</strong>.
+                            Intenta con otro mes o selecciona un profesional diferente.
+                          </span>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -381,6 +381,20 @@ export default function AgendarCitaWizard({
                       {loadSlots ? (
                         <div className="flex items-center gap-2 text-slate-400 text-xs py-4">
                           <div className="w-4 h-4 border-2 border-yellow-400 border-t-transparent rounded-full animate-spin" />Consultando...
+                        </div>
+                      ) : slots.length === 0 ? (
+                        <div className="flex flex-col items-center gap-2 py-5">
+                          <div className="flex items-start gap-2 bg-amber-500/10 border border-amber-500/30 rounded-xl px-3 py-2.5 text-xs text-amber-300 w-full">
+                            <AlertCircle size={14} className="mt-0.5 flex-shrink-0 text-amber-400" />
+                            <span>No hay horarios disponibles para este día. Selecciona otra fecha.</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setDiaSel(null)}
+                            className="text-xs text-slate-400 hover:text-yellow-300 underline underline-offset-2 transition-colors"
+                          >
+                            ← Volver al calendario
+                          </button>
                         </div>
                       ) : (
                         <>
