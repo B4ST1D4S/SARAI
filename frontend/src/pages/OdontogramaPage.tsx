@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search, Plus, Save, Sparkles, Trash2, Eraser, Stethoscope, ClipboardList,
-  Activity, CheckCircle2, Clock, CalendarClock, Ban, PauseCircle, DollarSign, X,
+  Activity, CheckCircle2, Clock, CalendarClock, Ban, PauseCircle, DollarSign, X, Printer,
 } from 'lucide-react';
 import { searchPacientes } from '../services/api';
 import OdontogramaInteractivo, { SUPERFICIES } from '../components/medical/OdontogramaInteractivo';
@@ -13,6 +13,230 @@ import type {
 
 const fmtCOP = (n: number) =>
   new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(n || 0);
+
+// ════════════════════════════════════════════════════════════════
+//  IMPRESIÓN ODONTOGRAMA — generador HTML + SVG
+// ════════════════════════════════════════════════════════════════
+function printInNewWindow(html: string) {
+  const w = window.open('', '_blank');
+  if (!w) { alert('Permita ventanas emergentes en su navegador para imprimir.'); return; }
+  w.document.open();
+  w.document.write(html);
+  w.document.close();
+}
+
+const ODO_PRINT_CSS = `
+  body{font-family:Arial,sans-serif;font-size:11px;color:#111;margin:0}
+  h1{font-size:14px;font-weight:bold;border-bottom:2px solid #222;padding-bottom:5px;margin-bottom:10px}
+  h2{font-size:10px;font-weight:bold;background:#f0f0f0;padding:3px 8px;border-left:3px solid #555;margin:10px 0 5px;page-break-after:avoid}
+  .hdr{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;background:#f8f8f8;border:1px solid #ddd;padding:6px 8px;border-radius:3px;margin-bottom:10px}
+  .f{margin-bottom:3px}
+  .lbl{font-size:8px;font-weight:bold;text-transform:uppercase;color:#666;letter-spacing:.5px}
+  .val{border-bottom:1px solid #bbb;min-height:14px;padding:1px 0;white-space:pre-wrap}
+  .g2{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+  .g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px}
+  .sec{margin-bottom:6px;page-break-inside:avoid}
+  .odo-wrap{background:#f9fafb;border:1px solid #e5e7eb;border-radius:4px;padding:10px;margin-bottom:6px}
+  .legend{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0;font-size:9px}
+  .ldot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:2px;vertical-align:middle}
+  table{width:100%;border-collapse:collapse;margin-top:4px}
+  th{background:#eee;padding:3px 5px;text-align:left;border:1px solid #ccc;font-size:9px}
+  td{padding:3px 5px;border:1px solid #ddd;font-size:9px}
+  tfoot td{background:#f8f8f8;font-weight:bold}
+  .firma{margin-top:24px;display:grid;grid-template-columns:1fr 1fr;gap:40px}
+  .firma-box{border-top:1px solid #333;padding-top:3px;text-align:center;font-size:9px}
+  @page{margin:12mm 15mm;size:A4}
+  @media print{body{print-color-adjust:exact;-webkit-print-color-adjust:exact}}
+`;
+
+function _toothSvg(diente: number, piezas: PiezaHallazgo[], x: number, y: number): string {
+  const S = 36, a = 11;
+  const q = Math.floor(diente / 10);
+  const mesialRight = q === 1 || q === 4 || q === 5 || q === 8;
+  const rightCode = mesialRight ? 'M' : 'D';
+  const leftCode  = mesialRight ? 'D' : 'M';
+  const find = (code: string | null) =>
+    piezas.find(p => p.diente === diente && (p.superficie || null) === code);
+  const col = (code: string | null): string => {
+    const f = find(code);
+    if (!f) return 'transparent';
+    return f.colorOverride || f.estado?.color || f.hallazgo?.color || 'transparent';
+  };
+  const whole      = find(null);
+  const wholeColor = whole ? (whole.colorOverride || whole.hallazgo?.color || null) : null;
+  const absent     = whole?.hallazgo?.codigo === 'AUSENTE';
+  const hasCircle  = whole && ['CORONA', 'IMPLANTE', 'PROTESIS'].includes(whole.hallazgo?.codigo || '');
+  const wc         = wholeColor || '#94a3b8';
+  const wfill      = wholeColor ? `${wholeColor}30` : 'rgba(200,200,200,0.06)';
+  return `<g transform="translate(${x},${y})">
+    <text x="${S/2}" y="-2" text-anchor="middle" font-size="6.5" fill="#666" font-family="Arial,sans-serif" font-weight="bold">${diente}</text>
+    <rect x="0" y="0" width="${S}" height="${S}" rx="2" fill="${wfill}" stroke="${wc}" stroke-width="${wholeColor ? 1.2 : 0.5}"/>
+    <polygon points="0,0 ${S},0 ${S-a},${a} ${a},${a}" fill="${col('V')}" stroke="#9ca3af" stroke-width="0.4"/>
+    <polygon points="0,${S} ${S},${S} ${S-a},${S-a} ${a},${S-a}" fill="${col('L')}" stroke="#9ca3af" stroke-width="0.4"/>
+    <polygon points="${S},0 ${S},${S} ${S-a},${S-a} ${S-a},${a}" fill="${col(rightCode)}" stroke="#9ca3af" stroke-width="0.4"/>
+    <polygon points="0,0 0,${S} ${a},${S-a} ${a},${a}" fill="${col(leftCode)}" stroke="#9ca3af" stroke-width="0.4"/>
+    <rect x="${a}" y="${a}" width="${S-2*a}" height="${S-2*a}" fill="${col('O')}" stroke="#9ca3af" stroke-width="0.4"/>
+    ${absent ? `<line x1="5" y1="5" x2="${S-5}" y2="${S-5}" stroke="${wholeColor||'#374151'}" stroke-width="2" stroke-linecap="round"/>
+    <line x1="${S-5}" y1="5" x2="5" y2="${S-5}" stroke="${wholeColor||'#374151'}" stroke-width="2" stroke-linecap="round"/>` : ''}
+    ${hasCircle ? `<circle cx="${S/2}" cy="${S/2}" r="${S/2-4}" fill="none" stroke="${whole!.hallazgo?.color||'#6b7280'}" stroke-width="1.5"/>` : ''}
+  </g>`;
+}
+
+function _buildOdoSvg(piezas: PiezaHallazgo[], denticion: string): string {
+  const S = 36, step = 38;
+  const PERM = {
+    supD: [18,17,16,15,14,13,12,11], supI: [21,22,23,24,25,26,27,28],
+    infD: [48,47,46,45,44,43,42,41], infI: [31,32,33,34,35,36,37,38],
+  };
+  const TEMP = {
+    supD: [55,54,53,52,51], supI: [61,62,63,64,65],
+    infD: [85,84,83,82,81], infI: [71,72,73,74,75],
+  };
+  const leftPad = 10, midGap = 14;
+  const permW = 8 * step, tempW = 5 * step;
+  const totalW = leftPad + permW + midGap + permW + leftPad;
+  const mostrarPerm = denticion === 'PERMANENTE' || denticion === 'MIXTA';
+  const mostrarTemp = denticion === 'TEMPORAL'   || denticion === 'MIXTA';
+  const parts: string[] = [];
+  let curY = 10;
+  if (mostrarPerm) {
+    for (let i = 0; i < 8; i++) {
+      parts.push(_toothSvg(PERM.supD[i], piezas, leftPad + i * step, curY));
+      parts.push(_toothSvg(PERM.supI[i], piezas, leftPad + permW + midGap + i * step, curY));
+    }
+    const mx = leftPad + permW + midGap / 2;
+    parts.push(`<line x1="${mx}" y1="${curY-6}" x2="${mx}" y2="${curY+S+10}" stroke="#d1d5db" stroke-width="0.8" stroke-dasharray="3,2"/>`);
+    const sepY = curY + S + 6;
+    parts.push(`<line x1="${leftPad}" y1="${sepY}" x2="${totalW-leftPad}" y2="${sepY}" stroke="#d1d5db" stroke-width="0.8"/>`);
+    curY = sepY + 8;
+    for (let i = 0; i < 8; i++) {
+      parts.push(_toothSvg(PERM.infD[i], piezas, leftPad + i * step, curY));
+      parts.push(_toothSvg(PERM.infI[i], piezas, leftPad + permW + midGap + i * step, curY));
+    }
+    parts.push(`<line x1="${mx}" y1="${curY-6}" x2="${mx}" y2="${curY+S+8}" stroke="#d1d5db" stroke-width="0.8" stroke-dasharray="3,2"/>`);
+    curY += S + 14;
+  }
+  if (mostrarTemp) {
+    if (mostrarPerm) {
+      parts.push(`<line x1="${leftPad}" y1="${curY}" x2="${totalW-leftPad}" y2="${curY}" stroke="#e5e7eb" stroke-width="0.5" stroke-dasharray="4,3"/>`);
+      parts.push(`<text x="${totalW/2}" y="${curY+10}" text-anchor="middle" font-size="7" fill="#9ca3af" font-family="Arial,sans-serif" font-weight="bold" letter-spacing="1">DENTICIÓN TEMPORAL</text>`);
+      curY += 18;
+    }
+    const tStart = leftPad + (permW - tempW) / 2;
+    for (let i = 0; i < 5; i++) {
+      parts.push(_toothSvg(TEMP.supD[i], piezas, tStart + i * step, curY));
+      parts.push(_toothSvg(TEMP.supI[i], piezas, tStart + tempW + midGap + i * step, curY));
+    }
+    const tmx = tStart + tempW + midGap / 2;
+    parts.push(`<line x1="${tmx}" y1="${curY-6}" x2="${tmx}" y2="${curY+S+10}" stroke="#d1d5db" stroke-width="0.8" stroke-dasharray="3,2"/>`);
+    const tSepY = curY + S + 6;
+    parts.push(`<line x1="${tStart}" y1="${tSepY}" x2="${tStart+2*tempW+midGap}" y2="${tSepY}" stroke="#d1d5db" stroke-width="0.8"/>`);
+    curY = tSepY + 8;
+    for (let i = 0; i < 5; i++) {
+      parts.push(_toothSvg(TEMP.infD[i], piezas, tStart + i * step, curY));
+      parts.push(_toothSvg(TEMP.infI[i], piezas, tStart + tempW + midGap + i * step, curY));
+    }
+    parts.push(`<line x1="${tmx}" y1="${curY-6}" x2="${tmx}" y2="${curY+S+8}" stroke="#d1d5db" stroke-width="0.8" stroke-dasharray="3,2"/>`);
+    curY += S + 14;
+  }
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${totalW}" height="${curY}" style="display:block;max-width:100%;background:white">${parts.join('')}</svg>`;
+}
+
+interface PrintOdoParams {
+  paciente: { nombreCompleto: string; tipoDocumento?: string; numeroDocumento: string };
+  odontograma: Odontograma;
+  piezas: PiezaHallazgo[];
+  generales: any;
+  estetica: any;
+  riesgoId: string;
+  resumenIA: string;
+  denticion: string;
+  catalogos: OdontoCatalogos;
+  tipo: 'PRIMERA_VEZ' | 'TRATAMIENTO';
+}
+
+function buildOdontogramaHtml(p: PrintOdoParams): string {
+  const { paciente, odontograma, piezas, generales, estetica, riesgoId, resumenIA, denticion, catalogos, tipo } = p;
+  const fechaHoy = new Date().toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' });
+  const riesgo = catalogos.riesgos.find(r => r.id === riesgoId)?.nombre || '—';
+  const fld = (label: string, value: unknown) => {
+    const v = value === true ? 'Sí' : value === false ? 'No' : String(value ?? '');
+    return `<div class="f"><div class="lbl">${label}</div><div class="val">${v || '&nbsp;'}</div></div>`;
+  };
+  const sec = (title: string, body: string) => `<div class="sec"><h2>${title}</h2>${body}</div>`;
+  const items = odontograma.planItems || [];
+  const total = items.reduce((s, i) => s + (i.precio || 0), 0);
+  const usedH = [...new Map(piezas.filter(pp => pp.hallazgo).map(pp => [pp.hallazgo!.id, pp.hallazgo!])).values()];
+  const legend = usedH.length > 0
+    ? `<div class="legend">${usedH.map(h => `<span><span class="ldot" style="background:${h.color}"></span>${h.nombre}</span>`).join('')}</div>`
+    : '';
+  const tipoLabel = tipo === 'PRIMERA_VEZ' ? 'Primera Vez' : 'Tratamiento';
+
+  return `<!DOCTYPE html>
+<html><head><meta charset="UTF-8">
+<title>Odontograma ${tipoLabel} — ${paciente.nombreCompleto}</title>
+<style>${ODO_PRINT_CSS}</style></head><body>
+<h1>Odontograma Odontológico · ${tipoLabel}</h1>
+<div class="hdr">
+  ${fld('Paciente', paciente.nombreCompleto)}
+  ${fld('Documento', `${paciente.tipoDocumento || ''} ${paciente.numeroDocumento}`)}
+  ${fld('Fecha', fechaHoy)}
+  ${fld('Dentición', denticion)}
+  ${fld('Riesgo clínico', riesgo)}
+  ${fld('Tipo', tipoLabel)}
+</div>
+
+${sec('Odontograma FDI · Numeración Internacional',
+  `<div class="odo-wrap">${_buildOdoSvg(piezas, denticion)}${legend}</div>`
+)}
+
+${sec('Hallazgos Generales', `<div class="g2">
+  ${fld('Higiene oral', generales.higiene || '')}
+  ${fld('Estado periodontal', generales.periodontal || '')}
+  ${fld('Oclusión', generales.oclusion || '')}
+  ${fld('ATM', generales.atm || '')}
+  ${fld('Riesgo clínico', riesgo)}
+  ${fld('Observaciones', generales.observaciones || '')}
+</div>`)}
+
+${sec('Odontología Estética', `<div class="g3">
+  ${fld('Color dental (VITA)', estetica.colorDental || '')}
+  ${fld('Pigmentaciones', estetica.pigmentaciones || '')}
+  ${fld('Diastemas', estetica.diastemas || '')}
+  ${fld('Alteraciones de forma', estetica.forma || '')}
+  ${fld('Alteraciones de tamaño', estetica.tamano || '')}
+  ${fld('Sonrisa gingival', estetica.sonrisaGingival || '')}
+  ${fld('Asimetrías', estetica.asimetrias || '')}
+  ${fld('Rest. antiestéticas', estetica.restauracionesAntiesteticas || '')}
+  ${fld('Desgaste estético', estetica.desgasteEstetico || '')}
+</div>${fld('Observaciones estéticas', estetica.observaciones || '')}`)}
+
+${sec('Resumen Clínico', fld('Resumen', resumenIA))}
+
+${items.length > 0 ? sec(`Plan de Tratamiento · ${items.length} procedimiento(s) · Total: ${fmtCOP(total)}`, `
+<table>
+  <thead><tr><th>Diente</th><th>Diagnóstico</th><th>Procedimiento</th><th>CUPS</th><th>Prioridad</th><th>Estado</th><th>Precio</th></tr></thead>
+  <tbody>
+    ${items.map(item => `<tr>
+      <td>${item.diente ? `${item.diente}${item.superficie ? ' · ' + item.superficie : ''}` : '—'}</td>
+      <td>${item.diagnostico || ''}</td>
+      <td>${item.descripcionProcedimiento || ''}</td>
+      <td>${item.codigoCups || '—'}</td>
+      <td>${(item as any).prioridad?.nombre || '—'}</td>
+      <td>${ESTADO_META[item.estadoTratamiento]?.label || item.estadoTratamiento}</td>
+      <td>${fmtCOP(item.precio)}</td>
+    </tr>`).join('')}
+  </tbody>
+  <tfoot><tr><td colspan="6" style="text-align:right">TOTAL</td><td>${fmtCOP(total)}</td></tr></tfoot>
+</table>`) : ''}
+
+<div class="firma">
+  <div class="firma-box">Firma y Sello del Odontólogo</div>
+  <div class="firma-box">Firma del Paciente / Representante</div>
+</div>
+<script>window.onload=()=>{window.print();setTimeout(()=>window.close(),1400);}</script>
+</body></html>`;
+}
 
 const ESTADO_FLOW: { code: EstadoTratamiento; label: string; color: string; icon: any }[] = [
   { code: 'PLANEADO', label: 'Planeado', color: '#94a3b8', icon: ClipboardList },
@@ -524,6 +748,14 @@ function PrimeraVez({
         <button onClick={guardarGenerales}
           className="w-full py-3 rounded-2xl bg-white/5 border border-white/10 text-gray-200 font-semibold flex items-center justify-center gap-2 hover:bg-white/10 transition-colors">
           <Save size={16} /> Guardar información clínica
+        </button>
+        <button
+          onClick={() => printInNewWindow(buildOdontogramaHtml({
+            paciente, odontograma, piezas, generales, estetica,
+            riesgoId, resumenIA, denticion, catalogos, tipo: 'PRIMERA_VEZ',
+          }))}
+          className="w-full py-3 rounded-2xl bg-white/5 border border-white/10 text-gray-200 font-semibold flex items-center justify-center gap-2 hover:bg-white/10 transition-colors">
+          <Printer size={16} /> Imprimir Odontograma
         </button>
         <button onClick={generarPlan} disabled={generando}
           className="w-full py-3 rounded-2xl bg-gradient-to-r from-yellow-400 to-amber-500 text-slate-900 font-bold flex items-center justify-center gap-2 hover:shadow-lg hover:shadow-yellow-500/20 transition-all disabled:opacity-60">
