@@ -8,15 +8,16 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import emailjs from '@emailjs/browser';
 import { motion, AnimatePresence, useInView, useReducedMotion } from 'framer-motion';
 import {
   TrendingUp, Zap, Smartphone, BarChart2, FileText,
-  Brain, Mic, CheckCircle, Mail, Phone, Building2,
-  User, Send, Lock, Eye, EyeOff, ArrowRight, HeartPulse,
-  Stethoscope, Activity, Receipt, DollarSign, Package,
-  ShoppingCart, Wallet, Award, Bot, Globe, ChevronRight,
+  Brain, Mic, CheckCircle, Mail, Building2,
+  Send, Lock, Eye, EyeOff, ArrowRight, HeartPulse,
+  Stethoscope, Receipt, DollarSign,
+  Wallet, Award, Globe, ChevronRight,
   Menu, X, AlertCircle, Layers, Users, Database,
-  Shield, Star, Cpu
+  Shield
 } from 'lucide-react';
 import NeuralCanvas from '../components/NeuralCanvas';
 import saraiLogo from '../assets/logo1.png';
@@ -546,18 +547,12 @@ function HeroSection() {
               transition={{ duration:0.6, delay:0.7 }}
               className="flex flex-wrap gap-6 mt-10 pt-8"
               style={{ borderTop:'1px solid rgba(0,180,216,0.12)' }}>
-              {[
-                { val:'100%', label:'Normativa DIAN / RIPS' },
-                { val:'IA',   label:'Clínica por voz y texto' },
-                { val:'24/7', label:'Soporte prioritario' },
-              ].map((s,i) => (
-                <div key={i}>
-                  <div className="text-2xl font-black text-white" style={{ fontFamily:"'Space Grotesk',sans-serif", color: s.val==='IA'?'#00B4D8':'white' }}>
-                    {s.val}
-                  </div>
-                  <div className="text-xs mt-0.5" style={{ color:'rgba(148,163,184,0.5)' }}>{s.label}</div>
+              <div>
+                <div className="text-2xl font-black text-white" style={{ fontFamily:"'Space Grotesk',sans-serif" }}>
+                  24/7
                 </div>
-              ))}
+                <div className="text-xs mt-0.5" style={{ color:'rgba(148,163,184,0.5)' }}>Soporte prioritario</div>
+              </div>
             </motion.div>
           </div>
 
@@ -969,7 +964,7 @@ function ModelSection() {
       <div className="absolute top-1/2 right-0 w-80 h-80 rounded-full pointer-events-none"
         style={{ background:'radial-gradient(circle,rgba(0,180,216,0.06) 0%,transparent 65%)', filter:'blur(60px)' }} />
       <div className="relative z-10 max-w-[1200px] mx-auto px-5 md:px-8">
-        <SectionTitle kicker="Modelo económico" title="Inversión clara, retorno inmediato."
+        <SectionTitle kicker="Modelo económico" title="Inversión clara, retorno desde la primera radicación."
           subtitle="Un precio de implementación único diferido y un alquiler mensual según su modalidad. Sin sorpresas." light />
 
         {/* Implementación */}
@@ -1204,6 +1199,7 @@ function CTAFinal() {
 function ContactForm() {
   const [form, setForm] = useState({ nombre:'', institucion:'', cargo:'', correo:'', telefono:'', mensaje:'' });
   const [sent, setSent] = useState(false);
+  const [sending, setSending] = useState(false);
   const [errors, setErrors] = useState<Record<string,string>>({});
 
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement|HTMLTextAreaElement>) =>
@@ -1219,10 +1215,31 @@ function ContactForm() {
     return err;
   };
 
-  const handleSend = () => {
+  const handleSend = async () => {
     const err = validate();
     if (Object.keys(err).length) { setErrors(err); return; }
-    setSent(true);
+    setSending(true);
+    setErrors({});
+    try {
+      await emailjs.send(
+        import.meta.env.VITE_EMAILJS_SERVICE_ID  || '',
+        import.meta.env.VITE_EMAILJS_TEMPLATE_ID || '',
+        {
+          from_name:   form.nombre,
+          institucion: form.institucion,
+          cargo:       form.cargo || '—',
+          reply_to:    form.correo,
+          telefono:    form.telefono,
+          message:     form.mensaje || '(sin mensaje adicional)',
+        },
+        import.meta.env.VITE_EMAILJS_PUBLIC_KEY || '',
+      );
+      setSent(true);
+    } catch {
+      setErrors({ global: 'Error al enviar. Por favor escríbanos directamente a sarai@sara-ai.co' });
+    } finally {
+      setSending(false);
+    }
   };
 
   const inputBase: React.CSSProperties = {
@@ -1287,13 +1304,23 @@ function ContactForm() {
                     onFocus={e=>{ e.currentTarget.style.borderColor='rgba(0,180,216,0.5)'; e.currentTarget.style.boxShadow='0 0 0 3px rgba(0,180,216,0.08)'; }}
                     onBlur={e=>{ e.currentTarget.style.borderColor='rgba(0,180,216,0.15)'; e.currentTarget.style.boxShadow='none'; }} />
                 </div>
-                <button type="button" onClick={handleSend}
+                <button type="button" onClick={handleSend} disabled={sending}
                   className="w-full py-4 rounded-xl font-bold text-white text-sm flex items-center justify-center gap-2 transition-all duration-200"
-                  style={{ background:'linear-gradient(90deg,#0077B6 0%,#00B4D8 100%)', boxShadow:'0 8px 24px rgba(0,180,216,0.25)' }}
-                  onMouseEnter={e=>{ e.currentTarget.style.transform='translateY(-1px)'; e.currentTarget.style.boxShadow='0 12px 32px rgba(0,180,216,0.35)'; }}
+                  style={{ background: sending ? 'rgba(0,119,182,0.5)' : 'linear-gradient(90deg,#0077B6 0%,#00B4D8 100%)', boxShadow:'0 8px 24px rgba(0,180,216,0.25)', cursor: sending ? 'not-allowed' : 'pointer' }}
+                  onMouseEnter={e=>{ if (!sending) { e.currentTarget.style.transform='translateY(-1px)'; e.currentTarget.style.boxShadow='0 12px 32px rgba(0,180,216,0.35)'; } }}
                   onMouseLeave={e=>{ e.currentTarget.style.transform='none'; e.currentTarget.style.boxShadow='0 8px 24px rgba(0,180,216,0.25)'; }}>
-                  <Send className="w-4 h-4"/> Enviar solicitud de demo
+                  {sending ? (
+                    <><svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
+                      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3"/>
+                      <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
+                    </svg> Enviando...</>
+                  ) : (
+                    <><Send className="w-4 h-4"/> Enviar solicitud de demo</>
+                  )}
                 </button>
+                {errors.global && (
+                  <p className="text-red-500 text-xs mt-2 text-center">{errors.global}</p>
+                )}
                 <p className="text-center text-[10px] mt-3" style={{ color:'rgba(10,22,40,0.3)' }}>
                   Sus datos son tratados conforme a la Ley 1581 de 2012 (Habeas Data). Nunca los compartiremos con terceros.
                 </p>
@@ -1316,8 +1343,11 @@ function Footer() {
       <div className="max-w-[1200px] mx-auto px-5 md:px-8 py-14">
         <div className="grid md:grid-cols-[1.5fr_1fr_1fr_1fr] gap-10 mb-12">
           <div>
-            <div className="flex items-center gap-2 mb-4">
-              <SaraiNodeLogo />
+            <div className="flex items-center gap-2.5 mb-4">
+              <div className="w-8 h-8 rounded-lg overflow-hidden flex-shrink-0"
+                style={{ background:'rgba(0,180,216,0.12)', border:'1px solid rgba(0,180,216,0.25)' }}>
+                <img src={saraiLogo} alt="SARAI" className="w-full h-full object-cover" />
+              </div>
               <div>
                 <span className="text-xl font-extrabold tracking-widest text-white"
                   style={{ fontFamily:"'Space Grotesk',sans-serif", letterSpacing:'0.15em' }}>SARAI</span>
@@ -1351,14 +1381,23 @@ function Footer() {
             <h5 className="text-[10px] font-semibold tracking-widest uppercase mb-4" style={{ color:'rgba(148,163,184,0.5)' }}>Contacto</h5>
             <ul className="space-y-3">
               {[
-                { i:<Mail className="w-3.5 h-3.5"/>,     t:'info@saraigroup.com.co' },
-                { i:<Phone className="w-3.5 h-3.5"/>,    t:'+57 300 000 0000' },
-                { i:<Globe className="w-3.5 h-3.5"/>,    t:'saraigroup.com.co' },
-                { i:<Building2 className="w-3.5 h-3.5"/>,t:'Colombia' },
+                { i:<Mail className="w-3.5 h-3.5"/>,  t:'sarai@sara-ai.co',              href:'mailto:sarai@sara-ai.co' },
+                { i:<Globe className="w-3.5 h-3.5"/>, t:'www.sara-ai.co/propuesta-indigo', href:'https://www.sara-ai.co/propuesta-indigo' },
+                { i:<Building2 className="w-3.5 h-3.5"/>, t:'Colombia',                  href: null },
               ].map((c,i)=>(
                 <li key={i} className="flex items-start gap-2">
                   <span style={{ color:'#00B4D8' }}>{c.i}</span>
-                  <span className="text-xs" style={{ color:'rgba(148,163,184,0.4)' }}>{c.t}</span>
+                  {c.href ? (
+                    <a href={c.href} target="_blank" rel="noopener noreferrer"
+                      className="text-xs transition-colors"
+                      style={{ color:'rgba(148,163,184,0.4)' }}
+                      onMouseEnter={e=>(e.currentTarget.style.color='rgba(0,180,216,0.8)')}
+                      onMouseLeave={e=>(e.currentTarget.style.color='rgba(148,163,184,0.4)')}>
+                      {c.t}
+                    </a>
+                  ) : (
+                    <span className="text-xs" style={{ color:'rgba(148,163,184,0.4)' }}>{c.t}</span>
+                  )}
                 </li>
               ))}
             </ul>
