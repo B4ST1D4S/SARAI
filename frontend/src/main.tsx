@@ -8,12 +8,12 @@ import { IamProvider } from './context/IamContext'
 
 initTheme()
 
-// Rutas estáticas: /propuesta → landing page propuesta Índigo
+// Rutas estáticas: /propuesta-indigo → landing page propuesta Índigo
 const path = window.location.pathname.replace(/\/$/, '')
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    {path === '/propuesta' ? (
+    {path === '/propuesta-indigo' ? (
       <PropuestaIndigoPage />
     ) : (
       <IamProvider>
