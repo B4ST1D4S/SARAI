@@ -1,7 +1,7 @@
 /**
  * PropuestaIndigoPage.tsx
  * Propuesta Comercial SARAI – Clínica Médica Índigo
- * CLICK SOLUCIONES TECNOLÓGICAS S.A.S.
+ * SARAI GROUP
  *
  * Acceso restringido: requiere credenciales para visualizar.
  */
@@ -516,7 +516,7 @@ function PasswordGate({ onSuccess }: { onSuccess: () => void }) {
 
           <p className="text-center text-white/20 text-[10px] mt-6 leading-relaxed">
             Documento confidencial · Uso exclusivo de Gerencia<br />
-            CLICK SOLUCIONES TECNOLÓGICAS S.A.S.
+            SARAI GROUP
           </p>
         </div>
       </motion.div>
@@ -1541,7 +1541,7 @@ function ContactForm() {
                   ¡Solicitud enviada!
                 </h3>
                 <p className="text-[#1C2E4A]/55 text-sm">
-                  Gracias, {form.nombre}. Un consultor de CLICK Soluciones se comunicará<br />
+                  Gracias, {form.nombre}. Un consultor de SARAI GROUP se comunicará<br />
                   con usted en las próximas 24 horas.
                 </p>
               </motion.div>
@@ -1623,7 +1623,7 @@ function Footer() {
               Solución asistencial clínica para hospitales y<br />clínicas en Colombia.
             </p>
             <p className="text-white/25 text-[11px] font-semibold uppercase tracking-widest">
-              CLICK SOLUCIONES TECNOLÓGICAS S.A.S.
+              SARAI GROUP
             </p>
           </div>
 
@@ -1680,7 +1680,7 @@ function Footer() {
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-6"
           style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
           <p className="text-white/20 text-[11px]">
-            © 2026 CLICK SOLUCIONES TECNOLÓGICAS S.A.S. Todos los derechos reservados.
+            © 2026 SARAI GROUP. Todos los derechos reservados.
           </p>
           <p className="text-white/15 text-[10px] text-center sm:text-right">
             Propuesta confidencial — Uso exclusivo de Clínica Médica Índigo.<br />
