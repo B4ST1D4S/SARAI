@@ -130,11 +130,20 @@ function SectionTitle({ kicker, title, subtitle, light=false, center=true }: {
 }
 
 /* ─── Check item ─────────────────────────────────────────────────────────────── */
-function Ci({ text, light=true }: { text:string; light?:boolean }) {
+function Ci({ text, light=true, checked=true }: { text:string; light?:boolean; checked?:boolean }) {
   return (
     <li className="flex items-start gap-2.5">
-      <CheckCircle className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color:'#1E8E5A' }} />
-      <span className={`text-sm leading-relaxed ${light?'text-white/70':'text-[#0A1628]/70'}`}>{text}</span>
+      {checked ? (
+        <CheckCircle className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color:'#1E8E5A' }} />
+      ) : (
+        <span className="w-4 h-4 mt-0.5 flex-shrink-0 flex items-center justify-center">
+          <span className="w-2 h-2 rounded-full border flex-shrink-0"
+            style={{ borderColor: light ? 'rgba(255,255,255,0.2)' : 'rgba(10,22,40,0.2)' }} />
+        </span>
+      )}
+      <span className={`text-sm leading-relaxed ${checked ? '' : 'opacity-45'} ${light?'text-white/70':'text-[#0A1628]/70'}`}>
+        {text}
+      </span>
     </li>
   );
 }
@@ -850,15 +859,47 @@ function IASection() {
    SERVICES
 ═══════════════════════════════════════════════════════════════════════════════ */
 function ServicesSection() {
-  const cats = [
+  const cats: { icon:React.ReactNode; title:string; c:string; items:{t:string; ok:boolean}[] }[] = [
     { icon:<Stethoscope className="w-5 h-5"/>, title:'Atención Asistencial', c:'#00B4D8',
-      items:['Urgencias y triage','Hospitalización / UCI / Home Care','Cirugías y salas quirúrgicas','Consulta externa','Apoyos diagnósticos','Laboratorio clínico','Odontología','Programas crónicos (Nefrología / VIH)'] },
+      items:[
+        { t:'Urgencias',                             ok:false },
+        { t:'Hospitalización / UCI / Home Care',     ok:false },
+        { t:'Cirugías y salas quirúrgicas',          ok:true  },
+        { t:'Consulta externa',                      ok:true  },
+        { t:'Apoyos diagnósticos',                   ok:true  },
+        { t:'Laboratorio clínico',                   ok:true  },
+        { t:'Odontología',                           ok:true  },
+        { t:'Programas crónicos (Nefrología / VIH)', ok:false },
+      ],
+    },
     { icon:<Receipt className="w-5 h-5"/>, title:'Facturación y Recaudo', c:'#0077B6',
-      items:['Facturación electrónica (FEV)','Radicación RIPS JSON','Glosas y respuesta masiva','Notas crédito/débito JSON','Recuperación de rubros y cartera','Tarifarios y gestión de contratos'] },
+      items:[
+        { t:'Facturación electrónica (FEV)',                    ok:false },
+        { t:'Radicación RIPS JSON (individual y masiva)',        ok:true  },
+        { t:'Glosas: registro y respuesta (masiva)',             ok:true  },
+        { t:'Notas crédito / débito y de ajuste (JSON)',         ok:true  },
+        { t:'Recuperación de rubros y cartera',                  ok:false },
+        { t:'Tarifarios y gestión de contratos',                 ok:true  },
+      ],
+    },
     { icon:<DollarSign className="w-5 h-5"/>, title:'Administrativo y Financiero', c:'#00B4D8',
-      items:['Inventarios y activos','Compras y proveedores','Interfaz contable','Cuentas por cobrar / pagar','Tesorería y flujo de caja','Honorarios médicos'] },
+      items:[
+        { t:'Inventarios y control de existencias', ok:true },
+        { t:'Compras y proveedores',                ok:true },
+        { t:'Interfaz contable',                    ok:true },
+        { t:'Cuentas por cobrar / pagar',           ok:true },
+        { t:'Tesorería y flujo de caja',            ok:true },
+        { t:'Honorarios médicos',                   ok:true },
+      ],
+    },
     { icon:<Brain className="w-5 h-5"/>, title:'Inteligencia y Experiencia', c:'#0077B6',
-      items:['Informes con IA (Power BI)','IA clínica por voz y texto','App responsive multiplataforma','Bot de WhatsApp / Smart Access'] },
+      items:[
+        { t:'Informes gerenciales con IA (tipo Power BI)', ok:false },
+        { t:'IA clínica por voz y texto',                  ok:true  },
+        { t:'App responsive (cualquier dispositivo móvil)',ok:true  },
+        { t:'Bot de WhatsApp / Smart Access',              ok:false },
+      ],
+    },
   ];
   return (
     <section id="servicios" style={{ background:'linear-gradient(160deg,#0A1628 0%,#060D1B 100%)' }}
@@ -880,7 +921,9 @@ function ServicesSection() {
                   <h3 className="font-bold text-white text-sm leading-snug"
                     style={{ fontFamily:"'Space Grotesk',sans-serif" }}>{cat.title}</h3>
                 </div>
-                <ul className="space-y-2 flex-1">{cat.items.map((t,j)=><Ci key={j} text={t}/>)}</ul>
+                <ul className="space-y-2 flex-1">
+                  {cat.items.map((item,j)=><Ci key={j} text={item.t} checked={item.ok}/>)}
+                </ul>
               </GlassCard>
             </FadeIn>
           ))}
