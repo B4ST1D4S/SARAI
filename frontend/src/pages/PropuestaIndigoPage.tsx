@@ -17,7 +17,7 @@ import {
   Stethoscope, Receipt, DollarSign,
   Wallet, Award, Globe, ChevronRight,
   Menu, X, AlertCircle, Layers, Users, Database,
-  Shield
+  Shield, LogOut
 } from 'lucide-react';
 import NeuralCanvas from '../components/NeuralCanvas';
 import saraiLogo from '../assets/logo1.png';
@@ -372,7 +372,7 @@ function PasswordGate({ onSuccess }: { onSuccess:()=>void }) {
 /* ══════════════════════════════════════════════════════════════════════════════
    NAVBAR
 ═══════════════════════════════════════════════════════════════════════════════ */
-function Navbar() {
+function Navbar({ onLogout }: { onLogout: () => void }) {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -432,13 +432,20 @@ function Navbar() {
             ))}
           </nav>
 
-          <div className="hidden lg:flex">
+          <div className="hidden lg:flex items-center gap-2">
             <button onClick={() => go('#contacto')}
               className="px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all duration-200"
               style={{ background:'linear-gradient(90deg,#0077B6 0%,#00B4D8 100%)', boxShadow:'0 4px 16px rgba(0,180,216,0.3)' }}
               onMouseEnter={e=>(e.currentTarget.style.transform='translateY(-1px)')}
               onMouseLeave={e=>(e.currentTarget.style.transform='none')}>
               Solicitar demo
+            </button>
+            <button onClick={onLogout} title="Cerrar sesión" aria-label="Cerrar sesión"
+              className="p-2 rounded-xl transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
+              style={{ color:'rgba(148,163,184,0.7)', border:'1px solid rgba(0,180,216,0.15)' }}
+              onMouseEnter={e=>{ e.currentTarget.style.color='#fff'; e.currentTarget.style.background='rgba(239,68,68,0.12)'; e.currentTarget.style.borderColor='rgba(239,68,68,0.3)'; }}
+              onMouseLeave={e=>{ e.currentTarget.style.color='rgba(148,163,184,0.7)'; e.currentTarget.style.background='transparent'; e.currentTarget.style.borderColor='rgba(0,180,216,0.15)'; }}>
+              <LogOut className="w-4 h-4" />
             </button>
           </div>
 
@@ -466,9 +473,14 @@ function Navbar() {
                 </button>
               ))}
             </nav>
-            <button onClick={() => go('#contacto')} className="w-full py-3 rounded-xl text-sm font-semibold text-white"
+            <button onClick={() => go('#contacto')} className="w-full py-3 rounded-xl text-sm font-semibold text-white mb-2"
               style={{ background:'linear-gradient(90deg,#0077B6 0%,#00B4D8 100%)' }}>
               Solicitar demo
+            </button>
+            <button onClick={onLogout}
+              className="w-full py-3 rounded-xl text-sm font-semibold flex items-center justify-center gap-2"
+              style={{ color:'rgba(248,113,113,0.9)', border:'1px solid rgba(239,68,68,0.25)', background:'rgba(239,68,68,0.06)' }}>
+              <LogOut className="w-4 h-4" /> Cerrar sesión
             </button>
           </motion.div>
         )}
@@ -1470,10 +1482,10 @@ function Footer() {
 /* ══════════════════════════════════════════════════════════════════════════════
    LANDING ASSEMBLY
 ═══════════════════════════════════════════════════════════════════════════════ */
-function LandingContent() {
+function LandingContent({ onLogout }: { onLogout: () => void }) {
   return (
     <div style={{ fontFamily:"'Inter',sans-serif" }}>
-      <Navbar />
+      <Navbar onLogout={onLogout} />
       <main>
         <HeroSection />
         <TrustBar />
@@ -1498,11 +1510,15 @@ function LandingContent() {
 export default function PropuestaIndigoPage() {
   useGoogleFonts();
   const [auth, setAuth] = useState(false);
+  const handleLogout = useCallback(() => {
+    setAuth(false);
+    window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
+  }, []);
   return (
     <AnimatePresence mode="wait">
       {auth ? (
         <motion.div key="landing" initial={{ opacity:0 }} animate={{ opacity:1 }} transition={{ duration:0.5 }}>
-          <LandingContent />
+          <LandingContent onLogout={handleLogout} />
         </motion.div>
       ) : (
         <motion.div key="gate" initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }} transition={{ duration:0.3 }}>
