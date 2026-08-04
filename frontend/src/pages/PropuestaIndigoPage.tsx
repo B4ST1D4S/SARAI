@@ -868,7 +868,8 @@ function ServicesSection() {
     { icon:<Stethoscope className="w-5 h-5"/>, title:'Atención Asistencial', c:'#00B4D8',
       items:[
         { t:'Urgencias',                             ok:false },
-        { t:'Hospitalización / UCI / Home Care',     ok:false },
+        { t:'Hospitalización',                       ok:true  },
+        { t:'UCI / Home Care',                       ok:false },
         { t:'Cirugías y salas quirúrgicas',          ok:true  },
         { t:'Consulta externa',                      ok:true  },
         { t:'Apoyos diagnósticos',                   ok:true  },
@@ -879,7 +880,7 @@ function ServicesSection() {
     },
     { icon:<Receipt className="w-5 h-5"/>, title:'Facturación y Recaudo', c:'#0077B6',
       items:[
-        { t:'Facturación electrónica (FEV)',                    ok:false },
+        { t:'Facturación electrónica (FEV)',                    ok:true  },
         { t:'Radicación RIPS JSON (individual y masiva)',        ok:true  },
         { t:'Glosas: registro y respuesta (masiva)',             ok:true  },
         { t:'Notas crédito / débito y de ajuste (JSON)',         ok:true  },
@@ -899,7 +900,7 @@ function ServicesSection() {
     },
     { icon:<Brain className="w-5 h-5"/>, title:'Inteligencia y Experiencia', c:'#0077B6',
       items:[
-        { t:'Informes gerenciales con IA (tipo Power BI)', ok:false },
+        { t:'Informes gerenciales con IA (tipo Power BI)', ok:true  },
         { t:'IA clínica por voz y texto',                  ok:true  },
         { t:'App responsive (cualquier dispositivo móvil)',ok:true  },
         { t:'Bot de WhatsApp / Smart Access',              ok:false },
