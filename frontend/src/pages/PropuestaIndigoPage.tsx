@@ -556,12 +556,17 @@ function HeroSection() {
               transition={{ duration:0.6, delay:0.7 }}
               className="flex flex-wrap gap-6 mt-10 pt-8"
               style={{ borderTop:'1px solid rgba(0,180,216,0.12)' }}>
-              <div>
-                <div className="text-2xl font-black text-white" style={{ fontFamily:"'Space Grotesk',sans-serif" }}>
-                  24/7
+              {[
+                { val:'100%', label:'Normativa DIAN / RIPS' },
+                { val:'IA',   label:'Clínica por voz y texto' },
+              ].map((s,i) => (
+                <div key={i}>
+                  <div className="text-2xl font-black text-white" style={{ fontFamily:"'Space Grotesk',sans-serif", color: s.val==='IA'?'#00B4D8':'white' }}>
+                    {s.val}
+                  </div>
+                  <div className="text-xs mt-0.5" style={{ color:'rgba(148,163,184,0.5)' }}>{s.label}</div>
                 </div>
-                <div className="text-xs mt-0.5" style={{ color:'rgba(148,163,184,0.5)' }}>Soporte prioritario</div>
-              </div>
+              ))}
             </motion.div>
           </div>
 
