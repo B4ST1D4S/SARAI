@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { login } from '../services/api';
 import NeuralCanvas from '../components/NeuralCanvas';
+import saraiBrandLogo from '../assets/LOGO.png';
 
 /* ?? Cruz médica SVG con glow ??????????????????????????????????????? */
 function MedicalCross() {
@@ -43,34 +44,6 @@ function MedicalCross() {
   );
 }
 
-/* ?? Logo nodos SARAI ???????????????????????????????????????????????? */
-function SaraiNodeLogo() {
-  const nodes = [
-    [30,8],[52,18],[14,26],[44,36],[26,48],[50,52],[12,56],
-  ];
-  const edges = [[0,1],[0,2],[1,3],[2,3],[2,4],[3,4],[3,5],[4,6],[5,6]];
-  return (
-    <svg viewBox="0 0 64 64" className="w-14 h-14" fill="none">
-      <defs>
-        <linearGradient id="ng" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%"   stopColor="#7B2FBE" />
-          <stop offset="100%" stopColor="#00B4D8" />
-        </linearGradient>
-      </defs>
-      {edges.map(([a,b],i) => (
-        <line key={i}
-          x1={nodes[a][0]} y1={nodes[a][1]}
-          x2={nodes[b][0]} y2={nodes[b][1]}
-          stroke="url(#ng)" strokeWidth="1.4" opacity="0.8"
-        />
-      ))}
-      {nodes.map(([cx,cy],i) => (
-        <circle key={i} cx={cx} cy={cy} r={i === 0 || i === 6 ? 4 : 3}
-          fill="url(#ng)" opacity="0.95" />
-      ))}
-    </svg>
-  );
-}
 
 export default function AuthPage() {
   const [loading, setLoading] = useState(false);
@@ -137,8 +110,13 @@ export default function AuthPage() {
       >
         {/* Branding */}
         <div className="text-center mb-8">
-          <div className="flex items-center justify-center mb-4">
-            <SaraiNodeLogo />
+          <div className="flex items-center justify-center mb-1">
+            <img
+              src={saraiBrandLogo}
+              alt="SARAI Logo"
+              className="w-24 sm:w-28 md:w-32 object-contain object-top"
+              style={{ height: '65px' }}
+            />
           </div>
           <h1 className="text-4xl font-extrabold tracking-widest"
               style={{ color: '#FFFFFF', letterSpacing: '0.2em' }}>

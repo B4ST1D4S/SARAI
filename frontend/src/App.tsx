@@ -27,7 +27,7 @@ import CotizacionesPage from './pages/CotizacionesPage';
 import ContratacionPage from './pages/ContratacionPage';
 import SaraiAssistant from './components/SaraiAssistant';
 import ManualPage from './pages/ManualPage';
-import saraiLogo from './assets/logo1.png';
+import saraiLogo from './assets/LOGO.png';
 import { getParametrosSistema } from './services/adminService';
 import { useTheme } from './hooks/useTheme';
 import { useIam } from './context/IamContext';
@@ -167,9 +167,9 @@ function Sidebar({
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.7 }}
                 transition={{ duration: 0.2 }}
-                className="w-9 h-9 rounded-xl bg-[#1a1a3e] flex items-center justify-center mx-auto shadow-md overflow-hidden"
+                className="w-7 h-7 rounded-xl bg-[#1a1a3e] flex items-center justify-center mx-auto shadow-md overflow-hidden"
               >
-                <img src={saraiLogo} alt="SARAI" className="w-9 h-9 object-cover" />
+                <img src={saraiLogo} alt="SARAI" className="w-7 h-7 object-contain" />
               </motion.div>
             ) : (
               <motion.span
