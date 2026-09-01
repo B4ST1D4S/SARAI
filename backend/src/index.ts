@@ -24,6 +24,7 @@ import contratacionRoutes from './routes/contratacion.js';
 import fevRipsRoutes from './routes/fevRips.js';
 import odontologiaRoutes from './routes/odontologia.js';
 import seguridadRoutes from './routes/seguridad.js';
+import programasEspecialesRoutes from './routes/programasEspeciales.js';
 
 dotenv.config();
 
@@ -94,6 +95,7 @@ app.use('/api/contratacion', contratacionRoutes);
 app.use('/api/fev-rips', fevRipsRoutes);
 app.use('/api/odontologia',  odontologiaRoutes);
 app.use('/api/seguridad',    seguridadRoutes);
+app.use('/api/programas-especiales', programasEspecialesRoutes);
 
 // ============================================
 // MANEJO DE ERRORES

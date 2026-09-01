@@ -29,9 +29,32 @@ $job2 = Start-Job -Name "Frontend" -ArgumentList $pathFrontend -ScriptBlock {
     param($p); Set-Location $p; npm run dev 2>&1
 }
 $pythonExe = $null
-$pythonCmd = Get-Command python -ErrorAction SilentlyContinue
-if (-not $pythonCmd) { $pythonCmd = Get-Command py -ErrorAction SilentlyContinue }
-if ($pythonCmd) { $pythonExe = $pythonCmd.Source }
+
+# 1. Buscar Python en el .venv del whisper_service (prioritario)
+$venvPy = "$pathWhisper\.venv\Scripts\python.exe"
+if (Test-Path $venvPy) {
+    $pythonExe = $venvPy
+} else {
+    # 2. Buscar en instalaciones comunes de Windows
+    $candidates = @(
+        "C:\Python313\python.exe", "C:\Python312\python.exe",
+        "C:\Python311\python.exe", "C:\Python310\python.exe",
+        "$env:LOCALAPPDATA\Programs\Python\Python313\python.exe",
+        "$env:LOCALAPPDATA\Programs\Python\Python312\python.exe",
+        "$env:LOCALAPPDATA\Programs\Python\Python311\python.exe",
+        "$env:LOCALAPPDATA\Programs\Python\Python310\python.exe"
+    )
+    foreach ($c in $candidates) { if (Test-Path $c) { $pythonExe = $c; break } }
+
+    # 3. Intentar desde el PATH (si no es el alias de la Store)
+    if (-not $pythonExe) {
+        $pythonCmd = Get-Command python -ErrorAction SilentlyContinue
+        if (-not $pythonCmd) { $pythonCmd = Get-Command py -ErrorAction SilentlyContinue }
+        if ($pythonCmd -and $pythonCmd.Source -notmatch "WindowsApps") {
+            $pythonExe = $pythonCmd.Source
+        }
+    }
+}
 
 $jobs = @($job1, $job2)
 if ($pythonExe) {

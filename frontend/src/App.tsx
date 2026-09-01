@@ -27,6 +27,7 @@ import CotizacionesPage from './pages/CotizacionesPage';
 import ContratacionPage from './pages/ContratacionPage';
 import SaraiAssistant from './components/SaraiAssistant';
 import ManualPage from './pages/ManualPage';
+import ProgramasEspecialesModule from './modules/programas-especiales';
 import saraiLogo from './assets/LOGO.png';
 import { getParametrosSistema } from './services/adminService';
 import { useTheme } from './hooks/useTheme';
@@ -54,6 +55,7 @@ const NAV_RECURSO: Record<string, string> = {
   admin:              'ADMIN.PARAMETRIZACION',
   usuarios:           'ADMIN.USUARIOS',
   seguridad:          'SEGURIDAD',
+  // programas-especiales no tiene código IAM → siempre visible para todos los roles
 };
 
 const NAV_SECTIONS = [
@@ -100,6 +102,12 @@ const NAV_SECTIONS = [
       { id: 'usuarios', label: 'Usuarios',          sym: 'U' },
       { id: 'seguridad', label: 'Seguridad & IAM',  sym: 'E' },
       { id: 'manual',   label: 'Manual de Usuario', sym: '?' },
+    ],
+  },
+  {
+    label: 'PROGRAMAS ESP.',
+    items: [
+      { id: 'programas-especiales', label: 'Prog. Especializados', sym: '⚕' },
     ],
   },
 ];
@@ -548,6 +556,11 @@ function App() {
           {currentPage === 'admin'               && <AdminPage />}
           {currentPage === 'seguridad'            && <SeguridadPage />}
           {currentPage === 'manual'              && <ManualPage />}
+          {currentPage === 'programas-especiales' && (
+            <div className="h-[calc(100vh-80px)]">
+              <ProgramasEspecialesModule />
+            </div>
+          )}
         </div>
         </div>
       </main>
