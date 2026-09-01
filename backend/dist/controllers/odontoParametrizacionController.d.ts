@@ -1,0 +1,18 @@
+import { Request, Response } from 'express';
+export declare function getHallazgos(req: Request, res: Response): Promise<void>;
+export declare function createHallazgo(req: Request, res: Response): Promise<void>;
+export declare function updateHallazgo(req: Request, res: Response): Promise<void>;
+export declare function deleteHallazgo(req: Request, res: Response): Promise<void>;
+export declare function setSugerencias(req: Request, res: Response): Promise<void>;
+export declare const getEstados: (req: Request, res: Response) => Promise<void>;
+export declare const createEstado: (req: Request, res: Response) => Promise<void>;
+export declare const updateEstado: (req: Request, res: Response) => Promise<void>;
+export declare const deleteEstado: (req: Request, res: Response) => Promise<void>;
+export declare const getPrioridades: (req: Request, res: Response) => Promise<void>;
+export declare const createPrioridad: (req: Request, res: Response) => Promise<void>;
+export declare const updatePrioridad: (req: Request, res: Response) => Promise<void>;
+export declare const deletePrioridad: (req: Request, res: Response) => Promise<void>;
+export declare const getRiesgos: (req: Request, res: Response) => Promise<void>;
+export declare const createRiesgo: (req: Request, res: Response) => Promise<void>;
+export declare const updateRiesgo: (req: Request, res: Response) => Promise<void>;
+export declare const deleteRiesgo: (req: Request, res: Response) => Promise<void>;

@@ -1,0 +1,41 @@
+import { Request, Response } from 'express';
+export declare function crearIngresoYCuentaDesdeCita(citaId: string): Promise<{
+    cuentas: {
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        estado: string;
+        numero: number;
+        ingresoId: string;
+        observaciones: string | null;
+    }[];
+} & {
+    id: string;
+    createdAt: Date;
+    updatedAt: Date;
+    estado: string;
+    pacienteId: string;
+    numero: number;
+    medicoId: string | null;
+    fechaIngreso: Date;
+    observaciones: string | null;
+    citaId: string | null;
+    tipoIngreso: string;
+    entidad: string | null;
+    plan: string | null;
+    fechaEgreso: Date | null;
+}>;
+export declare function getIngresos(req: Request, res: Response): Promise<void>;
+export declare function getIngresoById(req: Request, res: Response): Promise<Response<any, Record<string, any>> | undefined>;
+export declare function createIngreso(req: Request, res: Response): Promise<Response<any, Record<string, any>> | undefined>;
+export declare function getCuentaById(req: Request, res: Response): Promise<Response<any, Record<string, any>> | undefined>;
+export declare function addCuentaItem(req: Request, res: Response): Promise<Response<any, Record<string, any>> | undefined>;
+export declare function updateCuentaItem(req: Request, res: Response): Promise<Response<any, Record<string, any>> | undefined>;
+export declare function deleteCuentaItem(req: Request, res: Response): Promise<Response<any, Record<string, any>> | undefined>;
+export declare function buscarCargos(req: Request, res: Response): Promise<void>;
+export declare function validarRips(req: Request, res: Response): Promise<void>;
+export declare function facturarCuenta(req: Request, res: Response): Promise<Response<any, Record<string, any>> | undefined>;
+export declare function getFacturas(req: Request, res: Response): Promise<void>;
+export declare function getFacturaById(req: Request, res: Response): Promise<Response<any, Record<string, any>> | undefined>;
+export declare function anularFactura(req: Request, res: Response): Promise<Response<any, Record<string, any>> | undefined>;
+export declare function getResumen(_req: Request, res: Response): Promise<void>;

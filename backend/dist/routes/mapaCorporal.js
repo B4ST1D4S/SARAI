@@ -1,0 +1,17 @@
+import { Router } from 'express';
+import { save, getByProcedimiento, getByPaciente, update, remove, } from '../controllers/mapaCorporalController.js';
+import { authenticateToken, authorizeRole } from '../middleware/auth.js';
+const router = Router();
+// Todos los endpoints requieren autenticaci�n
+router.use(authenticateToken);
+// POST /api/mapa-corporal - Guardar/actualizar mapa corporal (solo m�dicos)
+router.post('/', authorizeRole('SUPER_ADMIN', 'MEDICO'), save);
+// GET /api/mapa-corporal/paciente/:pacienteId - Obtener mapas corporales de un paciente
+router.get('/paciente/:pacienteId', getByPaciente);
+// GET /api/mapa-corporal/procedimiento/:procedimientoId/:pacienteId - Obtener mapa corporal por procedimiento (DEBE ir despu�s de /paciente)
+router.get('/procedimiento/:procedimientoId/:pacienteId', getByProcedimiento);
+// PUT /api/mapa-corporal/:id - Actualizar mapa corporal (solo m�dicos)
+router.put('/:id', authorizeRole('SUPER_ADMIN', 'MEDICO'), update);
+// DELETE /api/mapa-corporal/:id - Eliminar mapa corporal (solo m�dicos)
+router.delete('/:id', authorizeRole('SUPER_ADMIN', 'MEDICO'), remove);
+export default router;

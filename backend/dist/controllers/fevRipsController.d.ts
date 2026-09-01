@@ -1,0 +1,13 @@
+import { Request, Response } from 'express';
+export declare function listUsuariosSispro(req: Request, res: Response): Promise<void>;
+export declare function createUsuarioSispro(req: Request, res: Response): Promise<void>;
+export declare function updateUsuarioSispro(req: Request, res: Response): Promise<void>;
+export declare function deleteUsuarioSispro(req: Request, res: Response): Promise<void>;
+export declare function listRipsPruebas(_req: Request, res: Response): Promise<void>;
+export declare function getRipsPrueba(req: Request, res: Response): Promise<void>;
+export declare function createRipsPrueba(req: Request, res: Response): Promise<void>;
+export declare function deleteRipsPrueba(req: Request, res: Response): Promise<void>;
+export declare function login(req: Request, res: Response): Promise<void>;
+export declare function enviar(req: Request, res: Response): Promise<void>;
+export declare function recuperarCuv(req: Request, res: Response): Promise<void>;
+export declare function consultarCuv(req: Request, res: Response): Promise<void>;

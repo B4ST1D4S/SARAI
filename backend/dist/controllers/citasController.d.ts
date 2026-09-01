@@ -1,0 +1,11 @@
+import { Request, Response } from 'express';
+export declare function create(req: Request, res: Response): Promise<void>;
+export declare function getMedico(req: Request, res: Response): Promise<void>;
+export declare function getPaciente(req: Request, res: Response): Promise<void>;
+export declare function getById(req: Request, res: Response): Promise<void>;
+export declare function update(req: Request, res: Response): Promise<void>;
+export declare function confirmar(req: Request, res: Response): Promise<void>;
+export declare function completar(req: Request, res: Response): Promise<void>;
+export declare function cancelar(req: Request, res: Response): Promise<void>;
+export declare function recordatorios(req: Request, res: Response): Promise<void>;
+export declare function admision(req: Request, res: Response): Promise<void>;

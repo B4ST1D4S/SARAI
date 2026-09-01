@@ -1,0 +1,260 @@
+import prisma from '../lib/prisma.js';
+import { createCita, getCitasByMedico, getCitasByPaciente, getCitaById, updateCita, cancelarCita, confirmarAsistencia, completarCita, enviarRecordatorios24h, } from '../services/citasService.js';
+import { crearIngresoYCuentaDesdeCita } from './facturacionController.js';
+// Crear cita
+export async function create(req, res) {
+    try {
+        if (!req.user) {
+            res.status(401).json({ error: 'No autenticado' });
+            return;
+        }
+        const { pacienteId, medicoId, tipoCita, entidadSalud, fechaHora, duracionMinutos, motivo, notas, } = req.body;
+        if (!pacienteId || !medicoId || !tipoCita || !fechaHora) {
+            res.status(400).json({ error: 'Datos incompletos' });
+            return;
+        }
+        const cita = await createCita({
+            pacienteId,
+            medicoId,
+            tipoCita,
+            entidadSalud,
+            fechaHora,
+            duracionMinutos,
+            motivo,
+            notas,
+        });
+        res.status(201).json({
+            success: true,
+            message: 'Cita creada exitosamente',
+            cita,
+        });
+    }
+    catch (error) {
+        console.error('Error en create:', error);
+        res.status(500).json({ error: error.message || 'Error al crear cita' });
+    }
+}
+// Obtener citas del médico
+export async function getMedico(req, res) {
+    try {
+        if (!req.user) {
+            res.status(401).json({ error: 'No autenticado' });
+            return;
+        }
+        const { estado, fechaInicio, fechaFin, medicoId } = req.query;
+        // Un MEDICO siempre ve su propia agenda. SUPER_ADMIN ve TODO siempre,
+        // sin excepción (ignora cualquier ?medicoId= que llegue). El resto de
+        // roles (recepción, auxiliares) ven la agenda de todos los profesionales
+        // por defecto, pero sí respetan un filtro puntual con ?medicoId=.
+        const medicoIdFiltro = req.user.rol === 'MEDICO'
+            ? req.user.userId
+            : req.user.rol === 'SUPER_ADMIN'
+                ? null
+                : medicoId || null;
+        const citas = await getCitasByMedico(medicoIdFiltro, estado, fechaInicio, fechaFin);
+        res.json({
+            success: true,
+            count: citas.length,
+            citas,
+        });
+    }
+    catch (error) {
+        console.error('Error en getMedico:', error);
+        res.status(500).json({ error: error.message || 'Error al obtener citas' });
+    }
+}
+// Obtener citas de paciente
+export async function getPaciente(req, res) {
+    try {
+        const { pacienteId } = req.params;
+        if (!pacienteId) {
+            res.status(400).json({ error: 'ID de paciente requerido' });
+            return;
+        }
+        const citas = await getCitasByPaciente(pacienteId);
+        res.json({
+            success: true,
+            count: citas.length,
+            citas,
+        });
+    }
+    catch (error) {
+        console.error('Error en getPaciente:', error);
+        res.status(500).json({ error: error.message || 'Error al obtener citas' });
+    }
+}
+// Obtener cita por ID
+export async function getById(req, res) {
+    try {
+        const { id } = req.params;
+        if (!id) {
+            res.status(400).json({ error: 'ID de cita requerido' });
+            return;
+        }
+        const cita = await getCitaById(id);
+        if (!cita) {
+            res.status(404).json({ error: 'Cita no encontrada' });
+            return;
+        }
+        res.json({
+            success: true,
+            cita,
+        });
+    }
+    catch (error) {
+        console.error('Error en getById:', error);
+        res.status(500).json({ error: error.message || 'Error al obtener cita' });
+    }
+}
+// Actualizar cita
+export async function update(req, res) {
+    try {
+        const { id } = req.params;
+        const { estado, asistencia, notas, motivo } = req.body;
+        if (!id) {
+            res.status(400).json({ error: 'ID de cita requerido' });
+            return;
+        }
+        const cita = await updateCita(id, {
+            estado,
+            asistencia,
+            notas,
+            motivo,
+        });
+        res.json({
+            success: true,
+            message: 'Cita actualizada exitosamente',
+            cita,
+        });
+    }
+    catch (error) {
+        console.error('Error en update:', error);
+        res.status(500).json({ error: error.message || 'Error al actualizar cita' });
+    }
+}
+// Confirmar asistencia de paciente
+export async function confirmar(req, res) {
+    try {
+        const { id } = req.params;
+        if (!id) {
+            res.status(400).json({ error: 'ID de cita requerido' });
+            return;
+        }
+        const cita = await confirmarAsistencia(id);
+        res.json({
+            success: true,
+            message: 'Asistencia confirmada',
+            cita,
+        });
+    }
+    catch (error) {
+        console.error('Error en confirmar:', error);
+        res
+            .status(500)
+            .json({ error: error.message || 'Error al confirmar asistencia' });
+    }
+}
+// Completar cita (atención médica)
+export async function completar(req, res) {
+    try {
+        const { id } = req.params;
+        const { notas } = req.body;
+        if (!id) {
+            res.status(400).json({ error: 'ID de cita requerido' });
+            return;
+        }
+        const cita = await completarCita(id, notas);
+        // Al completar la cita se genera automáticamente el ingreso + cuenta
+        // para poder facturar. No debe bloquear el cierre de la cita si falla.
+        let ingreso = null;
+        try {
+            ingreso = await crearIngresoYCuentaDesdeCita(id);
+        }
+        catch (facturacionError) {
+            console.error('No se pudo crear el ingreso de facturación:', facturacionError?.message);
+        }
+        res.json({
+            success: true,
+            message: 'Cita completada exitosamente',
+            cita,
+            ingreso,
+        });
+    }
+    catch (error) {
+        console.error('Error en completar:', error);
+        res.status(500).json({ error: error.message || 'Error al completar cita' });
+    }
+}
+// Cancelar cita
+export async function cancelar(req, res) {
+    try {
+        const { id } = req.params;
+        const { razon } = req.body;
+        if (!id) {
+            res.status(400).json({ error: 'ID de cita requerido' });
+            return;
+        }
+        const cita = await cancelarCita(id, razon);
+        res.json({
+            success: true,
+            message: 'Cita cancelada exitosamente',
+            cita,
+        });
+    }
+    catch (error) {
+        console.error('Error en cancelar:', error);
+        res.status(500).json({ error: error.message || 'Error al cancelar cita' });
+    }
+}
+// Enviar recordatorios 24h antes
+export async function recordatorios(req, res) {
+    try {
+        if (!req.user) {
+            res.status(401).json({ error: 'No autenticado' });
+            return;
+        }
+        const count = await enviarRecordatorios24h();
+        res.json({
+            success: true,
+            message: `${count} recordatorios enviados exitosamente`,
+            count,
+        });
+    }
+    catch (error) {
+        console.error('Error en recordatorios:', error);
+        res
+            .status(500)
+            .json({ error: error.message || 'Error al enviar recordatorios' });
+    }
+}
+// CU-03: Admisión — Paciente llega, pasa a EN_SALA
+export async function admision(req, res) {
+    try {
+        const { id } = req.params;
+        if (!id) {
+            res.status(400).json({ error: 'ID de cita requerido' });
+            return;
+        }
+        const cita = await prisma.cita.update({
+            where: { id },
+            data: { estado: 'EN_SALA', asistencia: true },
+            include: { paciente: true, medico: true },
+        });
+        // Igual que al completar la cita: desde que el paciente llega se puede
+        // empezar a cargar cuenta (consulta, insumos, etc.), así que la cuenta
+        // debe existir desde la admisión, no solo al cerrar la atención. No debe
+        // bloquear el registro de llegada si falla.
+        let ingreso = null;
+        try {
+            ingreso = await crearIngresoYCuentaDesdeCita(id);
+        }
+        catch (facturacionError) {
+            console.error('No se pudo crear el ingreso de facturación en admisión:', facturacionError?.message);
+        }
+        res.json({ success: true, message: 'Paciente en sala de espera', cita, ingreso });
+    }
+    catch (error) {
+        console.error('Error en admision:', error);
+        res.status(500).json({ error: error.message || 'Error al registrar admisión' });
+    }
+}

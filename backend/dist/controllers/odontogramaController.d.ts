@@ -1,0 +1,16 @@
+import { Request, Response } from 'express';
+export declare function getCatalogos(_req: Request, res: Response): Promise<void>;
+export declare function buscarCargos(req: Request, res: Response): Promise<void>;
+export declare function getOdontogramasByPaciente(req: Request, res: Response): Promise<void>;
+export declare function getOdontogramaById(req: Request, res: Response): Promise<void>;
+export declare function crearOdontograma(req: Request, res: Response): Promise<void>;
+export declare function updateOdontograma(req: Request, res: Response): Promise<void>;
+export declare function guardarPiezas(req: Request, res: Response): Promise<void>;
+export declare function generarPlan(req: Request, res: Response): Promise<void>;
+export declare function addPlanItem(req: Request, res: Response): Promise<void>;
+export declare function updatePlanItem(req: Request, res: Response): Promise<void>;
+export declare function deletePlanItem(req: Request, res: Response): Promise<void>;
+export declare function cambiarEstadoTratamiento(req: Request, res: Response): Promise<void>;
+export declare function addEvolucion(req: Request, res: Response): Promise<void>;
+export declare function getTimeline(req: Request, res: Response): Promise<void>;
+export declare function getResumen(_req: Request, res: Response): Promise<void>;

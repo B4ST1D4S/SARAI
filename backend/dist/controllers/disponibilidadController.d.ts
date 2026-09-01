@@ -1,0 +1,14 @@
+import { Request, Response } from 'express';
+export declare function getMedicoDisponibilidad(req: Request, res: Response): Promise<void>;
+export declare function postDisponibilidad(req: Request, res: Response): Promise<void>;
+export declare function getMedicosList(req: Request, res: Response): Promise<void>;
+export declare function getTiposConsultaMedico(req: Request, res: Response): Promise<void>;
+export declare function putDisponibilidad(req: Request, res: Response): Promise<void>;
+export declare function deleteDisponibilidadCtrl(req: Request, res: Response): Promise<void>;
+export declare function getDisponibilidadesConCitasCtrl(req: Request, res: Response): Promise<void>;
+export declare function getSlots(req: Request, res: Response): Promise<void>;
+export declare function getBloqueosMedico(req: Request, res: Response): Promise<void>;
+export declare function postBloqueo(req: Request, res: Response): Promise<void>;
+export declare function deleteBloqueoCtrl(req: Request, res: Response): Promise<void>;
+export declare function getMedicosPorTipoCtrl(req: Request, res: Response): Promise<void>;
+export declare function getDiasDisponiblesCtrl(req: Request, res: Response): Promise<void>;

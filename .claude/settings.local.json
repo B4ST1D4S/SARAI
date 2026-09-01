@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find \"/c/Users/SOPORTE/AppData/Local/Temp/scp19864\" -iname \"*SubirTarifarios*\" 2>/dev/null)",
+      "Read(//c/Users/SOPORTE/AppData/Local/Temp/scp19864/**)",
+      "Bash(find \"/c/Users/SOPORTE/AppData/Local/Temp\" -maxdepth 3 -iname \"scp*\" -type d 2>/dev/null)",
+      "Read(//c/Users/SOPORTE/AppData/Local/Temp/**)"
+    ]
+  }
+}

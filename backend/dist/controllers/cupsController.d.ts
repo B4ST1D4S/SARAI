@@ -1,0 +1,17 @@
+import { Request, Response } from 'express';
+export declare function getAllProcedimientos(req: Request, res: Response): Promise<void>;
+export declare function getProcedimientoByCUPS(req: Request, res: Response): Promise<Response<any, Record<string, any>> | undefined>;
+export declare function createProcedimiento(req: Request, res: Response): Promise<Response<any, Record<string, any>> | undefined>;
+export declare function updateProcedimiento(req: Request, res: Response): Promise<void>;
+export declare function deleteProcedimiento(req: Request, res: Response): Promise<void>;
+export declare function getPlantillasPorCUPS(req: Request, res: Response): Promise<void>;
+export declare function getPlantillaById(req: Request, res: Response): Promise<Response<any, Record<string, any>> | undefined>;
+export declare function createPlantilla(req: Request, res: Response): Promise<void>;
+export declare function updatePlantilla(req: Request, res: Response): Promise<void>;
+export declare function deletePlantilla(req: Request, res: Response): Promise<void>;
+export declare function getChecklistPorCUPS(req: Request, res: Response): Promise<void>;
+export declare function createChecklist(req: Request, res: Response): Promise<void>;
+export declare function updateChecklist(req: Request, res: Response): Promise<void>;
+export declare function getConsentimientoPorCUPS(req: Request, res: Response): Promise<Response<any, Record<string, any>> | undefined>;
+export declare function createConsentimiento(req: Request, res: Response): Promise<void>;
+export declare function updateConsentimiento(req: Request, res: Response): Promise<void>;
