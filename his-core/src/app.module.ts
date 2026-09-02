@@ -9,13 +9,14 @@ import { MasterDatabaseModule } from './core/database/master-database.module';
 import { TenancyModule } from './core/tenancy/tenancy.module';
 import { TenantResolverMiddleware } from './core/tenancy/middleware/tenant-resolver.middleware';
 import { AppController } from './app.controller';
+import { CLINICAL_MODULES } from './modules';
 
 @Module({
   imports: [
     CoreConfigModule,
     MasterDatabaseModule,
     TenancyModule,
-    // Módulos funcionales de negocio bajo src/modules/ se registran aquí
+    ...CLINICAL_MODULES,
   ],
   controllers: [AppController],
   providers: [],

@@ -20,7 +20,7 @@ export const MASTER_CONNECTION_NAME = 'master_connection';
         password: config.password,
         database: config.database,
         entities: [Tenant],
-        synchronize: process.env.NODE_ENV === 'development',
+        synchronize: false,
         logging:
           process.env.NODE_ENV === 'development'
             ? ['error', 'warn']

@@ -30,17 +30,20 @@ export class TenantResolverMiddleware implements NestMiddleware {
     // 1. Extraer identificador de header (útil para apps móviles, Swagger, integraciones API)
     const headerTenantId = this.extractHeaderTenant(req);
 
-    // 2. Extraer identificador desde el subdominio de la petición
+    // 2. Extraer identificador desde el token JWT (Authorization: Bearer <token>)
+    const jwtTenant = this.extractJwtTenant(req);
+
+    // 3. Extraer identificador desde el subdominio de la petición
     const subdomainTenant = this.extractSubdomain(req);
 
-    const tenantIdentifier = headerTenantId || subdomainTenant;
+    const tenantIdentifier = headerTenantId || jwtTenant || subdomainTenant;
 
     if (!tenantIdentifier) {
       this.logger.warn(
-        `Petición rechazada en [${req.method} ${req.originalUrl}]: No se proporcionó subdominio ni header 'x-tenant-id'`,
+        `Petición rechazada en [${req.method} ${req.originalUrl}]: No se proporcionó subdominio, token JWT ni header 'x-tenant-id'`,
       );
       throw new UnauthorizedException(
-        'Identificador de clínica/tenant no proporcionado en la petición. Debe incluir un subdominio válido (ej: clinica1.hisapp.local) o el header "x-tenant-id".',
+        'Identificador de clínica/tenant no proporcionado en la petición. Debe incluir un subdominio válido (ej: clinica1.hisapp.local), un token JWT con claim de tenant o el header "x-tenant-id".',
       );
     }
 
@@ -93,6 +96,50 @@ export class TenantResolverMiddleware implements NestMiddleware {
 
     if (typeof headerValue === 'string' && headerValue.trim().length > 0) {
       return headerValue.trim();
+    }
+
+    return null;
+  }
+
+  /**
+   * Extrae el tenant decodificando de forma segura el payload de un token JWT
+   * presente en el header Authorization (Bearer <token>).
+   */
+  private extractJwtTenant(req: Request): string | null {
+    const authHeader = req.headers['authorization'];
+    if (!authHeader || typeof authHeader !== 'string') {
+      return null;
+    }
+
+    const parts = authHeader.trim().split(' ');
+    if (parts.length !== 2 || parts[0].toLowerCase() !== 'bearer') {
+      return null;
+    }
+
+    const token = parts[1];
+    const tokenParts = token.split('.');
+    if (tokenParts.length !== 3) {
+      return null;
+    }
+
+    try {
+      const payloadBase64 = tokenParts[1];
+      const payloadJson = Buffer.from(payloadBase64, 'base64url').toString('utf8');
+      const payload = JSON.parse(payloadJson);
+
+      const tenantClaim =
+        payload.tenantId ||
+        payload.tenant_id ||
+        payload.subdomain ||
+        payload.tenant?.id ||
+        payload.tenant?.subdomain;
+
+      if (typeof tenantClaim === 'string' && tenantClaim.trim().length > 0) {
+        return tenantClaim.trim();
+      }
+    } catch {
+      // Si el payload no es base64url/JSON válido, se continúa con la cadena de resolución
+      return null;
     }
 
     return null;

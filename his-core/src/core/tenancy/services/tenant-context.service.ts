@@ -20,48 +20,48 @@ export interface TenantContext {
 
 @Injectable()
 export class TenantContextService {
-  private readonly asyncLocalStorage = new AsyncLocalStorage<TenantContext>();
+  private static readonly asyncLocalStorage = new AsyncLocalStorage<TenantContext>();
 
   /**
    * Ejecuta una función síncrona o asíncrona dentro del contexto del tenant proporcionado.
    */
   run<R>(context: TenantContext, callback: () => R): R {
-    return this.asyncLocalStorage.run(context, callback);
+    return TenantContextService.asyncLocalStorage.run(context, callback);
   }
 
   /**
    * Obtiene el contexto completo del tenant para la petición en curso.
    */
   getContext(): TenantContext | undefined {
-    return this.asyncLocalStorage.getStore();
+    return TenantContextService.asyncLocalStorage.getStore();
   }
 
   /**
    * Obtiene la entidad Tenant completa de la petición actual.
    */
   getTenant(): Tenant | undefined {
-    return this.asyncLocalStorage.getStore()?.tenant;
+    return TenantContextService.asyncLocalStorage.getStore()?.tenant;
   }
 
   /**
    * Obtiene el identificador UUID del tenant actual.
    */
   getTenantId(): string | undefined {
-    return this.asyncLocalStorage.getStore()?.tenantId;
+    return TenantContextService.asyncLocalStorage.getStore()?.tenantId;
   }
 
   /**
    * Obtiene el subdominio del tenant actual.
    */
   getSubdomain(): string | undefined {
-    return this.asyncLocalStorage.getStore()?.subdomain;
+    return TenantContextService.asyncLocalStorage.getStore()?.subdomain;
   }
 
   /**
    * Obtiene la configuración de conexión a la base de datos aislada del tenant.
    */
   getTenantDbConfig(): TenantDbConfig | undefined {
-    return this.asyncLocalStorage.getStore()?.dbConfig;
+    return TenantContextService.asyncLocalStorage.getStore()?.dbConfig;
   }
 
   /**

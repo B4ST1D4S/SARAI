@@ -72,6 +72,17 @@ describe('TenantContextService (AsyncLocalStorage)', () => {
     expect(contextService.getContext()).toBeUndefined();
   });
 
+  it('debe compartir el contexto activo con nuevas instancias de TenantContextService gracias al AsyncLocalStorage estático', () => {
+    contextService.run(mockContext, () => {
+      // Simula el uso dentro de un decorador de parámetros (@CurrentTenant / @TenantId)
+      const anotherInstance = new TenantContextService();
+      expect(anotherInstance.getContext()).toEqual(mockContext);
+      expect(anotherInstance.getTenantId()).toBe(mockTenant.id);
+      expect(anotherInstance.getTenant()).toEqual(mockTenant);
+      expect(anotherInstance.getSubdomain()).toBe('sanvicente');
+    });
+  });
+
   it('debe mantener aislamiento entre diferentes ejecuciones asíncronas concurrentes', async () => {
     const tenantA: TenantContext = {
       ...mockContext,

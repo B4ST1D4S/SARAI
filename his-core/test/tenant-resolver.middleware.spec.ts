@@ -111,6 +111,44 @@ describe('TenantResolverMiddleware', () => {
     expect(mockNext).toHaveBeenCalled();
   });
 
+  it('debe resolver el tenant mediante un token JWT en el header Authorization (Bearer <token>) con claim tenantId', async () => {
+    const payload = JSON.stringify({ tenantId: mockTenant.id, sub: 'user-123' });
+    const fakeJwt = `eyJhbGciOiJIUzI1NiJ9.${Buffer.from(payload).toString('base64url')}.fakeSig`;
+    mockReq.headers = { authorization: `Bearer ${fakeJwt}` };
+    tenantService.findById.mockResolvedValue(mockTenant);
+
+    await middleware.use(
+      mockReq as Request,
+      mockRes as Response,
+      () => {
+        mockNext();
+        expect(contextService.getTenantId()).toBe(mockTenant.id);
+      },
+    );
+
+    expect(tenantService.findById).toHaveBeenCalledWith(mockTenant.id);
+    expect(mockNext).toHaveBeenCalled();
+  });
+
+  it('debe resolver el tenant mediante un token JWT con claim subdomain', async () => {
+    const payload = JSON.stringify({ subdomain: 'sanjose', sub: 'user-123' });
+    const fakeJwt = `eyJhbGciOiJIUzI1NiJ9.${Buffer.from(payload).toString('base64url')}.fakeSig`;
+    mockReq.headers = { authorization: `Bearer ${fakeJwt}` };
+    tenantService.findBySubdomain.mockResolvedValue(mockTenant);
+
+    await middleware.use(
+      mockReq as Request,
+      mockRes as Response,
+      () => {
+        mockNext();
+        expect(contextService.getTenantId()).toBe(mockTenant.id);
+      },
+    );
+
+    expect(tenantService.findBySubdomain).toHaveBeenCalledWith('sanjose');
+    expect(mockNext).toHaveBeenCalled();
+  });
+
   it('debe resolver el tenant mediante el subdominio del header Host (ej: sanjose.hisapp.local:3000)', async () => {
     mockReq.headers = { host: 'sanjose.hisapp.local:3000' };
     tenantService.findBySubdomain.mockResolvedValue(mockTenant);
