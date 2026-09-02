@@ -32,6 +32,20 @@ export const envSchema = z.object({
     .string({ required_error: 'JWT_SECRET is required' })
     .min(16, 'JWT_SECRET must be at least 16 characters'),
   JWT_EXPIRES_IN: z.string().default('24h'),
+
+  // DigitalOcean Spaces / S3 Storage (ISO 27001)
+  SPACES_ENDPOINT: z.string().default('https://nyc3.digitaloceanspaces.com'),
+  SPACES_REGION: z.string().default('nyc3'),
+  SPACES_BUCKET: z.string().default('sarai-his-storage'),
+  SPACES_KEY: z.string().default(''),
+  SPACES_SECRET: z.string().default(''),
+  SPACES_PRESIGNED_EXPIRES_IN: z.coerce.number().default(900),
+
+  // Redis & BullMQ Queues
+  REDIS_HOST: z.string().default('localhost'),
+  REDIS_PORT: z.coerce.number().default(6379),
+  REDIS_PASSWORD: z.string().optional(),
+  REDIS_DB: z.coerce.number().default(0),
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;

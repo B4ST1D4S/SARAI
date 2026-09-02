@@ -3,8 +3,11 @@
   "rootDir": ".",
   "testRegex": ".*\\.spec\\.ts$",
   "transform": {
-    "^.+\\.(t|j)s$": "ts-jest"
+    "^.+\\.(t|j)sx?$": "ts-jest"
   },
+  "transformIgnorePatterns": [
+    "node_modules/(?!(@nestjs/bullmq|@nestjs/bull-shared)/)"
+  ],
   "collectCoverageFrom": ["src/**/*.(t|j)s"],
   "coverageDirectory": "./coverage",
   "testEnvironment": "node",

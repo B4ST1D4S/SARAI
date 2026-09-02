@@ -7,6 +7,8 @@ import {
 import { CoreConfigModule } from './core/config/core-config.module';
 import { MasterDatabaseModule } from './core/database/master-database.module';
 import { TenancyModule } from './core/tenancy/tenancy.module';
+import { StorageModule } from './core/storage/storage.module';
+import { QueueModule } from './core/queue/queue.module';
 import { TenantResolverMiddleware } from './core/tenancy/middleware/tenant-resolver.middleware';
 import { AppController } from './app.controller';
 import { CLINICAL_MODULES } from './modules';
@@ -16,6 +18,8 @@ import { CLINICAL_MODULES } from './modules';
     CoreConfigModule,
     MasterDatabaseModule,
     TenancyModule,
+    StorageModule,
+    QueueModule,
     ...CLINICAL_MODULES,
   ],
   controllers: [AppController],
