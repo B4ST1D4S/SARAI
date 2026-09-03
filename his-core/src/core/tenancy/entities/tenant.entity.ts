@@ -44,8 +44,11 @@ export class Tenant {
   subdomain: string;
 
   @Index({ unique: true })
-  @Column({ type: 'varchar', length: 50, unique: true })
-  code: string; // Código de habilitación REPS o NIT institucional
+  @Column({ type: 'varchar', length: 50, name: 'nit_ips', unique: true })
+  nitIps: string; // NIT o código de habilitación IPS / REPS
+
+  @Column({ type: 'boolean', name: 'is_active', default: true })
+  isActive: boolean;
 
   @Column({
     type: 'enum',
@@ -57,9 +60,10 @@ export class Tenant {
   @Column({
     type: 'enum',
     enum: TenantPlan,
+    name: 'plan_tier',
     default: TenantPlan.PROFESSIONAL,
   })
-  plan: TenantPlan;
+  planTier: TenantPlan;
 
   // Credenciales de la Base de Datos dedicada para este Tenant
   @Column({ type: 'varchar', length: 100, name: 'db_name' })
@@ -77,11 +81,11 @@ export class Tenant {
   @Column({
     type: 'varchar',
     length: 255,
-    name: 'db_password',
+    name: 'db_password_encrypted',
     nullable: true,
     select: false,
   })
-  dbPassword?: string;
+  dbPasswordEncrypted?: string;
 
   @Column({ type: 'varchar', length: 150, name: 'contact_email', nullable: true })
   contactEmail?: string;

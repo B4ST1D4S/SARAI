@@ -5,4 +5,5 @@ export * from './services/tenant-context.service';
 export * from './services/tenancy-connection.service';
 export * from './middleware/tenant-resolver.middleware';
 export * from './decorators/current-tenant.decorator';
+export * from '../security/crypto.service';
 export * from './tenancy.module';

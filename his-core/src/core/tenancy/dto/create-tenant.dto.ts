@@ -7,6 +7,7 @@ import {
   Matches,
   IsObject,
   IsNumber,
+  IsBoolean,
 } from 'class-validator';
 import {
   TenantPlan,
@@ -27,13 +28,25 @@ export class CreateTenantDto {
   })
   subdomain: string;
 
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  code: string;
+  nitIps?: string;
+
+  @IsOptional()
+  @IsString()
+  code?: string; // Alias retrocompatible para nitIps
+
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
 
   @IsOptional()
   @IsEnum(TenantPlan)
-  plan?: TenantPlan;
+  planTier?: TenantPlan;
+
+  @IsOptional()
+  @IsEnum(TenantPlan)
+  plan?: TenantPlan; // Alias retrocompatible para planTier
 
   @IsOptional()
   @IsEnum(TenantStatus)
@@ -57,7 +70,11 @@ export class CreateTenantDto {
 
   @IsOptional()
   @IsString()
-  dbPassword?: string;
+  dbPasswordEncrypted?: string;
+
+  @IsOptional()
+  @IsString()
+  dbPassword?: string; // Alias para contraseña en texto plano antes de cifrar
 
   @IsOptional()
   @IsEmail()

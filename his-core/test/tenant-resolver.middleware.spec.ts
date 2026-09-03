@@ -21,13 +21,15 @@ describe('TenantResolverMiddleware', () => {
     id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
     name: 'Clínica San José',
     subdomain: 'sanjose',
-    code: 'REPS-05001',
+    nitIps: 'REPS-05001',
+    isActive: true,
     status: TenantStatus.ACTIVE,
-    plan: TenantPlan.PROFESSIONAL,
+    planTier: TenantPlan.PROFESSIONAL,
     dbName: 'his_tenant_sanjose',
     dbHost: 'localhost',
     dbPort: 5432,
     dbUser: 'sanjose_user',
+    dbPasswordEncrypted: 'enc:pass',
     clinicalSettings: {
       enableOdontology: true,
     },
@@ -97,6 +99,7 @@ describe('TenantResolverMiddleware', () => {
         // Verificar que dentro del next() el ALS tiene el contexto activo
         expect(contextService.getTenantId()).toBe(mockTenant.id);
         expect(contextService.getSubdomain()).toBe('sanjose');
+        expect(contextService.getNitIps()).toBe('REPS-05001');
         expect(contextService.getTenantDbConfig()?.database).toBe(
           'his_tenant_sanjose',
         );
@@ -111,9 +114,21 @@ describe('TenantResolverMiddleware', () => {
     expect(mockNext).toHaveBeenCalled();
   });
 
+<<<<<<< Updated upstream
   it('debe resolver el tenant mediante un token JWT en el header Authorization (Bearer <token>) con claim tenantId', async () => {
     const payload = JSON.stringify({ tenantId: mockTenant.id, sub: 'user-123' });
     const fakeJwt = `eyJhbGciOiJIUzI1NiJ9.${Buffer.from(payload).toString('base64url')}.fakeSig`;
+=======
+  it('debe resolver el tenant desde el token JWT en Authorization: Bearer', async () => {
+    const payload = {
+      sub: 'user-uuid-1',
+      email: 'medico@sanjose.com',
+      tenant_id: mockTenant.id,
+    };
+    const base64Payload = Buffer.from(JSON.stringify(payload)).toString('base64url');
+    const fakeJwt = `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.${base64Payload}.signature`;
+
+>>>>>>> Stashed changes
     mockReq.headers = { authorization: `Bearer ${fakeJwt}` };
     tenantService.findById.mockResolvedValue(mockTenant);
 
@@ -130,6 +145,7 @@ describe('TenantResolverMiddleware', () => {
     expect(mockNext).toHaveBeenCalled();
   });
 
+<<<<<<< Updated upstream
   it('debe resolver el tenant mediante un token JWT con claim subdomain', async () => {
     const payload = JSON.stringify({ subdomain: 'sanjose', sub: 'user-123' });
     const fakeJwt = `eyJhbGciOiJIUzI1NiJ9.${Buffer.from(payload).toString('base64url')}.fakeSig`;
@@ -149,6 +165,8 @@ describe('TenantResolverMiddleware', () => {
     expect(mockNext).toHaveBeenCalled();
   });
 
+=======
+>>>>>>> Stashed changes
   it('debe resolver el tenant mediante el subdominio del header Host (ej: sanjose.hisapp.local:3000)', async () => {
     mockReq.headers = { host: 'sanjose.hisapp.local:3000' };
     tenantService.findBySubdomain.mockResolvedValue(mockTenant);
@@ -183,7 +201,7 @@ describe('TenantResolverMiddleware', () => {
     expect(mockNext).toHaveBeenCalled();
   });
 
-  it('debe lanzar UnauthorizedException si no se proporciona subdominio ni header', async () => {
+  it('debe lanzar UnauthorizedException si no se proporciona subdominio, header ni JWT', async () => {
     mockReq.headers = { host: 'localhost:3000' };
 
     await expect(

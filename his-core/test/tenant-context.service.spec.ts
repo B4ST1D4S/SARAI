@@ -15,9 +15,10 @@ describe('TenantContextService (AsyncLocalStorage)', () => {
     id: 'b2c7de88-1111-2222-3333-444455556666',
     name: 'Hospital San Vicente',
     subdomain: 'sanvicente',
-    code: 'REPS-05002',
+    nitIps: 'REPS-05002',
+    isActive: true,
     status: TenantStatus.ACTIVE,
-    plan: TenantPlan.HOSPITAL_ENTERPRISE,
+    planTier: TenantPlan.HOSPITAL_ENTERPRISE,
     dbName: 'his_tenant_sanvicente',
     dbHost: 'db.sanvicente.internal',
     dbPort: 5432,
@@ -33,7 +34,8 @@ describe('TenantContextService (AsyncLocalStorage)', () => {
   const mockContext: TenantContext = {
     tenantId: mockTenant.id,
     subdomain: mockTenant.subdomain,
-    code: mockTenant.code,
+    nitIps: mockTenant.nitIps,
+    code: mockTenant.nitIps,
     tenant: mockTenant,
     dbConfig: {
       host: mockTenant.dbHost,

@@ -7,9 +7,10 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Tenant, TenantStatus } from '../entities/tenant.entity';
+import { Tenant, TenantStatus, TenantPlan } from '../entities/tenant.entity';
 import { MASTER_CONNECTION_NAME } from '../../database/master-database.module';
 import { CreateTenantDto } from '../dto/create-tenant.dto';
+import { CryptoService } from '../../security/crypto.service';
 
 interface CacheEntry {
   tenant: Tenant;
@@ -27,6 +28,7 @@ export class TenantService {
   constructor(
     @InjectRepository(Tenant, MASTER_CONNECTION_NAME)
     private readonly tenantRepository: Repository<Tenant>,
+    private readonly cryptoService?: CryptoService,
   ) {}
 
   /**
@@ -42,9 +44,11 @@ export class TenantService {
     const cached = this.getFromCache(cacheKey);
     if (cached) return cached;
 
-    const tenant = await this.tenantRepository.findOne({
-      where: { subdomain: cleanSubdomain },
-    });
+    const tenant = await this.tenantRepository
+      .createQueryBuilder('tenant')
+      .where('tenant.subdomain = :subdomain', { subdomain: cleanSubdomain })
+      .addSelect('tenant.dbPasswordEncrypted')
+      .getOne();
 
     if (!tenant) {
       throw new NotFoundException(
@@ -70,9 +74,11 @@ export class TenantService {
     const cached = this.getFromCache(cacheKey);
     if (cached) return cached;
 
-    const tenant = await this.tenantRepository.findOne({
-      where: { id: tenantId },
-    });
+    const tenant = await this.tenantRepository
+      .createQueryBuilder('tenant')
+      .where('tenant.id = :id', { id: tenantId })
+      .addSelect('tenant.dbPasswordEncrypted')
+      .getOne();
 
     if (!tenant) {
       throw new NotFoundException(
@@ -87,12 +93,26 @@ export class TenantService {
   }
 
   /**
-   * Obtiene un tenant por su código institucional (NIT / REPS)
+   * Obtiene un tenant incluyendo explícitamente sus credenciales de base de datos
+   */
+  async findByIdWithCredentials(tenantId: string): Promise<Tenant> {
+    return this.findById(tenantId);
+  }
+
+  /**
+   * Obtiene un tenant por su NIT o código de habilitación IPS / REPS
+   */
+  async findByNitIps(nitIps: string): Promise<Tenant | null> {
+    return this.tenantRepository.findOne({
+      where: { nitIps: nitIps.trim() },
+    });
+  }
+
+  /**
+   * Alias retrocompatible de findByNitIps
    */
   async findByCode(code: string): Promise<Tenant | null> {
-    return this.tenantRepository.findOne({
-      where: { code: code.trim() },
-    });
+    return this.findByNitIps(code);
   }
 
   /**
@@ -100,6 +120,7 @@ export class TenantService {
    */
   async create(dto: CreateTenantDto): Promise<Tenant> {
     const cleanSubdomain = dto.subdomain.trim().toLowerCase();
+    const effectiveNitIps = (dto.nitIps || dto.code || '').trim();
 
     const existingSubdomain = await this.tenantRepository.findOne({
       where: { subdomain: cleanSubdomain },
@@ -111,20 +132,33 @@ export class TenantService {
       );
     }
 
-    const existingCode = await this.tenantRepository.findOne({
-      where: { code: dto.code.trim() },
-    });
+    if (effectiveNitIps) {
+      const existingNit = await this.tenantRepository.findOne({
+        where: { nitIps: effectiveNitIps },
+      });
 
-    if (existingCode) {
-      throw new ConflictException(
-        `El código institucional '${dto.code}' ya se encuentra registrado`,
-      );
+      if (existingNit) {
+        throw new ConflictException(
+          `El NIT / código institucional '${effectiveNitIps}' ya se encuentra registrado`,
+        );
+      }
     }
+
+    // Cifrar contraseña de base de datos del tenant si se proporciona
+    const rawPassword = dto.dbPassword || dto.dbPasswordEncrypted;
+    const encryptedPassword =
+      rawPassword && this.cryptoService
+        ? this.cryptoService.encrypt(rawPassword)
+        : rawPassword;
 
     const tenant = this.tenantRepository.create({
       ...dto,
       subdomain: cleanSubdomain,
+      nitIps: effectiveNitIps,
+      dbPasswordEncrypted: encryptedPassword,
+      isActive: dto.isActive ?? true,
       status: dto.status ?? TenantStatus.ACTIVE,
+      planTier: dto.planTier || dto.plan || TenantPlan.PROFESSIONAL,
       clinicalSettings: dto.clinicalSettings ?? {},
     });
 
@@ -145,6 +179,7 @@ export class TenantService {
   ): Promise<Tenant> {
     const tenant = await this.findById(tenantId);
     tenant.status = status;
+    tenant.isActive = status === TenantStatus.ACTIVE;
     const updated = await this.tenantRepository.save(tenant);
 
     this.invalidateCache(updated.id, updated.subdomain);
@@ -161,9 +196,9 @@ export class TenantService {
       );
     }
 
-    if (tenant.status !== TenantStatus.ACTIVE) {
+    if (!tenant.isActive || tenant.status !== TenantStatus.ACTIVE) {
       throw new ForbiddenException(
-        `La institución '${tenant.name}' no está en estado activo (${tenant.status}).`,
+        `La institución '${tenant.name}' no está en estado activo.`,
       );
     }
   }

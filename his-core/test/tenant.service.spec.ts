@@ -1,26 +1,38 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { NotFoundException, ForbiddenException, ConflictException } from '@nestjs/common';
+import {
+  NotFoundException,
+  ForbiddenException,
+  ConflictException,
+} from '@nestjs/common';
 import { TenantService } from '../src/core/tenancy/services/tenant.service';
-import { Tenant, TenantStatus, TenantPlan } from '../src/core/tenancy/entities/tenant.entity';
+import {
+  Tenant,
+  TenantStatus,
+  TenantPlan,
+} from '../src/core/tenancy/entities/tenant.entity';
 import { MASTER_CONNECTION_NAME } from '../src/core/database/master-database.module';
+import { CryptoService } from '../src/core/security/crypto.service';
 
 describe('TenantService', () => {
   let service: TenantService;
   let repo: jest.Mocked<Repository<Tenant>>;
+  let queryBuilder: any;
 
   const mockTenant: Tenant = {
     id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
     name: 'Clínica San José',
     subdomain: 'sanjose',
-    code: 'REPS-05001',
+    nitIps: 'REPS-05001',
+    isActive: true,
     status: TenantStatus.ACTIVE,
-    plan: TenantPlan.PROFESSIONAL,
+    planTier: TenantPlan.PROFESSIONAL,
     dbName: 'his_tenant_sanjose',
     dbHost: 'localhost',
     dbPort: 5432,
     dbUser: 'sanjose_user',
+    dbPasswordEncrypted: 'enc:samplepassword',
     clinicalSettings: {
       enableOdontology: true,
       enableHospitalization: false,
@@ -30,6 +42,12 @@ describe('TenantService', () => {
   };
 
   beforeEach(async () => {
+    queryBuilder = {
+      where: jest.fn().mockReturnThis(),
+      addSelect: jest.fn().mockReturnThis(),
+      getOne: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TenantService,
@@ -39,6 +57,14 @@ describe('TenantService', () => {
             findOne: jest.fn(),
             create: jest.fn(),
             save: jest.fn(),
+            createQueryBuilder: jest.fn().mockReturnValue(queryBuilder),
+          },
+        },
+        {
+          provide: CryptoService,
+          useValue: {
+            encrypt: jest.fn((val) => `enc:${val}`),
+            decrypt: jest.fn((val) => val.replace('enc:', '')),
           },
         },
       ],
@@ -51,20 +77,20 @@ describe('TenantService', () => {
 
   describe('findBySubdomain', () => {
     it('debe retornar un tenant activo y almacenarlo en caché', async () => {
-      repo.findOne.mockResolvedValue(mockTenant);
+      queryBuilder.getOne.mockResolvedValue(mockTenant);
 
       const result1 = await service.findBySubdomain('sanjose');
       expect(result1).toEqual(mockTenant);
-      expect(repo.findOne).toHaveBeenCalledTimes(1);
+      expect(repo.createQueryBuilder).toHaveBeenCalledTimes(1);
 
       // Segunda llamada debe resolverse desde caché sin consultar repo
       const result2 = await service.findBySubdomain('SANJOSE');
       expect(result2).toEqual(mockTenant);
-      expect(repo.findOne).toHaveBeenCalledTimes(1);
+      expect(repo.createQueryBuilder).toHaveBeenCalledTimes(1);
     });
 
     it('debe lanzar NotFoundException si el tenant no existe', async () => {
-      repo.findOne.mockResolvedValue(null);
+      queryBuilder.getOne.mockResolvedValue(null);
 
       await expect(service.findBySubdomain('no-existe')).rejects.toThrow(
         NotFoundException,
@@ -76,7 +102,7 @@ describe('TenantService', () => {
         ...mockTenant,
         status: TenantStatus.SUSPENDED,
       };
-      repo.findOne.mockResolvedValue(suspendedTenant);
+      queryBuilder.getOne.mockResolvedValue(suspendedTenant);
 
       await expect(service.findBySubdomain('sanjose')).rejects.toThrow(
         ForbiddenException,
@@ -86,17 +112,17 @@ describe('TenantService', () => {
 
   describe('findById', () => {
     it('debe retornar un tenant por ID', async () => {
-      repo.findOne.mockResolvedValue(mockTenant);
+      queryBuilder.getOne.mockResolvedValue(mockTenant);
 
       const result = await service.findById(mockTenant.id);
       expect(result).toEqual(mockTenant);
-      expect(repo.findOne).toHaveBeenCalledWith({
-        where: { id: mockTenant.id },
+      expect(queryBuilder.where).toHaveBeenCalledWith('tenant.id = :id', {
+        id: mockTenant.id,
       });
     });
 
     it('debe lanzar NotFoundException si el ID no existe', async () => {
-      repo.findOne.mockResolvedValue(null);
+      queryBuilder.getOne.mockResolvedValue(null);
 
       await expect(service.findById('uuid-inexistente')).rejects.toThrow(
         NotFoundException,
@@ -115,6 +141,7 @@ describe('TenantService', () => {
         subdomain: 'sanjose',
         code: 'REPS-05001',
         dbName: 'his_tenant_sanjose',
+        dbPassword: 'secretpassword',
       });
 
       expect(result).toEqual(mockTenant);
