@@ -1,6 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ClinicalRecordController } from '../src/modules/clinical-record/controllers/clinical-record.controller';
 import { ClinicalRecordService } from '../src/modules/clinical-record/services/clinical-record.service';
+import { ClinicalPdfService } from '../src/modules/clinical-record/services/clinical-pdf.service';
+import { TenantContextService } from '../src/core/tenancy/services/tenant-context.service';
 import {
   EspecialidadClinica,
   TipoDiagnostico,
@@ -10,9 +12,18 @@ import {
 describe('ClinicalRecordController', () => {
   let controller: ClinicalRecordController;
   let service: ClinicalRecordService;
+  let pdfService: ClinicalPdfService;
 
   const mockService = {
     crearFolioConsultaExterna: jest.fn(),
+  };
+
+  const mockPdfService = {
+    obtenerOEncolarPdfFolio: jest.fn(),
+  };
+
+  const mockTenantContextService = {
+    getRequiredTenantId: jest.fn().mockReturnValue('t-tenant-controller-123'),
   };
 
   beforeEach(async () => {
@@ -23,11 +34,20 @@ describe('ClinicalRecordController', () => {
           provide: ClinicalRecordService,
           useValue: mockService,
         },
+        {
+          provide: ClinicalPdfService,
+          useValue: mockPdfService,
+        },
+        {
+          provide: TenantContextService,
+          useValue: mockTenantContextService,
+        },
       ],
     }).compile();
 
     controller = module.get<ClinicalRecordController>(ClinicalRecordController);
     service = module.get<ClinicalRecordService>(ClinicalRecordService);
+    pdfService = module.get<ClinicalPdfService>(ClinicalPdfService);
   });
 
   it('debe estar definido el controlador', () => {
@@ -71,5 +91,26 @@ describe('ClinicalRecordController', () => {
       numeroFolio: 1,
     });
     expect(service.crearFolioConsultaExterna).toHaveBeenCalledWith(mockDto);
+  });
+
+  it('debe consultar o encolar el PDF del folio en GET /api/v1/clinical-records/folios/:id/pdf', async () => {
+    const folioId = 'f0000000-1111-2222-3333-444444444444';
+    mockPdfService.obtenerOEncolarPdfFolio.mockResolvedValue({
+      status: 'READY',
+      url: 'https://spaces.download/folio.pdf',
+      fileKey: 'tenants/t-tenant-controller-123/clinical-records/f0000000-1111-2222-3333-444444444444.pdf',
+    });
+
+    const result = await controller.obtenerPdfFolio(folioId);
+
+    expect(result).toEqual({
+      status: 'READY',
+      url: 'https://spaces.download/folio.pdf',
+      fileKey: 'tenants/t-tenant-controller-123/clinical-records/f0000000-1111-2222-3333-444444444444.pdf',
+    });
+    expect(pdfService.obtenerOEncolarPdfFolio).toHaveBeenCalledWith(
+      't-tenant-controller-123',
+      folioId,
+    );
   });
 });

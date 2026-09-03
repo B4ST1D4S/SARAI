@@ -273,4 +273,54 @@ describe('SpacesStorageService (DigitalOcean Spaces & ISO 27001)', () => {
       ).rejects.toThrow(InternalServerErrorException);
     });
   });
+
+  describe('uploadClinicalPdfBuffer', () => {
+    it('debe subir el buffer PDF a la clave tenants/{tenantId}/clinical-records/{folioId}.pdf con cifrado AES-256', async () => {
+      const s3Client = service.getS3Client();
+      const sendSpy = jest.spyOn(s3Client, 'send' as any).mockResolvedValue({} as any);
+
+      const tenantId = 't-tenant-hospital';
+      const folioId = 'f0000000-1111-2222-3333-444444444444';
+      const pdfBuffer = Buffer.from('%PDF-1.4 mock content');
+
+      const fileKey = await service.uploadClinicalPdfBuffer(
+        tenantId,
+        folioId,
+        pdfBuffer,
+      );
+
+      expect(fileKey).toBe(`tenants/${tenantId}/clinical-records/${folioId}.pdf`);
+      expect(sendSpy).toHaveBeenCalledTimes(1);
+
+      const command = sendSpy.mock.calls[0][0] as PutObjectCommand;
+      expect(command.input.Bucket).toBe('sarai-medical-vault');
+      expect(command.input.Key).toBe(fileKey);
+      expect(command.input.Body).toBe(pdfBuffer);
+      expect(command.input.ContentType).toBe('application/pdf');
+      expect(command.input.ServerSideEncryption).toBe('AES256');
+    });
+
+    it('debe lanzar BadRequestException si falta algún parámetro', async () => {
+      await expect(
+        service.uploadClinicalPdfBuffer('', 'folio-1', Buffer.from('pdf')),
+      ).rejects.toThrow(BadRequestException);
+
+      await expect(
+        service.uploadClinicalPdfBuffer('t1', '', Buffer.from('pdf')),
+      ).rejects.toThrow(BadRequestException);
+
+      await expect(
+        service.uploadClinicalPdfBuffer('t1', 'folio-1', null as any),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('debe lanzar InternalServerErrorException si la subida a Spaces falla', async () => {
+      const s3Client = service.getS3Client();
+      jest.spyOn(s3Client, 'send' as any).mockRejectedValue(new Error('S3 upload error'));
+
+      await expect(
+        service.uploadClinicalPdfBuffer('t1', 'folio-1', Buffer.from('pdf')),
+      ).rejects.toThrow(InternalServerErrorException);
+    });
+  });
 });

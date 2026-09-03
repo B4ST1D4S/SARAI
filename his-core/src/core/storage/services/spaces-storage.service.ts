@@ -271,6 +271,99 @@ export class SpacesStorageService {
   }
 
   /**
+   * Sube un documento PDF de historia clínica a la ruta protegida de Spaces
+   * bajo el patrón WORM con cifrado del lado del servidor (AES-256).
+   *
+   * @param tenantId Identificador UUID del tenant
+   * @param folioId Identificador UUID del folio
+   * @param buffer Buffer con el contenido binario del PDF
+   */
+  async uploadClinicalPdfBuffer(
+    tenantId: string,
+    folioId: string,
+    buffer: Buffer,
+  ): Promise<string> {
+    if (!tenantId || !folioId || !buffer) {
+      throw new BadRequestException(
+        'tenantId, folioId y buffer son requeridos para subir el PDF clínico.',
+      );
+    }
+
+    const fileKey = `tenants/${tenantId}/clinical-records/${folioId}.pdf`;
+
+    try {
+      const command = new PutObjectCommand({
+        Bucket: this.bucket,
+        Key: fileKey,
+        Body: buffer,
+        ContentType: 'application/pdf',
+        ServerSideEncryption: 'AES256', // WORM / ISO 27001 Data-at-rest encryption
+      });
+
+      await this.s3Client.send(command);
+      this.logger.log(
+        `Documento PDF de historia clínica persistido en Spaces: [${fileKey}]`,
+      );
+
+      return fileKey;
+    } catch (error: any) {
+      this.logger.error(
+        `Error al subir PDF clínico para folio [${folioId}] en tenant [${tenantId}]: ${error.message}`,
+        error.stack,
+      );
+      throw new InternalServerErrorException(
+        'Fallo al persistir el PDF clínico en almacenamiento Spaces.',
+      );
+    }
+  }
+
+  /**
+   * Sube el paquete JSON de RIPS (Resolución 2275 de 2023) a Spaces con cifrado AES-256.
+   *
+   * @param tenantId Identificador UUID del tenant
+   * @param loteId Identificador UUID del lote de RIPS
+   * @param buffer Buffer con el JSON generado
+   */
+  async uploadRipsJsonBuffer(
+    tenantId: string,
+    loteId: string,
+    buffer: Buffer,
+  ): Promise<string> {
+    if (!tenantId || !loteId || !buffer) {
+      throw new BadRequestException(
+        'tenantId, loteId y buffer son requeridos para subir el archivo RIPS JSON.',
+      );
+    }
+
+    const fileKey = `tenants/${tenantId}/rips/${loteId}.json`;
+
+    try {
+      const command = new PutObjectCommand({
+        Bucket: this.bucket,
+        Key: fileKey,
+        Body: buffer,
+        ContentType: 'application/json',
+        ServerSideEncryption: 'AES256', // Cifrado obligatorio en reposo
+      });
+
+      await this.s3Client.send(command);
+      this.logger.log(
+        `Archivo RIPS JSON (Res. 2275/2023) persistido exitosamente en Spaces: [${fileKey}]`,
+      );
+
+      return fileKey;
+    } catch (error: any) {
+      this.logger.error(
+        `Error al subir archivo RIPS JSON para lote [${loteId}] en tenant [${tenantId}]: ${error.message}`,
+        error.stack,
+      );
+      throw new InternalServerErrorException(
+        'Fallo al persistir el archivo RIPS JSON en almacenamiento Spaces.',
+      );
+    }
+  }
+
+  /**
    * Getter del cliente S3 para extensiones avanzadas o pruebas
    */
   public getS3Client(): S3Client {
