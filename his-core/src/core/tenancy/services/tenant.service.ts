@@ -137,6 +137,15 @@ export class TenantService {
   }
 
   /**
+   * Obtiene todos los tenants activos registrados en la base de datos maestra
+   */
+  async obtenerTenantsActivos(): Promise<Tenant[]> {
+    return this.tenantRepository.find({
+      where: { status: TenantStatus.ACTIVE },
+    });
+  }
+
+  /**
    * Actualiza el estado de un tenant e invalida su caché
    */
   async updateStatus(

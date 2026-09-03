@@ -4,6 +4,7 @@ import {
   MiddlewareConsumer,
   RequestMethod,
 } from '@nestjs/common';
+import { ScheduleModule } from '@nestjs/schedule';
 import { CoreConfigModule } from './core/config/core-config.module';
 import { MasterDatabaseModule } from './core/database/master-database.module';
 import { TenancyModule } from './core/tenancy/tenancy.module';
@@ -20,6 +21,7 @@ import { CLINICAL_MODULES } from './modules';
     TenancyModule,
     StorageModule,
     QueueModule,
+    ScheduleModule.forRoot(),
     ...CLINICAL_MODULES,
   ],
   controllers: [AppController],
