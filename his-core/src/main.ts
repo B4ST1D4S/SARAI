@@ -2,6 +2,9 @@ import { NestFactory } from '@nestjs/core';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
+import { AuditService } from './modules/audit/services/audit.service';
+import { TenantContextService } from './core/tenancy/services/tenant-context.service';
+import { AuditInterceptor } from './core/interceptors/audit.interceptor';
 
 async function bootstrap() {
   const logger = new Logger('HIS-Bootstrap');
@@ -24,6 +27,13 @@ async function bootstrap() {
         enableImplicitConversion: true,
       },
     }),
+  );
+
+  // Registro del Interceptor Global de Auditoría ISO/IEC 27001 (A.8.15 Logging)
+  const auditService = app.get(AuditService);
+  const tenantContextService = app.get(TenantContextService);
+  app.useGlobalInterceptors(
+    new AuditInterceptor(auditService, tenantContextService),
   );
 
   // CORS para frontend de salud y clínicas
