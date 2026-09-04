@@ -20,14 +20,20 @@ $pathFrontend = "$root\frontend"
 $pathWhisper  = "$root\whisper_service"
 
 $job1 = Start-Job -Name "Backend" -ArgumentList $pathBackend -ScriptBlock {
-    param($p); Set-Location $p; npm run dev 2>&1
+    param($p); Set-Location $p; npm.cmd run dev 2>&1
 }
 $job2 = Start-Job -Name "Frontend" -ArgumentList $pathFrontend -ScriptBlock {
-    param($p); Set-Location $p; npm run dev 2>&1
+    param($p); Set-Location $p; npm.cmd run dev 2>&1
 }
-$pythonExe = "C:\Users\SOPORTE\AppData\Local\Programs\Python\Python313\python.exe"
+$pythonExe = "$pathWhisper\.venv\Scripts\python.exe"
 $job3 = Start-Job -Name "Whisper" -ArgumentList $pathWhisper, $pythonExe -ScriptBlock {
-    param($p, $py); Set-Location $p; & $py main.py 2>&1
+    param($p, $py)
+    Set-Location $p
+    if (-not (Test-Path $py)) {
+        throw "No se encontro Python en $py. Ejecuta primero whisper_service\start.ps1."
+    }
+    $env:SSL_CERT_FILE = & $py -c "import certifi; print(certifi.where())"
+    & $py main.py 2>&1
 }
 $jobs = @($job1, $job2, $job3)
 

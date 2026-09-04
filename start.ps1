@@ -1,75 +1,56 @@
-# EstetIA - Arrancar todos los servicios
-# Uso: .\start.ps1
+# SARAI - Script de inicio para Windows
+# Ejecutar: .\start.ps1
 
-$root = $PSScriptRoot
-
-Write-Host ""
-Write-Host "============================================" -ForegroundColor Cyan
-Write-Host "  EstetIA - Iniciando todos los servicios  " -ForegroundColor Cyan
-Write-Host "============================================" -ForegroundColor Cyan
-Write-Host "  Backend  -> http://localhost:3001"
-Write-Host "  Frontend -> http://localhost:5173"
-Write-Host "  Whisper  -> http://localhost:8000"
-Write-Host "  Presiona Ctrl+C para detener todo"
-Write-Host "============================================" -ForegroundColor Cyan
-Write-Host ""
-
-# Matar procesos node previos para liberar puertos
-Get-Process -Name node -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-Start-Sleep -Milliseconds 500
-
-$pathBackend  = "$root\backend"
-$pathFrontend = "$root\frontend"
-$pathWhisper  = "$root\whisper_service"
-
-$job1 = Start-Job -Name "Backend" -ArgumentList $pathBackend -ScriptBlock {
-    param($p); Set-Location $p; npm run dev 2>&1
+$rootStart = Join-Path $PSScriptRoot "..\start.ps1"
+if (Test-Path $rootStart) {
+    & powershell.exe -ExecutionPolicy Bypass -File $rootStart
+    exit $LASTEXITCODE
 }
-$job2 = Start-Job -Name "Frontend" -ArgumentList $pathFrontend -ScriptBlock {
-    param($p); Set-Location $p; npm run dev 2>&1
-}
-$pythonExe = $null
-$pythonCmd = Get-Command python -ErrorAction SilentlyContinue
-if (-not $pythonCmd) { $pythonCmd = Get-Command py -ErrorAction SilentlyContinue }
-if ($pythonCmd) { $pythonExe = $pythonCmd.Source }
 
-$jobs = @($job1, $job2)
-if ($pythonExe) {
-    $job3 = Start-Job -Name "Whisper" -ArgumentList $pathWhisper, $pythonExe -ScriptBlock {
-        param($p, $py); Set-Location $p; & $py main.py 2>&1
+$venvPath = "$PSScriptRoot\.venv"
+$pythonExe = "$venvPath\Scripts\python.exe"
+$uvicornExe = "$venvPath\Scripts\uvicorn.exe"
+
+# Crear virtualenv si no existe
+if (-not (Test-Path $pythonExe)) {
+    Write-Host "Creando entorno virtual..." -ForegroundColor Cyan
+    $pyCmd = if (Get-Command python -ErrorAction SilentlyContinue) { "python" } else { "py" }
+    & $pyCmd -m venv $venvPath
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "ERROR: Python no encontrado. Instala Python 3.10+ desde https://www.python.org" -ForegroundColor Red
+        exit 1
     }
-    $jobs += $job3
-} else {
-    Write-Host "[AVISO] No se encontro Python en el PATH. El servicio Whisper no se iniciara." -ForegroundColor Yellow
-    Write-Host "        Instala Python o agregalo al PATH y vuelve a correr .\start.ps1" -ForegroundColor Yellow
 }
 
-$colors = @{
-    "Backend"  = "Cyan"
-    "Frontend" = "Yellow"
-    "Whisper"  = "Green"
+# Limpiar variables SSL conflictivas de XAMPP
+$env:REQUESTS_CA_BUNDLE = ""
+$env:CURL_CA_BUNDLE = ""
+
+# Instalar dependencias si no están instaladas
+$fasterWhisper = "$venvPath\Lib\site-packages\faster_whisper"
+if (-not (Test-Path $fasterWhisper)) {
+    Write-Host "Instalando dependencias (primera vez ~2min)..." -ForegroundColor Cyan
+    & $pythonExe -m pip install --upgrade pip -q
+    & $pythonExe -m pip install -r "$PSScriptRoot\requirements.txt"
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "ERROR al instalar dependencias" -ForegroundColor Red
+        exit 1
+    }
 }
 
-Write-Host "[OK] $($jobs.Count) servicio(s) arrancaron en segundo plano" -ForegroundColor Green
+$env:SSL_CERT_FILE = & $pythonExe -c "import certifi; print(certifi.where())"
+if ($LASTEXITCODE -ne 0 -or -not (Test-Path $env:SSL_CERT_FILE)) {
+    Write-Host "ERROR: No se pudo localizar el almacén de certificados de Python" -ForegroundColor Red
+    exit 1
+}
+
+Write-Host ""
+Write-Host "==========================================" -ForegroundColor Green
+Write-Host "  SARAI Whisper Service" -ForegroundColor Green
+Write-Host "  http://localhost:8000" -ForegroundColor Green
+Write-Host "  Modelo: $($(if ($env:WHISPER_MODEL) { $env:WHISPER_MODEL } else { 'medium' }))" -ForegroundColor Yellow
+Write-Host "==========================================" -ForegroundColor Green
 Write-Host ""
 
-try {
-    while ($true) {
-        foreach ($job in $jobs) {
-            $lines = Receive-Job -Job $job
-            foreach ($line in $lines) {
-                if ($line) {
-                    $color = $colors[$job.Name]
-                    Write-Host "[$($job.Name.ToUpper())] $line" -ForegroundColor $color
-                }
-            }
-        }
-        Start-Sleep -Milliseconds 300
-    }
-} finally {
-    Write-Host ""
-    Write-Host "Deteniendo servicios..." -ForegroundColor Red
-    $jobs | Stop-Job
-    $jobs | Remove-Job -Force
-    Write-Host "Servicios detenidos." -ForegroundColor Red
-}
+Set-Location $PSScriptRoot
+& $uvicornExe main:app --host 0.0.0.0 --port 8000

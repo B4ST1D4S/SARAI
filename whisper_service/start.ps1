@@ -1,5 +1,11 @@
-# SARAI Whisper Service - Script de inicio para Windows
+# SARAI - Script de inicio para Windows
 # Ejecutar: .\start.ps1
+
+$rootStart = Join-Path $PSScriptRoot "..\start.ps1"
+if (Test-Path $rootStart) {
+    & powershell.exe -ExecutionPolicy Bypass -File $rootStart
+    exit $LASTEXITCODE
+}
 
 $venvPath = "$PSScriptRoot\.venv"
 $pythonExe = "$venvPath\Scripts\python.exe"
@@ -18,7 +24,6 @@ if (-not (Test-Path $pythonExe)) {
 
 # Limpiar variables SSL conflictivas de XAMPP
 $env:REQUESTS_CA_BUNDLE = ""
-$env:SSL_CERT_FILE = ""
 $env:CURL_CA_BUNDLE = ""
 
 # Instalar dependencias si no están instaladas
@@ -33,11 +38,17 @@ if (-not (Test-Path $fasterWhisper)) {
     }
 }
 
+$env:SSL_CERT_FILE = & $pythonExe -c "import certifi; print(certifi.where())"
+if ($LASTEXITCODE -ne 0 -or -not (Test-Path $env:SSL_CERT_FILE)) {
+    Write-Host "ERROR: No se pudo localizar el almacén de certificados de Python" -ForegroundColor Red
+    exit 1
+}
+
 Write-Host ""
 Write-Host "==========================================" -ForegroundColor Green
 Write-Host "  SARAI Whisper Service" -ForegroundColor Green
 Write-Host "  http://localhost:8000" -ForegroundColor Green
-Write-Host "  Modelo: small (descarga ~500MB primera vez)" -ForegroundColor Yellow
+Write-Host "  Modelo: $($(if ($env:WHISPER_MODEL) { $env:WHISPER_MODEL } else { 'medium' }))" -ForegroundColor Yellow
 Write-Host "==========================================" -ForegroundColor Green
 Write-Host ""
 
