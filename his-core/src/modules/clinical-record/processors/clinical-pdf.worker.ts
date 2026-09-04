@@ -81,7 +81,7 @@ export class ClinicalPdfWorker extends WorkerHost {
     const tenantContext: TenantContext = {
       tenantId: tenant.id,
       subdomain: tenant.subdomain,
-      code: tenant.code,
+      code: tenant.subdomain,
       tenant,
       dbConfig: {
         host: tenant.dbHost,
@@ -143,7 +143,7 @@ export class ClinicalPdfWorker extends WorkerHost {
         // 3. Generar código QR en Base64 con metadatos de integridad y firma digital
         const qrPayload = JSON.stringify({
           clinica: tenant.name,
-          codigoReps: tenant.code,
+          codigoReps: tenant.subdomain,
           folioId: folio.id,
           numeroFolio: folio.numero_folio,
           pacienteId: folio.paciente_id,

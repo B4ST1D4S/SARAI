@@ -64,7 +64,7 @@ export class ClinicalPdfService {
     const tenantContext: TenantContext = {
       tenantId: tenant.id,
       subdomain: tenant.subdomain,
-      code: tenant.code,
+      code: tenant.subdomain,
       tenant,
       dbConfig: {
         host: tenant.dbHost,

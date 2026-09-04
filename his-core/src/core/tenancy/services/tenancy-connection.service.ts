@@ -29,9 +29,16 @@ export class TenancyConnectionService implements OnModuleDestroy {
         'No se encontró un TenantContext activo para resolver la conexión a la base de datos.',
       );
     }
-
+    
     const { tenantId, dbConfig } = tenantContext;
     const cacheKey = tenantId;
+    
+    if (!dbConfig.host) {
+      throw new InternalServerErrorException(
+        `El tenant '${tenantContext.subdomain}' no tiene configurado un 'db_host' válido. Operación cancelada para proteger his_master.`,
+      );
+    }
+    this.logger.log(`Conectando pool dinámico al Host: [${dbConfig.host}], DB: [${dbConfig.database}], User: [${dbConfig.username}]`);
 
     let pool = this.tenantPools.get(cacheKey);
     if (!pool) {
@@ -52,14 +59,15 @@ export class TenancyConnectionService implements OnModuleDestroy {
         parseInt(process.env.MASTER_DB_PORT ?? '5432', 10);
 
       pool = new Pool({
-        host: dbConfig.host || defaultHost,
-        port: dbConfig.port || defaultPort,
-        database: dbConfig.database,
-        user: dbConfig.username || defaultUser,
-        password: dbConfig.password || defaultPassword,
-        max: 15,
+        host: dbConfig.host,
+        port: dbConfig.port || 5432,
+        database: dbConfig.database || 'postgres',
+        user: dbConfig.username || 'postgres',
+        password: dbConfig.password,
+        ssl: { rejectUnauthorized: false },
+        max: 10,
         idleTimeoutMillis: 30000,
-        connectionTimeoutMillis: 5000,
+        connectionTimeoutMillis: 20000,
       });
 
       pool.on('error', (err) => {
@@ -117,6 +125,13 @@ export class TenancyConnectionService implements OnModuleDestroy {
   ): Promise<QueryResult<T>> {
     const pool = this.getTenantPool();
     return pool.query<T>(queryText, params);
+  }
+
+  /**
+   * Retorna la cantidad de pools de conexión activos en memoria
+   */
+  public getActivePoolCount(): number {
+    return this.tenantPools.size;
   }
 
   /**

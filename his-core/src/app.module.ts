@@ -13,6 +13,7 @@ import { QueueModule } from './core/queue/queue.module';
 import { TenantResolverMiddleware } from './core/tenancy/middleware/tenant-resolver.middleware';
 import { AppController } from './app.controller';
 import { CLINICAL_MODULES } from './modules';
+import { AuthModule } from './modules/auth/auth.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { CLINICAL_MODULES } from './modules';
     QueueModule,
     ScheduleModule.forRoot(),
     ...CLINICAL_MODULES,
+    AuthModule,
   ],
   controllers: [AppController],
   providers: [],

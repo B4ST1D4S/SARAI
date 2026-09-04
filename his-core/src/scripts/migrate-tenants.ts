@@ -1,7 +1,18 @@
+import * as dotenv from 'dotenv';
+dotenv.config();
+
 import { NestFactory } from '@nestjs/core';
-import { Logger } from '@nestjs/common';
-import { AppModule } from '../app.module';
+import { Logger, Module } from '@nestjs/common';
+import { CoreConfigModule } from '../core/config/core-config.module';
+import { MasterDatabaseModule } from '../core/database/master-database.module';
+import { TenancyModule } from '../core/tenancy/tenancy.module';
 import { MigrationRunnerService } from '../core/tenancy/services/migration-runner.service';
+
+// Módulo exclusivo para CLI: sin Redis ni BullMQ
+@Module({
+  imports: [CoreConfigModule, MasterDatabaseModule, TenancyModule],
+})
+class MigrationCliModule {}
 
 async function bootstrap() {
   const logger = new Logger('MigrateTenantsCLI');
@@ -11,7 +22,8 @@ async function bootstrap() {
   let app;
 
   try {
-    app = await NestFactory.createApplicationContext(AppModule, {
+    // Levanta solo la base de datos y tenancy, ignorando colas
+    app = await NestFactory.createApplicationContext(MigrationCliModule, {
       logger: ['error', 'warn', 'log'],
     });
 
@@ -32,10 +44,10 @@ async function bootstrap() {
     console.log(`• Migraciones Evaluadas:   ${report.migracionesCargadas}`);
     console.log('---------------------------------------------------------------');
 
-    if (report.resultados.length > 0) {
+    if (report.resultados && report.resultados.length > 0) {
       console.log('\n📋 Detalle por Institución:');
       console.table(
-        report.resultados.map((r) => ({
+        report.resultados.map((r: any) => ({
           Institución: r.tenantName,
           Subdominio: r.subdomain,
           Aplicadas: r.aplicadas,
@@ -45,17 +57,11 @@ async function bootstrap() {
       );
     }
 
+    // En migrate-tenants.ts, dentro de bootstrap():
     if (report.totalErrores > 0) {
-      console.log('\n❌ Detalle de Errores:');
-      report.tenantsConError.forEach((e) => {
-        console.error(`  - [${e.tenantName}] (${e.tenantId}): ${e.error}`);
-      });
-
-      await app.close();
       logger.error('❌ Proceso de migración finalizado con errores.');
       process.exit(1);
     } else {
-      await app.close();
       logger.log('✅ Todas las bases de datos de tenants se encuentran al día.');
       process.exit(0);
     }

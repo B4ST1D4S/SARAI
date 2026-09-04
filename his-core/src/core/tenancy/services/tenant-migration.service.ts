@@ -50,14 +50,16 @@ export class TenantMigrationService {
   ): Promise<TenantMigrationResult> {
     const tenantContext: TenantContext = {
       tenantId: tenant.id,
-      subdomain: tenant.subdomain,
-      code: tenant.code,
-      tenant,
+      subdomain: tenant.subdomain || (tenant as any).subdominio,
+      code: tenant.code || (tenant as any).subdominio || tenant.id,
+      tenant: tenant, // <-- Entidad completa requerida por la interfaz
       dbConfig: {
-        host: tenant.dbHost,
-        port: tenant.dbPort,
-        database: tenant.dbName,
-        username: tenant.dbUser,
+        host: tenant.dbHost || (tenant as any).db_host,
+        port: tenant.dbPort || (tenant as any).db_port || 5432,
+        database: tenant.dbName || (tenant as any).db_name || 'postgres',
+        username: tenant.dbUser || (tenant as any).db_user || 'postgres',
+        password: tenant.dbPassword || (tenant as any).db_password,
+        ssl: true,
       },
     };
 

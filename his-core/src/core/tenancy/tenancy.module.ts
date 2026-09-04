@@ -1,3 +1,4 @@
+import { CryptoService } from '../security/crypto.service';
 import { Module, Global } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Tenant } from './entities/tenant.entity';
@@ -12,10 +13,12 @@ import { MASTER_CONNECTION_NAME } from '../database/master-database.module';
 @Global()
 @Module({
   imports: [
+    TypeOrmModule.forFeature([Tenant], 'master_connection'),
     TypeOrmModule.forFeature([Tenant], MASTER_CONNECTION_NAME),
   ],
   providers: [
     TenantService,
+    CryptoService, 
     TenantContextService,
     TenancyConnectionService,
     TenantMigrationService,

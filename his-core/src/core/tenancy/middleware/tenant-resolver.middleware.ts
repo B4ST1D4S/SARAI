@@ -60,14 +60,14 @@ export class TenantResolverMiddleware implements NestMiddleware {
     const context: TenantContext = {
       tenantId: tenant.id,
       subdomain: tenant.subdomain,
-      code: tenant.code,
+      code: tenant.subdomain,
       tenant,
       dbConfig: {
         host: tenant.dbHost,
         port: tenant.dbPort,
         database: tenant.dbName,
         username: tenant.dbUser,
-        password: tenant.dbPassword,
+        password: (tenant as any).db_password || (tenant as any).dbPassword,
       },
     };
 
