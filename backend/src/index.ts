@@ -38,6 +38,8 @@ app.use(helmet());
 app.use(cors({
   origin: [
     'https://app-sarai.vercel.app',
+    'https://sara-ai.co',
+    'https://www.sara-ai.co',
     'http://localhost:5173',
     'http://localhost:3000',
   ],
