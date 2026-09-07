@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Calendar, Camera, AlertCircle, CheckCircle, MessageCircle, TrendingUp } from 'lucide-react';
-import { followUpService, initializeMockData } from '../services/mockData';
+import { followUpService, initializeMockData } from '../../services/mockData';
 
 interface FollowUp {
   id: string;

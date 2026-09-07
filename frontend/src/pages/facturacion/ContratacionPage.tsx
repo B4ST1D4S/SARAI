@@ -6,7 +6,7 @@ import {
   Edit2, Trash2, ChevronDown, RefreshCw, DollarSign, Calendar,
   Phone, Mail, MapPin, User, Shield, Briefcase, Save, Eye, Copy,
 } from 'lucide-react';
-import { apiCall } from '../services/api';
+import { apiCall } from '../../services/api';
 
 // ─── TIPOS ──────────────────────────────────────────────────────────────────
 

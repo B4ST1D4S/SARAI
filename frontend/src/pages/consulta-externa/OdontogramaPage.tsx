@@ -4,12 +4,12 @@ import {
   Search, Plus, Save, Sparkles, Trash2, Eraser, Stethoscope, ClipboardList,
   Activity, CheckCircle2, Clock, CalendarClock, Ban, PauseCircle, DollarSign, X, Printer,
 } from 'lucide-react';
-import { searchPacientes } from '../services/api';
-import OdontogramaInteractivo, { SUPERFICIES } from '../components/medical/OdontogramaInteractivo';
-import * as odo from '../services/odontologiaService';
+import { searchPacientes } from '../../services/api';
+import OdontogramaInteractivo, { SUPERFICIES } from '../../components/medical/OdontogramaInteractivo';
+import * as odo from '../../services/odontologiaService';
 import type {
   OdontoCatalogos, OdontoHallazgo, PiezaHallazgo, Odontograma, PlanItem, Evolucion, EstadoTratamiento,
-} from '../services/odontologiaService';
+} from '../../services/odontologiaService';
 
 const fmtCOP = (n: number) =>
   new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(n || 0);

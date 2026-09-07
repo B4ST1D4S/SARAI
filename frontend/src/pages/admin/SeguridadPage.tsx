@@ -7,7 +7,7 @@ import {
   Trash2, CheckCircle, XCircle, Ban, LogOut, Info,
   BarChart3, Server, Globe, TrendingUp,
 } from 'lucide-react';
-import { API_BASE_URL } from '../config';
+import { API_BASE_URL } from '../../config';
 
 // ─────────────────────────────────────────────────────────
 //  Tipos

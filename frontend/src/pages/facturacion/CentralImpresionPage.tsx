@@ -5,8 +5,8 @@
  */
 import { useState } from 'react';
 import { Search, Printer, FileText, ClipboardList, User, Loader2, AlertCircle } from 'lucide-react';
-import { searchPacientes, getHistoriasPaciente, getHistoriaClinica } from '../services/api';
-import { API_BASE_URL } from '../config';
+import { searchPacientes, getHistoriasPaciente, getHistoriaClinica } from '../../services/api';
+import { API_BASE_URL } from '../../config';
 
 // ─────────────────────────────────────────────────────────
 // Generador HTML para Historia Clínica (secciones 1-11)

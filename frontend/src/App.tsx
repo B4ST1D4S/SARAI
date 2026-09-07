@@ -1,38 +1,48 @@
 ﻿import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LayoutGrid, Columns } from 'lucide-react';
-import AuthPage from './pages/AuthPage';
 import NeuralCanvas from './components/NeuralCanvas';
-import DashboardPage from './pages/DashboardPage';
-import PacientesPage from './pages/PacientesPage';
-import HistoriaClinicaPage from './pages/HistoriaClinicaPage';
-import VisualClinicoPage from './pages/VisualClinicoPage';
-import ConsentimientoPage from './pages/ConsentimientoPage';
-import AgendaPage from './pages/AgendaPage';
-import AgendaProfesionalPage from './pages/AgendaProfesionalPage';
-import ConfigAgendaPage from './pages/ConfigAgendaPage';
-import AdmisionPage from './pages/AdmisionPage';
-import VistaCirujanoPage from './pages/VistaCirujanoPage';
-import FollowUpPage from './pages/FollowUpPage';
-import CRMPage from './pages/CRMPage';
-import FacturacionPage from './pages/FacturacionPage';
-import PlantillasPage from './pages/PlantillasPage';
-import MapaCorporalPage from './pages/MapaCorporalPage';
-import OdontogramaPage from './pages/OdontogramaPage';
-import SeguridadPage from './pages/SeguridadPage';
-import { Body3DTestPage } from './pages/Body3DTestPage';
-import UsuariosPage from './pages/UsuariosPage';
-import AdminPage from './pages/AdminPage';
-import CentralImpresionPage from './pages/CentralImpresionPage';
-import CotizacionesPage from './pages/CotizacionesPage';
-import ContratacionPage from './pages/ContratacionPage';
 import SaraiAssistant from './components/SaraiAssistant';
-import ManualPage from './pages/ManualPage';
 import saraiLogo from './assets/LOGO.png';
 import { getParametrosSistema } from './services/adminService';
 import { useTheme } from './hooks/useTheme';
 import { useIam } from './context/IamContext';
 import LaunchpadHub, { SARAI_DEFAULT_TILES } from './components/layout/LaunchpadHub';
+
+// ── Rutas Organizadas por Dominio ──
+// Core & Auth
+import AuthPage from './pages/auth/AuthPage';
+import DashboardPage from './pages/dashboard/DashboardPage';
+
+// Consulta Externa
+import PacientesPage from './pages/consulta-externa/PacientesPage';
+import HistoriaClinicaPage from './pages/consulta-externa/HistoriaClinicaPage';
+import AgendaPage from './pages/consulta-externa/AgendaPage';
+import AgendaProfesionalPage from './pages/consulta-externa/AgendaProfesionalPage';
+import ConfigAgendaPage from './pages/consulta-externa/ConfigAgendaPage';
+import AdmisionPage from './pages/consulta-externa/AdmisionPage';
+import FollowUpPage from './pages/consulta-externa/FollowUpPage';
+import OdontogramaPage from './pages/consulta-externa/OdontogramaPage';
+import MapaCorporalPage from './pages/consulta-externa/MapaCorporalPage';
+
+// Quirófano & Cirugía
+import VistaCirujanoPage from './pages/quirofano/VistaCirujanoPage';
+import VisualClinicoPage from './pages/quirofano/VisualClinicoPage';
+import ConsentimientoPage from './pages/quirofano/ConsentimientoPage';
+import { Body3DTestPage } from './pages/quirofano/Body3DTestPage';
+
+// Facturación, Contratación & RIPS
+import FacturacionPage from './pages/facturacion/FacturacionPage';
+import CotizacionesPage from './pages/facturacion/CotizacionesPage';
+import ContratacionPage from './pages/facturacion/ContratacionPage';
+import CRMPage from './pages/facturacion/CRMPage';
+import CentralImpresionPage from './pages/facturacion/CentralImpresionPage';
+
+// Administración & Configuración
+import AdminPage from './pages/admin/AdminPage';
+import UsuariosPage from './pages/admin/UsuariosPage';
+import SeguridadPage from './pages/admin/SeguridadPage';
+import PlantillasPage from './pages/admin/PlantillasPage';
+import ManualPage from './pages/admin/ManualPage';
 
 export type NavMode = 'hub' | 'sidebar';
 
@@ -140,7 +150,6 @@ function Sidebar({
     setMobileOpen(false);
   };
 
-  // Si está en modo Hub y hay módulo activo, se filtra solo esa sección; si es modo Sidebar, se toman todas
   const sectionsToRender = (navMode === 'hub' && activeMacroModule)
     ? [{ key: activeMacroModule, ...MACRO_MODULES_NAV[activeMacroModule] }]
     : Object.entries(MACRO_MODULES_NAV).map(([key, val]) => ({ key, ...val }));
@@ -163,7 +172,6 @@ function Sidebar({
           ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}
           lg:translate-x-0`}
       >
-        {/* Header con botón Volver al Hub o Logo */}
         <div className="flex items-center justify-between px-3 h-14 border-b border-white/5 flex-shrink-0">
           {navMode === 'hub' ? (
             <button
@@ -206,7 +214,6 @@ function Sidebar({
           )}
         </div>
 
-        {/* Submódulos organizados */}
         <nav className="flex-1 overflow-y-auto overflow-x-hidden py-3 sidebar-scroll">
           {sectionsToRender.map((section) => (
             <div key={section.key} className="mb-3">
@@ -254,7 +261,6 @@ function Sidebar({
           ))}
         </nav>
 
-        {/* Footer usuario */}
         <div className="border-t border-white/5 p-3 flex-shrink-0">
           <div className={`flex items-center gap-2.5 ${effectiveCollapsed ? 'justify-center' : ''}`}>
             <div className="w-8 h-8 flex-shrink-0 rounded-full bg-gradient-to-br from-yellow-400 to-amber-600 flex items-center justify-center text-slate-900 font-bold text-xs">
@@ -285,7 +291,16 @@ function App() {
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [activeMacroModule, setActiveMacroModule] = useState<string | null>(null);
   const [navMode, setNavMode] = useState<NavMode>(() => {
-    return (localStorage.getItem('sarai_nav_mode') as NavMode) || 'hub';
+    try {
+      const userStr = localStorage.getItem('user');
+      if (userStr) {
+        const u = JSON.parse(userStr);
+        if (u?.preferencias?.navMode) return u.preferencias.navMode;
+      }
+      return (localStorage.getItem('sarai_nav_mode') as NavMode) || 'hub';
+    } catch {
+      return 'hub';
+    }
   });
 
   const { canDo } = useIam();
@@ -309,15 +324,6 @@ function App() {
 
   useEffect(() => { currentPageRef.current = currentPage; }, [currentPage]);
 
-  const handleCambiarNavMode = (mode: NavMode) => {
-    setNavMode(mode);
-    localStorage.setItem('sarai_nav_mode', mode);
-    if (mode === 'sidebar') {
-      setActiveMacroModule(null);
-    }
-  };
-
-  // Atajos de teclado globales Alt + sym
   useEffect(() => {
     if (!user) return;
     const handler = (e: KeyboardEvent) => {
@@ -436,20 +442,20 @@ function App() {
               : sidebarCollapsed ? 'lg:ml-[68px]' : 'lg:ml-[236px]'
           }`}
         >
-          {/* ══════ TOPBAR ══════ */}
+          {/* Topbar despejada y limpia */}
           {(() => {
             const T = {
-              'dark':             { bg: 'bg-[#0a0c13]',    border: 'border-white/[0.06]',   nameGrad: 'from-yellow-300 via-amber-400 to-yellow-500',     sub: 'text-yellow-500/50',   date: 'text-gray-400',    dateSub: 'text-gray-600'    },
-              'premium-light':    { bg: 'bg-white',         border: 'border-slate-200',      nameGrad: 'from-blue-700 via-indigo-600 to-blue-800',         sub: 'text-blue-500/60',     date: 'text-slate-600',   dateSub: 'text-slate-400'   },
-              'soft-medical':     { bg: 'bg-slate-50',      border: 'border-slate-200',      nameGrad: 'from-teal-600 via-cyan-600 to-teal-700',           sub: 'text-teal-500/60',     date: 'text-slate-500',   dateSub: 'text-slate-400'   },
-              'executive-ai':     { bg: 'bg-[#0c1220]',     border: 'border-blue-400/12',    nameGrad: 'from-blue-400 via-violet-400 to-blue-500',         sub: 'text-blue-400/45',     date: 'text-blue-300/70', dateSub: 'text-blue-400/40' },
-              'rose-care':        { bg: 'bg-white',         border: 'border-rose-200',       nameGrad: 'from-rose-600 via-pink-500 to-rose-700',           sub: 'text-rose-500/60',     date: 'text-slate-500',   dateSub: 'text-slate-400'   },
-              'fuchsia-premium':  { bg: 'bg-white',         border: 'border-fuchsia-200',    nameGrad: 'from-fuchsia-600 via-purple-500 to-fuchsia-700',   sub: 'text-fuchsia-500/60',  date: 'text-slate-500',   dateSub: 'text-slate-400'   },
-              'purple-care':      { bg: 'bg-white',         border: 'border-violet-200',     nameGrad: 'from-violet-700 via-purple-600 to-violet-800',     sub: 'text-violet-500/60',   date: 'text-slate-500',   dateSub: 'text-slate-400'   },
-              'arctic-blue':      { bg: 'bg-white',         border: 'border-sky-200',        nameGrad: 'from-sky-700 via-blue-600 to-sky-800',             sub: 'text-sky-500/60',      date: 'text-slate-500',   dateSub: 'text-slate-400'   },
-              'mint-premium':     { bg: 'bg-white',         border: 'border-teal-200',       nameGrad: 'from-teal-700 via-emerald-600 to-teal-800',        sub: 'text-teal-500/60',     date: 'text-slate-500',   dateSub: 'text-slate-400'   },
-              'sunset-care':      { bg: 'bg-white',         border: 'border-amber-200',      nameGrad: 'from-amber-600 via-orange-500 to-amber-700',       sub: 'text-amber-500/60',    date: 'text-slate-500',   dateSub: 'text-slate-400'   },
-            }[theme] ?? { bg: 'bg-[#0a0c13]', border: 'border-white/[0.06]', nameGrad: 'from-yellow-300 via-amber-400 to-yellow-500', sub: 'text-yellow-500/50', date: 'text-gray-400', dateSub: 'text-gray-600' };
+              'dark':             { bg: 'bg-[#0a0c13]',    border: 'border-white/[0.06]',   nameGrad: 'from-yellow-300 via-amber-400 to-yellow-500',     date: 'text-gray-400',    dateSub: 'text-gray-600'    },
+              'premium-light':    { bg: 'bg-white',         border: 'border-slate-200',      nameGrad: 'from-blue-700 via-indigo-600 to-blue-800',         date: 'text-slate-600',   dateSub: 'text-slate-400'   },
+              'soft-medical':     { bg: 'bg-slate-50',      border: 'border-slate-200',      nameGrad: 'from-teal-600 via-cyan-600 to-teal-700',           date: 'text-slate-500',   dateSub: 'text-slate-400'   },
+              'executive-ai':     { bg: 'bg-[#0c1220]',     border: 'border-blue-400/12',    nameGrad: 'from-blue-400 via-violet-400 to-blue-500',         date: 'text-blue-300/70', dateSub: 'text-blue-400/40' },
+              'rose-care':        { bg: 'bg-white',         border: 'border-rose-200',       nameGrad: 'from-rose-600 via-pink-500 to-rose-700',           date: 'text-slate-500',   dateSub: 'text-slate-400'   },
+              'fuchsia-premium':  { bg: 'bg-white',         border: 'border-fuchsia-200',    nameGrad: 'from-fuchsia-600 via-purple-500 to-fuchsia-700',   date: 'text-slate-500',   dateSub: 'text-slate-400'   },
+              'purple-care':      { bg: 'bg-white',         border: 'border-violet-200',     nameGrad: 'from-violet-700 via-purple-600 to-violet-800',     date: 'text-slate-500',   dateSub: 'text-slate-400'   },
+              'arctic-blue':      { bg: 'bg-white',         border: 'border-sky-200',        nameGrad: 'from-sky-700 via-blue-600 to-sky-800',             date: 'text-slate-500',   dateSub: 'text-slate-400'   },
+              'mint-premium':     { bg: 'bg-white',         border: 'border-teal-200',       nameGrad: 'from-teal-700 via-emerald-600 to-teal-800',        date: 'text-slate-500',   dateSub: 'text-slate-400'   },
+              'sunset-care':      { bg: 'bg-white',         border: 'border-amber-200',      nameGrad: 'from-amber-600 via-orange-500 to-amber-700',       date: 'text-slate-500',   dateSub: 'text-slate-400'   },
+            }[theme] ?? { bg: 'bg-[#0a0c13]', border: 'border-white/[0.06]', nameGrad: 'from-yellow-300 via-amber-400 to-yellow-500', date: 'text-gray-400', dateSub: 'text-gray-600' };
 
             const hoy = new Date();
             const diaSemana = hoy.toLocaleDateString('es-CO', { weekday: 'long' });
@@ -481,34 +487,6 @@ function App() {
                 </div>
 
                 <div className="flex items-center gap-3 flex-shrink-0 ml-auto z-10">
-                  {/* Selector de modo de navegación: Hub vs Sidebar */}
-                  <div className="hidden sm:flex items-center gap-1 bg-white/5 p-1 rounded-lg border border-white/10 text-xs mr-2">
-                    <button
-                      onClick={() => handleCambiarNavMode('hub')}
-                      className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md transition-all ${
-                        navMode === 'hub'
-                          ? 'bg-yellow-500/20 text-yellow-400 font-semibold'
-                          : 'text-gray-400 hover:text-white'
-                      }`}
-                      title="Modo Launchpad Hub"
-                    >
-                      <LayoutGrid className="w-3.5 h-3.5" />
-                      <span>Hub</span>
-                    </button>
-                    <button
-                      onClick={() => handleCambiarNavMode('sidebar')}
-                      className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md transition-all ${
-                        navMode === 'sidebar'
-                          ? 'bg-yellow-500/20 text-yellow-400 font-semibold'
-                          : 'text-gray-400 hover:text-white'
-                      }`}
-                      title="Modo Barra Lateral Permanente"
-                    >
-                      <Columns className="w-3.5 h-3.5" />
-                      <span>Barra</span>
-                    </button>
-                  </div>
-
                   <div className="hidden md:flex flex-col items-end leading-snug">
                     <span className={`text-[11px] font-semibold capitalize ${T.date}`}>{diaSemana}</span>
                     <span className={`text-[10px] capitalize ${T.dateSub}`}>{fechaCompleta}</span>
@@ -556,6 +534,7 @@ function App() {
               </div>
             ) : (
               <>
+                {/* Páginas de Consulta Externa */}
                 {currentPage === 'pacientes'           && <PacientesPage />}
                 {currentPage === 'historia'            && (
                   <HistoriaClinicaPage
@@ -569,8 +548,6 @@ function App() {
                     pacienteIdExterno={historiaPacienteId}
                   />
                 )}
-                {currentPage === 'fotos'               && <VisualClinicoPage />}
-                {currentPage === 'consentimiento'      && <ConsentimientoPage />}
                 {currentPage === 'agenda'              && <AgendaPage />}
                 {currentPage === 'admision'            && <AdmisionPage />}
                 {currentPage === 'config-agenda'       && <ConfigAgendaPage />}
@@ -586,17 +563,25 @@ function App() {
                     }}
                   />
                 )}
-                {currentPage === 'vista-cirujano'      && <VistaCirujanoPage />}
                 {currentPage === 'followup'            && <FollowUpPage />}
+                {currentPage === 'mapa-corporal'       && <MapaCorporalPage />}
+                {currentPage === 'odontograma'         && <OdontogramaPage />}
+
+                {/* Páginas de Quirófano */}
+                {currentPage === 'vista-cirujano'      && <VistaCirujanoPage />}
+                {currentPage === 'fotos'               && <VisualClinicoPage />}
+                {currentPage === 'consentimiento'      && <ConsentimientoPage />}
+                {currentPage === 'body3d-test'         && <Body3DTestPage />}
+
+                {/* Páginas de Facturación & RIPS */}
                 {currentPage === 'crm'                 && <CRMPage onNavegar={setCurrentPage} />}
                 {currentPage === 'cotizaciones'        && <CotizacionesPage />}
                 {currentPage === 'contratacion'        && <ContratacionPage />}
                 {currentPage === 'facturacion'         && <FacturacionPage />}
-                {currentPage === 'plantillas'          && <PlantillasPage />}
                 {currentPage === 'impresion'           && <CentralImpresionPage />}
-                {currentPage === 'mapa-corporal'       && <MapaCorporalPage />}
-                {currentPage === 'odontograma'         && <OdontogramaPage />}
-                {currentPage === 'body3d-test'         && <Body3DTestPage />}
+
+                {/* Páginas de Administración */}
+                {currentPage === 'plantillas'          && <PlantillasPage />}
                 {currentPage === 'usuarios'            && <UsuariosPage />}
                 {currentPage === 'admin'               && <AdminPage />}
                 {currentPage === 'seguridad'           && <SeguridadPage />}

@@ -1,13 +1,13 @@
 ﻿import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Trash2, RotateCw, Download, TrendingDown, Calendar, Plus, Save, ChevronDown, ChevronUp, AlertTriangle, ClipboardList, FileText, Activity, Eye, Box, Share2 } from 'lucide-react';
-import { Body3D } from '../components/Body3D';
-import { saveMapaCorporal, getMapaCorporalPorPaciente, searchPacientes } from '../services/api';
-import { API_BASE_URL } from '../config';
-import bodyFrontImg from './images/body-front-3d.png';
-import bodyBackImg from './images/body-back-3d.png';
-import bodyLeftImg from './images/body-left-3d.png';
-import bodyRightImg from './images/body-right-3d.png';
+import { Body3D } from '../../components/Body3D';
+import { saveMapaCorporal, getMapaCorporalPorPaciente, searchPacientes } from '../../services/api';
+import { API_BASE_URL } from '../../config';
+import bodyFrontImg from '../images/body-front-3d.png';
+import bodyBackImg from '../images/body-back-3d.png';
+import bodyLeftImg from '../images/body-left-3d.png';
+import bodyRightImg from '../images/body-right-3d.png';
 
 interface Mark {
   id: string;

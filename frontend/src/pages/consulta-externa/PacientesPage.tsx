@@ -1,15 +1,15 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Search, Eye, Trash2, Upload } from 'lucide-react';
-import { useIam } from '../context/IamContext';
+import { useIam } from '../../context/IamContext';
 import {
   createPaciente,
   getAllPacientes,
   deletePaciente,
   searchPacientes,
-} from '../services/api';
-import { FormularioPaciente } from '../components/FormularioPaciente';
-import { CargaMasivaPacientes } from '../components/CargaMasivaPacientes';
+} from '../../services/api';
+import { FormularioPaciente } from '../../components/FormularioPaciente';
+import { CargaMasivaPacientes } from '../../components/CargaMasivaPacientes';
 
 export default function PacientesPage() {
   const [pacientes, setPacientes] = useState<any[]>([]);

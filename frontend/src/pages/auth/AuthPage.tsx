@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { login } from '../services/api';
-import NeuralCanvas from '../components/NeuralCanvas';
-import saraiBrandLogo from '../assets/LOGO.png';
+import { login } from '../../services/api';
+import NeuralCanvas from '../../components/NeuralCanvas';
+import saraiBrandLogo from '../../assets/LOGO.png';
 
 /* ?? Cruz médica SVG con glow ??????????????????????????????????????? */
 function MedicalCross() {

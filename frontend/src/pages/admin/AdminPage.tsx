@@ -16,9 +16,9 @@ import {
   FileText, List, SlidersHorizontal, Stethoscope, Calendar, MessageSquare, Palette,
   Sparkles,
 } from 'lucide-react';
-import * as svc from '../services/adminService';
-import { useTheme, ThemeId } from '../hooks/useTheme';
-import TabOdontologia from './admin/TabOdontologia';
+import * as svc from '../../services/adminService';
+import { useTheme, ThemeId } from '../../hooks/useTheme';
+import TabOdontologia from '../admin/TabOdontologia';
 
 // ─── CSV helpers ──────────────────────────────────────────────
 function csvToObjects(text: string): any[] {
@@ -2159,8 +2159,43 @@ function TabMotivosCita() {
 // ════════════════════════════════════════════════
 // TAB: TEMAS DEL SISTEMA
 // ════════════════════════════════════════════════
+// ════════════════════════════════════════════════
+// TAB: TEMAS Y NAVEGACIÓN DEL SISTEMA
+// ════════════════════════════════════════════════
 function TabTemasistema() {
   const { theme, setTheme } = useTheme();
+  const [navMode, setNavMode] = useState<'hub' | 'sidebar'>(() => {
+    try {
+      const userStr = localStorage.getItem('user');
+      if (userStr) {
+        const u = JSON.parse(userStr);
+        if (u?.preferencias?.navMode) return u.preferencias.navMode;
+      }
+      return (localStorage.getItem('sarai_nav_mode') as 'hub' | 'sidebar') || 'hub';
+    } catch {
+      return 'hub';
+    }
+  });
+
+  const cambiarModoNavegacion = (nuevoModo: 'hub' | 'sidebar') => {
+    setNavMode(nuevoModo);
+    localStorage.setItem('sarai_nav_mode', nuevoModo);
+    
+    // Actualizar en localStorage
+    try {
+      const userStr = localStorage.getItem('user');
+      if (userStr) {
+        const u = JSON.parse(userStr);
+        u.preferencias = { ...(u.preferencias || {}), navMode: nuevoModo };
+        localStorage.setItem('user', JSON.stringify(u));
+      }
+    } catch { /* noop */ }
+
+    // Persistir en backend
+    svc.updatePreferenciasUsuario({ navMode: nuevoModo }).catch((err) => {
+      console.warn('Error al guardar modo de navegación:', err);
+    });
+  };
 
   type TemaInfo = {
     id: ThemeId;
@@ -2310,206 +2345,271 @@ function TabTemasistema() {
   ];
 
   return (
-    <div style={{ maxWidth: 860 }}>
-      {/* Header */}
-      <div style={{ marginBottom: 24 }}>
-        <h2 style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>Temas del Sistema</h2>
-        <p style={{ fontSize: 12, color: '#94a3b8', lineHeight: 1.6 }}>
-          Selecciona la paleta visual de SARAI. El cambio aplica inmediatamente en toda la interfaz.
-        </p>
+    <div style={{ maxWidth: 860 }} className="space-y-8">
+      {/* ── SECCIÓN 1: MODO DE NAVEGACIÓN ── */}
+      <div>
+        <div style={{ marginBottom: 16 }}>
+          <h2 style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }} className="text-white">
+            Modo de Navegación del Sistema
+          </h2>
+          <p style={{ fontSize: 12, color: '#94a3b8', lineHeight: 1.6 }}>
+            Elige la distribución de pantallas que mejor se adapte a tu flujo de trabajo diario.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* Opción Hub */}
+          <div
+            onClick={() => cambiarModoNavegacion('hub')}
+            className={`p-4 rounded-xl border cursor-pointer transition-all ${
+              navMode === 'hub'
+                ? 'bg-yellow-500/10 border-yellow-500/50 shadow-lg shadow-yellow-500/5'
+                : 'bg-slate-800/40 border-white/5 hover:border-white/20'
+            }`}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-lg bg-yellow-500/20 text-yellow-400">
+                  <LayoutGrid size={18} />
+                </div>
+                <span className="text-sm font-bold text-white">Launchpad Hub</span>
+              </div>
+              {navMode === 'hub' && (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">
+                  ACTIVO
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-gray-400 leading-relaxed">
+              Inicio con cuadrícula de macro-módulos e indicadores en vivo. La barra lateral solo aparece al entrar a un módulo específico.
+            </p>
+          </div>
+
+          {/* Opción Barra Lateral */}
+          <div
+            onClick={() => cambiarModoNavegacion('sidebar')}
+            className={`p-4 rounded-xl border cursor-pointer transition-all ${
+              navMode === 'sidebar'
+                ? 'bg-yellow-500/10 border-yellow-500/50 shadow-lg shadow-yellow-500/5'
+                : 'bg-slate-800/40 border-white/5 hover:border-white/20'
+            }`}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-lg bg-yellow-500/20 text-yellow-400">
+                  <List size={18} />
+                </div>
+                <span className="text-sm font-bold text-white">Barra Lateral Permanente</span>
+              </div>
+              {navMode === 'sidebar' && (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">
+                  ACTIVO
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-gray-400 leading-relaxed">
+              Menú lateral permanente con todos los módulos agrupados. El panel central se enfoca 100% en los indicadores del turno.
+            </p>
+          </div>
+        </div>
       </div>
 
-      {/* Grid 1 col mobile / 2 col desktop */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-        gap: 16,
-      }}>
-        {TEMAS.map(t => {
-          const active = theme === t.id;
-          return (
-            <motion.div
-              key={t.id}
-              whileHover={{ y: -3, transition: { duration: 0.15 } }}
-              onClick={() => setTheme(t.id)}
-              style={{
-                borderRadius: 16,
-                overflow: 'hidden',
-                border: `1.5px solid ${active ? t.accent : t.border}`,
-                boxShadow: active ? `0 0 22px ${t.accent}28` : '0 2px 8px rgba(0,0,0,0.18)',
-                cursor: 'pointer',
-                position: 'relative',
-                background: t.bg[1],
-              }}
-            >
-              {/* Badge activo */}
-              {active && (
-                <div style={{
-                  position: 'absolute', top: 10, right: 10, zIndex: 10,
-                  display: 'flex', alignItems: 'center', gap: 5,
-                  padding: '3px 10px',
-                  background: `${t.accent}22`,
-                  border: `1px solid ${t.accent}55`,
-                  borderRadius: 99,
-                  fontSize: 10, fontWeight: 700,
-                  color: t.accent,
-                }}>
-                  <span style={{
-                    width: 6, height: 6, borderRadius: '50%',
-                    background: t.accent,
-                    display: 'inline-block',
-                    boxShadow: `0 0 4px ${t.accent}`,
-                  }} />
-                  ACTIVO
-                </div>
-              )}
+      <div className="border-t border-white/5" />
 
-              {/* Preview mini-UI */}
-              <div style={{
-                height: 108,
-                background: `linear-gradient(135deg, ${t.bg[0]}, ${t.bg[1]}, ${t.bg[2]})`,
-                padding: '10px 12px',
-                display: 'flex',
-                gap: 8,
-                overflow: 'hidden',
-              }}>
-                {/* Sidebar mock */}
-                <div style={{
-                  width: 32, flexShrink: 0,
-                  background: t.bg[0],
-                  border: `1px solid ${t.border}`,
-                  borderRadius: 7,
-                  padding: '6px 5px',
-                  display: 'flex', flexDirection: 'column', gap: 5,
-                }}>
-                  {([1,0,0,0] as number[]).map((hl, i) => (
-                    <div key={i} style={{
-                      height: 4, borderRadius: 3,
-                      background: hl ? t.accent : `${t.txt}18`,
-                      width: hl ? '80%' : '60%',
-                    }} />
-                  ))}
-                  <div style={{ flex: 1 }} />
-                  <div style={{ height: 4, borderRadius: 3, background: `${t.txt}10`, width: '70%' }} />
-                </div>
-                {/* Contenido */}
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 5 }}>
-                  {/* Navbar */}
+      {/* ── SECCIÓN 2: PALETA DE TEMAS ── */}
+      <div>
+        <div style={{ marginBottom: 24 }}>
+          <h2 style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }} className="text-white">
+            Temas Visuales
+          </h2>
+          <p style={{ fontSize: 12, color: '#94a3b8', lineHeight: 1.6 }}>
+            Selecciona la paleta visual de SARAI. Tu preferencia se guardará en tu perfil de usuario.
+          </p>
+        </div>
+
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+          gap: 16,
+        }}>
+          {TEMAS.map(t => {
+            const active = theme === t.id;
+            return (
+              <motion.div
+                key={t.id}
+                whileHover={{ y: -3, transition: { duration: 0.15 } }}
+                onClick={() => setTheme(t.id)}
+                style={{
+                  borderRadius: 16,
+                  overflow: 'hidden',
+                  border: `1.5px solid ${active ? t.accent : t.border}`,
+                  boxShadow: active ? `0 0 22px ${t.accent}28` : '0 2px 8px rgba(0,0,0,0.18)',
+                  cursor: 'pointer',
+                  position: 'relative',
+                  background: t.bg[1],
+                }}
+              >
+                {active && (
                   <div style={{
-                    height: 14, background: t.card,
-                    border: `1px solid ${t.border}`,
-                    borderRadius: 6,
-                    display: 'flex', alignItems: 'center', gap: 4, padding: '0 6px',
+                    position: 'absolute', top: 10, right: 10, zIndex: 10,
+                    display: 'flex', alignItems: 'center', gap: 5,
+                    padding: '3px 10px',
+                    background: `${t.accent}22`,
+                    border: `1px solid ${t.accent}55`,
+                    borderRadius: 99,
+                    fontSize: 10, fontWeight: 700,
+                    color: t.accent,
                   }}>
-                    <div style={{ height: 3, width: '30%', borderRadius: 2, background: `${t.txt}25` }} />
-                    <div style={{ flex: 1 }} />
-                    <div style={{ width: 12, height: 6, borderRadius: 3, background: t.accent }} />
+                    <span style={{
+                      width: 6, height: 6, borderRadius: '50%',
+                      background: t.accent,
+                      display: 'inline-block',
+                      boxShadow: `0 0 4px ${t.accent}`,
+                    }} />
+                    ACTIVO
                   </div>
-                  {/* Stat cards */}
-                  <div style={{ display: 'flex', gap: 4, flex: 1 }}>
-                    {([t.accent, `${t.accent}80`, `${t.accent}44`] as string[]).map((c, i) => (
-                      <div key={i} style={{
-                        flex: 1, background: t.card,
-                        border: `1px solid ${t.border}`,
-                        borderRadius: 6, padding: 4,
-                      }}>
-                        <div style={{ height: 3, width: '70%', background: c, borderRadius: 2, marginBottom: 3 }} />
-                        <div style={{ height: 2, width: '90%', background: `${t.txt}20`, borderRadius: 2 }} />
-                        <div style={{ height: 2, width: '50%', background: `${t.txt}12`, borderRadius: 2, marginTop: 2 }} />
-                      </div>
-                    ))}
-                  </div>
-                  {/* Table rows */}
-                  <div style={{ background: t.card, border: `1px solid ${t.border}`, borderRadius: 6, overflow: 'hidden' }}>
-                    {([0, 1] as number[]).map(i => (
-                      <div key={i} style={{
-                        display: 'flex', alignItems: 'center', gap: 4,
-                        padding: '3px 6px',
-                        background: i === 0 ? `${t.accent}10` : 'transparent',
-                        borderBottom: i === 0 ? `1px solid ${t.border}` : 'none',
-                      }}>
-                        <div style={{ height: 2, flex: 1, background: `${t.txt}20`, borderRadius: 2 }} />
-                        <div style={{ height: 5, width: 20, background: i === 0 ? t.accent : `${t.txt}15`, borderRadius: 3 }} />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
+                )}
 
-              {/* Info */}
-              <div style={{
-                padding: '14px 16px',
-                background: t.bg[1],
-                borderTop: `1px solid ${t.border}`,
-              }}>
-                {/* Nombre + swatches */}
                 <div style={{
-                  display: 'flex', alignItems: 'flex-start',
-                  justifyContent: 'space-between', marginBottom: 6,
+                  height: 108,
+                  background: `linear-gradient(135deg, ${t.bg[0]}, ${t.bg[1]}, ${t.bg[2]})`,
+                  padding: '10px 12px',
+                  display: 'flex',
+                  gap: 8,
+                  overflow: 'hidden',
                 }}>
-                  <div>
-                    <p style={{ fontSize: 13, fontWeight: 700, color: t.txt, marginBottom: 2 }}>{t.name}</p>
-                    <p style={{ fontSize: 10, fontWeight: 600, color: t.accent }}>{t.tagline}</p>
-                  </div>
-                  <div style={{ display: 'flex', gap: 3, flexShrink: 0, marginTop: 2 }}>
-                    {t.swatches.map((c, i) => (
+                  <div style={{
+                    width: 32, flexShrink: 0,
+                    background: t.bg[0],
+                    border: `1px solid ${t.border}`,
+                    borderRadius: 7,
+                    padding: '6px 5px',
+                    display: 'flex', flexDirection: 'column', gap: 5,
+                  }}>
+                    {([1,0,0,0] as number[]).map((hl, i) => (
                       <div key={i} style={{
-                        width: 12, height: 12, borderRadius: '50%',
-                        background: c, border: `1.5px solid ${t.border}`,
+                        height: 4, borderRadius: 3,
+                        background: hl ? t.accent : `${t.txt}18`,
+                        width: hl ? '80%' : '60%',
                       }} />
                     ))}
+                    <div style={{ flex: 1 }} />
+                    <div style={{ height: 4, borderRadius: 3, background: `${t.txt}10`, width: '70%' }} />
+                  </div>
+
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 5 }}>
+                    <div style={{
+                      height: 14, background: t.card,
+                      border: `1px solid ${t.border}`,
+                      borderRadius: 6,
+                      display: 'flex', alignItems: 'center', gap: 4, padding: '0 6px',
+                    }}>
+                      <div style={{ height: 3, width: '30%', borderRadius: 2, background: `${t.txt}25` }} />
+                      <div style={{ flex: 1 }} />
+                      <div style={{ width: 12, height: 6, borderRadius: 3, background: t.accent }} />
+                    </div>
+
+                    <div style={{ display: 'flex', gap: 4, flex: 1 }}>
+                      {([t.accent, `${t.accent}80`, `${t.accent}44`] as string[]).map((c, i) => (
+                        <div key={i} style={{
+                          flex: 1, background: t.card,
+                          border: `1px solid ${t.border}`,
+                          borderRadius: 6, padding: 4,
+                        }}>
+                          <div style={{ height: 3, width: '70%', background: c, borderRadius: 2, marginBottom: 3 }} />
+                          <div style={{ height: 2, width: '90%', background: `${t.txt}20`, borderRadius: 2 }} />
+                          <div style={{ height: 2, width: '50%', background: `${t.txt}12`, borderRadius: 2, marginTop: 2 }} />
+                        </div>
+                      ))}
+                    </div>
+
+                    <div style={{ background: t.card, border: `1px solid ${t.border}`, borderRadius: 6, overflow: 'hidden' }}>
+                      {([0, 1] as number[]).map(i => (
+                        <div key={i} style={{
+                          display: 'flex', alignItems: 'center', gap: 4,
+                          padding: '3px 6px',
+                          background: i === 0 ? `${t.accent}10` : 'transparent',
+                          borderBottom: i === 0 ? `1px solid ${t.border}` : 'none',
+                        }}>
+                          <div style={{ height: 2, flex: 1, background: `${t.txt}20`, borderRadius: 2 }} />
+                          <div style={{ height: 5, width: 20, background: i === 0 ? t.accent : `${t.txt}15`, borderRadius: 3 }} />
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
-                {/* Descripción */}
-                <p style={{ fontSize: 11, color: `${t.txt}bb`, lineHeight: 1.55, marginBottom: 8 }}>
-                  {t.desc}
-                </p>
-                {/* Ideal para */}
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 10 }}>
-                  {t.ideal.map((label, i) => (
-                    <span key={i} style={{
-                      fontSize: 9, padding: '2px 8px', borderRadius: 99, fontWeight: 600,
-                      background: `${t.accent}15`,
-                      color: t.accent,
-                      border: `1px solid ${t.accent}30`,
-                    }}>{label}</span>
-                  ))}
-                </div>
-                {/* Botón */}
-                <button
-                  onClick={e => { e.stopPropagation(); setTheme(t.id); }}
-                  style={{
-                    width: '100%', padding: '8px 0', borderRadius: 10,
-                    fontSize: 12, fontWeight: 700, cursor: 'pointer',
-                    transition: 'opacity 0.15s',
-                    border: active ? `1.5px solid ${t.accent}55` : 'none',
-                    background: active ? `${t.accent}18` : t.accent,
-                    color: active
-                      ? t.accent
-                      : (['premium-light','soft-medical','rose-care','fuchsia-premium','purple-care','arctic-blue','mint-premium','sunset-care'].includes(t.id) ? '#ffffff' : '#0a0a0f'),
-                  }}
-                >
-                  {active ? '✓ Tema activo' : 'Activar tema'}
-                </button>
-              </div>
-            </motion.div>
-          );
-        })}
-      </div>
 
-      {/* Info banner */}
-      <div style={{
-        marginTop: 20, padding: '12px 16px', borderRadius: 12,
-        background: 'rgba(6,182,212,0.06)', border: '1px solid rgba(6,182,212,0.12)',
-        display: 'flex', gap: 10, alignItems: 'flex-start',
-      }}>
-        <SlidersHorizontal size={14} style={{ color: '#06b6d4', flexShrink: 0, marginTop: 1 }} />
-        <div>
-          <p style={{ fontSize: 12, fontWeight: 600, color: '#22d3ee', marginBottom: 3 }}>Sobre los temas visuales</p>
-          <p style={{ fontSize: 11, color: 'rgba(34,211,238,0.6)', lineHeight: 1.55 }}>
-            Los temas cambian la paleta de colores de toda la interfaz SARAI. Tu preferencia se guarda
-            en el dispositivo y se aplica automáticamente al iniciar sesión.
-          </p>
+                <div style={{
+                  padding: '14px 16px',
+                  background: t.bg[1],
+                  borderTop: `1px solid ${t.border}`,
+                }}>
+                  <div style={{
+                    display: 'flex', alignItems: 'flex-start',
+                    justifyContent: 'space-between', marginBottom: 6,
+                  }}>
+                    <div>
+                      <p style={{ fontSize: 13, fontWeight: 700, color: t.txt, marginBottom: 2 }}>{t.name}</p>
+                      <p style={{ fontSize: 10, fontWeight: 600, color: t.accent }}>{t.tagline}</p>
+                    </div>
+                    <div style={{ display: 'flex', gap: 3, flexShrink: 0, marginTop: 2 }}>
+                      {t.swatches.map((c, i) => (
+                        <div key={i} style={{
+                          width: 12, height: 12, borderRadius: '50%',
+                          background: c, border: `1.5px solid ${t.border}`,
+                        }} />
+                      ))}
+                    </div>
+                  </div>
+
+                  <p style={{ fontSize: 11, color: `${t.txt}bb`, lineHeight: 1.55, marginBottom: 8 }}>
+                    {t.desc}
+                  </p>
+
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 10 }}>
+                    {t.ideal.map((label, i) => (
+                      <span key={i} style={{
+                        fontSize: 9, padding: '2px 8px', borderRadius: 99, fontWeight: 600,
+                        background: `${t.accent}15`,
+                        color: t.accent,
+                        border: `1px solid ${t.accent}30`,
+                      }}>{label}</span>
+                    ))}
+                  </div>
+
+                  <button
+                    onClick={e => { e.stopPropagation(); setTheme(t.id); }}
+                    style={{
+                      width: '100%', padding: '8px 0', borderRadius: 10,
+                      fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                      transition: 'opacity 0.15s',
+                      border: active ? `1.5px solid ${t.accent}55` : 'none',
+                      background: active ? `${t.accent}18` : t.accent,
+                      color: active
+                        ? t.accent
+                        : (['premium-light','soft-medical','rose-care','fuchsia-premium','purple-care','arctic-blue','mint-premium','sunset-care'].includes(t.id) ? '#ffffff' : '#0a0a0f'),
+                    }}
+                  >
+                    {active ? '✓ Tema activo' : 'Activar tema'}
+                  </button>
+                </div>
+              </motion.div>
+            );
+          })}
+        </div>
+
+        <div style={{
+          marginTop: 20, padding: '12px 16px', borderRadius: 12,
+          background: 'rgba(6,182,212,0.06)', border: '1px solid rgba(6,182,212,0.12)',
+          display: 'flex', gap: 10, alignItems: 'flex-start',
+        }}>
+          <SlidersHorizontal size={14} style={{ color: '#06b6d4', flexShrink: 0, marginTop: 1 }} />
+          <div>
+            <p style={{ fontSize: 12, fontWeight: 600, color: '#22d3ee', marginBottom: 3 }}>Sincronización en la Nube</p>
+            <p style={{ fontSize: 11, color: 'rgba(34,211,238,0.6)', lineHeight: 1.55 }}>
+              Tanto el tema visual como el modo de navegación se guardan en tu perfil de usuario en el servidor. Tus preferencias se mantendrán aunque cambies de computador o navegador.
+            </p>
+          </div>
         </div>
       </div>
     </div>

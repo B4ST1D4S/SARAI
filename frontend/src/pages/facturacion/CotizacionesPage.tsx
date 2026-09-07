@@ -4,9 +4,9 @@ import {
   Plus, Search, X, TrendingUp, CheckCircle2, XCircle, Clock,
   FileText, Send, Trash2, DollarSign, RotateCw, Eye, AlertTriangle, Printer,
 } from 'lucide-react';
-import { apiCall, searchPacientes } from '../services/api';
-import { leadsService } from '../services/mockData';
-import { getParametrosSistema } from '../services/adminService';
+import { apiCall, searchPacientes } from '../../services/api';
+import { leadsService } from '../../services/mockData';
+import { getParametrosSistema } from '../../services/adminService';
 
 const TERMINOS = `
 1. <b>Validez de la cotización:</b> La presente cotización tiene vigencia según la fecha indicada. Pasada esa fecha los precios podrán variar sin previo aviso.

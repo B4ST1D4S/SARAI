@@ -11,8 +11,8 @@ import {
 } from 'lucide-react';
 import {
   createHistoriaClinica, getAllPacientes, getHistoriasMedico, updateHistoriaClinica, getHistoriasPaciente,
-} from '../services/api';
-import { API_BASE_URL } from '../config';
+} from '../../services/api';
+import { API_BASE_URL } from '../../config';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tipos

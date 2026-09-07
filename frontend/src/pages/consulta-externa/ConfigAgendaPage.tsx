@@ -5,7 +5,7 @@
  */
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { API_BASE_URL } from '../config';
+import { API_BASE_URL } from '../../config';
 import {
   Settings, Plus, Trash2, Clock,
   AlertCircle, Check, X, User, ChevronDown, Search,

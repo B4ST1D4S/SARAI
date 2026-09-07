@@ -9,7 +9,7 @@ import {
   FileText, ZoomIn, Activity, Layers, ChevronLeft, ChevronRight,
   Trash2, User, Search, TrendingUp, Minus, AlertCircle, BarChart2,
 } from 'lucide-react';
-import { searchPacientes } from '../services/api';
+import { searchPacientes } from '../../services/api';
 
 type FaseEvolucion = 'ANTES' | 'DURANTE' | 'DESPUES' | 'SEGUIMIENTO' | 'MANTENIMIENTO' | 'REINTERVENCION';
 

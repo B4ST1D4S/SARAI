@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Clock, User, MapPin, CheckCircle, AlertCircle, Zap, Search, RefreshCw } from 'lucide-react';
-import { FormularioPaciente } from '../components/FormularioPaciente';
-import { BuscadorPaciente } from '../components/BuscadorPaciente';
-import AgendarCitaWizard from '../components/AgendarCitaWizard';
-import { createPaciente } from '../services/api';
+import { FormularioPaciente } from '../../components/FormularioPaciente';
+import { BuscadorPaciente } from '../../components/BuscadorPaciente';
+import AgendarCitaWizard from '../../components/AgendarCitaWizard';
+import { createPaciente } from '../../services/api';
 
 export default function AgendaPage() {
   const hoy = new Date();

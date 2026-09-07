@@ -1,8 +1,8 @@
 ﻿import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { Calendar, Clock, User, CheckCircle, Plus, Trash2, Stethoscope, Bell, RefreshCw, Zap } from 'lucide-react';
-import { completarCita } from '../services/api';
-import { API_BASE_URL } from '../config';
+import { completarCita } from '../../services/api';
+import { API_BASE_URL } from '../../config';
 
 interface Cita {
   id: string;

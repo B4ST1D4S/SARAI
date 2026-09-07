@@ -29,6 +29,7 @@ export interface AuthSuccessResult {
     rol: string;
     esAsistencial: boolean;
     especialidad: string | null;
+    preferencias?: Record<string, any> | null;
   };
   institucion: {
     id: string;
@@ -118,6 +119,7 @@ export class AuthService {
           u.primer_apellido,
           u.rol,
           u.activo,
+          u.preferencias,
           u.intentos_fallidos,
           u.bloqueado_hasta,
           p.id AS profesional_id,
@@ -245,6 +247,7 @@ export class AuthService {
           rol: user.rol,
           esAsistencial: !!user.profesional_id,
           especialidad: user.especialidad_principal || null,
+          preferencias: user.preferencias ?? { navMode: 'hub', theme: 'dark' },
         },
         institucion: {
           id: tenantContext.tenantId,
@@ -278,7 +281,7 @@ export class AuthService {
 
       const userQuery = `
         SELECT 
-          u.id, u.username, u.email, u.primer_nombre, u.primer_apellido, u.rol, u.activo,
+          u.id, u.username, u.email, u.primer_nombre, u.primer_apellido, u.rol, u.activo, u.preferencias,
           p.id AS profesional_id, p.registro_medico, p.especialidad_principal
         FROM usuarios u
         LEFT JOIN profesionales_salud p ON p.usuario_id = u.id

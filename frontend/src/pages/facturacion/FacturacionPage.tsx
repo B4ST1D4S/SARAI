@@ -11,11 +11,11 @@ import {
   getFacturas, getFactura, anularFactura, getValidacionRips,
   type Ingreso, type CuentaDetalle, type CargoBusqueda, type Factura,
   type ResumenFacturacion, type ReporteValidacionRips,
-} from '../services/facturacionService';
-import { searchPacientes } from '../services/api';
-import { getParametrosSistema } from '../services/adminService';
+} from '../../services/facturacionService';
+import { searchPacientes } from '../../services/api';
+import { getParametrosSistema } from '../../services/adminService';
 import QRCode from 'qrcode';
-import FevRipsPanel from '../components/FevRipsPanel';
+import FevRipsPanel from '../../components/FevRipsPanel';
 
 const cop = (n: number) =>
   new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(n || 0);

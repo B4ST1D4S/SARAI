@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { updatePreferenciasUsuario } from '../services/adminService';
 
 export type ThemeId =
   | 'dark'
@@ -12,33 +13,65 @@ export type ThemeId =
   | 'mint-premium'
   | 'sunset-care';
 
-const STORAGE_KEY = 'sarai-theme';
-const EVENT_NAME  = 'sarai-theme-change';
+export const DEFAULT_THEME: ThemeId = 'dark';
 
-/** Aplica el tema guardado en localStorage al elemento <html> */
-export function initTheme() {
-  const id = (localStorage.getItem(STORAGE_KEY) as ThemeId) || 'dark';
-  document.documentElement.setAttribute('data-theme', id);
+export function getInitialTheme(): ThemeId {
+  try {
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      const u = JSON.parse(userStr);
+      if (u?.preferencias?.theme) return u.preferencias.theme as ThemeId;
+    }
+    return (localStorage.getItem('sarai-theme') as ThemeId) || DEFAULT_THEME;
+  } catch {
+    return DEFAULT_THEME;
+  }
 }
 
-/** Hook para leer y cambiar el tema activo */
+export function applyTheme(theme: ThemeId) {
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem('sarai-theme', theme);
+  window.dispatchEvent(new CustomEvent('sarai-theme-change', { detail: theme }));
+}
+
+// Inicializador ejecutado al arrancar en main.tsx
+export function initTheme(): ThemeId {
+  const theme = getInitialTheme();
+  applyTheme(theme);
+  return theme;
+}
+
 export function useTheme() {
-  const [theme, setThemeState] = useState<ThemeId>(() =>
-    (localStorage.getItem(STORAGE_KEY) as ThemeId) || 'dark'
-  );
+  const [theme, setThemeState] = useState<ThemeId>(() => getInitialTheme());
+
+  const setTheme = (newTheme: ThemeId) => {
+    setThemeState(newTheme);
+    applyTheme(newTheme);
+
+    try {
+      const userStr = localStorage.getItem('user');
+      if (userStr) {
+        const u = JSON.parse(userStr);
+        u.preferencias = { ...(u.preferencias || {}), theme: newTheme };
+        localStorage.setItem('user', JSON.stringify(u));
+      }
+    } catch { /* noop */ }
+
+    updatePreferenciasUsuario({ theme: newTheme }).catch((err) => {
+      console.warn('No se pudo guardar el tema en la base de datos:', err?.message || err);
+    });
+  };
 
   useEffect(() => {
-    const handler = (e: Event) =>
-      setThemeState((e as CustomEvent<ThemeId>).detail);
-    window.addEventListener(EVENT_NAME, handler);
-    return () => window.removeEventListener(EVENT_NAME, handler);
-  }, []);
-
-  const setTheme = (id: ThemeId) => {
-    localStorage.setItem(STORAGE_KEY, id);
-    document.documentElement.setAttribute('data-theme', id);
-    window.dispatchEvent(new CustomEvent<ThemeId>(EVENT_NAME, { detail: id }));
-  };
+    const handler = (e: Event) => {
+      const customEvent = e as CustomEvent<ThemeId>;
+      if (customEvent.detail && customEvent.detail !== theme) {
+        setThemeState(customEvent.detail);
+      }
+    };
+    window.addEventListener('sarai-theme-change', handler);
+    return () => window.removeEventListener('sarai-theme-change', handler);
+  }, [theme]);
 
   return { theme, setTheme };
 }

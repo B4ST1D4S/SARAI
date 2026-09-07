@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Body3D } from '../components/Body3D';
+import { Body3D } from '../../components/Body3D';
 import { motion } from 'framer-motion';
 
 export function Body3DTestPage() {

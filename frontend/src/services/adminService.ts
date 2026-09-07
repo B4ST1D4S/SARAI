@@ -199,3 +199,20 @@ export const getTarifarioItems    = (id: string, params?: string) => req(`/tarif
 export const upsertTarifarioItem  = (id: string, body: any) => req(`/tarifarios/${id}/items`, { method: 'POST', body: JSON.stringify(body) });
 export const bulkTarifarioItems   = (id: string, items: any[]) => req(`/tarifarios/${id}/items/bulk`, { method: 'POST', body: JSON.stringify({ items }) });
 export const deleteTarifarioItem  = (id: string, itemId: string) => req(`/tarifarios/${id}/items/${itemId}`, { method: 'DELETE' });
+
+export async function updatePreferenciasUsuario(preferencias: { navMode?: 'hub' | 'sidebar'; theme?: string }) {
+  const token = localStorage.getItem('accessToken') || '';
+  const res = await fetch('/api/v1/usuarios/perfil/preferencias', {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify(preferencias),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || 'Error al actualizar preferencias');
+  }
+  return res.json();
+}

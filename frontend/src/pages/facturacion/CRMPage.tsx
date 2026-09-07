@@ -14,8 +14,8 @@ import {
   useDraggable, useDroppable,
 } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
-import { apiCall } from '../services/api';
-import AgendarCitaWizard from '../components/AgendarCitaWizard';
+import { apiCall } from '../../services/api';
+import AgendarCitaWizard from '../../components/AgendarCitaWizard';
 
 // ─────────────────────────────────────────────
 // TYPES

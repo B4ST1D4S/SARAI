@@ -14,6 +14,7 @@ import { TenantResolverMiddleware } from './core/tenancy/middleware/tenant-resol
 import { AppController } from './app.controller';
 import { CLINICAL_MODULES } from './modules';
 import { AuthModule } from './modules/auth/auth.module';
+import { UsuariosModule } from './modules/users/usuarios.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { AuthModule } from './modules/auth/auth.module';
     ScheduleModule.forRoot(),
     ...CLINICAL_MODULES,
     AuthModule,
+    UsuariosModule,
   ],
   controllers: [AppController],
   providers: [],

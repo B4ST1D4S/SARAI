@@ -15,7 +15,7 @@ import {
   Stethoscope,
   User,
 } from 'lucide-react';
-import { CargaMasivaUsuarios } from '../components/CargaMasivaUsuarios';
+import { CargaMasivaUsuarios } from '../../components/CargaMasivaUsuarios';
 import {
   createUsuario,
   getAllUsuarios,
@@ -25,7 +25,7 @@ import {
   CreateUserRequest,
   UpdateUserRequest,
   EspecialidadItem,
-} from '../services/api';
+} from '../../services/api';
 
 // ─── Constantes ──────────────────────────────────────────────────────────────
 const ROLES = [

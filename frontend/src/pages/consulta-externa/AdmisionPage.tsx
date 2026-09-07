@@ -6,7 +6,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Users, UserCheck, Clock, RefreshCw, Bell, CheckCircle, AlertCircle, Search, X } from 'lucide-react';
-import { API_BASE_URL } from '../config';
+import { API_BASE_URL } from '../../config';
 
 
 interface Cita {
