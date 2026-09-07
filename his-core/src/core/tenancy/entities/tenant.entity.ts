@@ -107,7 +107,7 @@ export class Tenant {
     type: 'varchar',
     length: 255,
     name: 'db_password',
-    nullable: true,
+    select: true,
   })
   dbPassword?: string;
 

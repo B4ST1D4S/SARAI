@@ -1,117 +1,183 @@
-// src/services/api.ts - Servicio API para comunicar con el backend
+// URL base hacia el API de NestJS
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
 
-import { API_BASE_URL } from '../config';
+// Función para extraer el subdominio del host actual o usar 'demo' por defecto
+export const getSubdomain = (): string => {
+  if (typeof window === 'undefined') return 'demo';
+  const hostname = window.location.hostname;
+  const parts = hostname.split('.');
+  if (parts.length > 1 && parts[0] !== 'www' && parts[0] !== 'localhost') {
+    return parts[0];
+  }
+  return 'demo';
+};
 
-interface RequestOptions {
-  method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
+// ============================================
+// HELPER CENTRAL APICALL CON ROTACIÓN AUTOMÁTICA
+// ============================================
+
+interface ApiCallOptions {
+  method?: string;
   body?: any;
-  headers?: Record<string, string>;
   token?: string;
+  headers?: Record<string, string>;
 }
 
-interface ApiResponse<T> {
-  data?: T;
-  error?: string;
-  status: number;
-}
+let isRefreshing = false;
+let failedQueue: Array<{
+  resolve: (token: string) => void;
+  reject: (err: any) => void;
+}> = [];
 
-// Función genérica para hacer peticiones
-export async function apiCall<T>(
+const processQueue = (error: any, token: string | null = null) => {
+  failedQueue.forEach((prom) => {
+    if (error) {
+      prom.reject(error);
+    } else {
+      prom.resolve(token!);
+    }
+  });
+  failedQueue = [];
+};
+
+export async function apiCall<T = any>(
   endpoint: string,
-  options: RequestOptions = {}
-): Promise<ApiResponse<T>> {
-  const {
-    method = 'GET',
-    body,
-    headers = {},
-    token,
-  } = options;
+  options: ApiCallOptions = {}
+): Promise<T> {
+  const { method = 'GET', body, token, headers = {} } = options;
 
-  try {
-    const requestHeaders: Record<string, string> = {
-      'Content-Type': 'application/json',
-      ...headers,
-    };
+  const currentToken = token || (typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null);
 
-    if (token) {
-      requestHeaders['Authorization'] = `Bearer ${token}`;
+  const requestHeaders: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'x-tenant-id': getSubdomain(),
+    ...headers,
+  };
+
+  if (currentToken) {
+    requestHeaders['Authorization'] = `Bearer ${currentToken}`;
+  }
+
+  const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  const url = `${API_URL}${cleanEndpoint}`;
+
+  const fetchConfig: RequestInit = {
+    method,
+    headers: requestHeaders,
+    credentials: 'include', // Crucial para transmitir la cookie __Host-refresh_token
+  };
+
+  if (body) {
+    fetchConfig.body = JSON.stringify(body);
+  }
+
+  const response = await fetch(url, fetchConfig);
+
+  // Manejo de expiración de token (401) y rotación silenciosa (RTR)
+  if (response.status === 401 && !cleanEndpoint.includes('/auth/login')) {
+    if (isRefreshing) {
+      return new Promise<string>((resolve, reject) => {
+        failedQueue.push({ resolve, reject });
+      }).then((newToken) => {
+        return apiCall<T>(endpoint, { ...options, token: newToken });
+      });
     }
 
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-      method,
-      headers: requestHeaders,
-      body: body ? JSON.stringify(body) : undefined,
-    });
+    isRefreshing = true;
 
-    const data = await response.json();
+    try {
+      const refreshRes = await fetch(`${API_URL}/auth/refresh`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-tenant-id': getSubdomain(),
+        },
+        credentials: 'include',
+        body: JSON.stringify({ subdomain: getSubdomain() }),
+      });
 
-    if (!response.ok) {
-      // Token inválido/expirado: limpiar sesión y recargar para ir al login
-      if (response.status === 401 || response.status === 403) {
-        const isAuthError =
-          data.error?.toLowerCase().includes('token') ||
-          data.error?.toLowerCase().includes('no autenticado') ||
-          data.error?.toLowerCase().includes('expirado') ||
-          data.error?.toLowerCase().includes('inválido');
-        if (isAuthError) {
-          localStorage.removeItem('accessToken');
-          localStorage.removeItem('user');
-          window.location.reload();
-          return { error: 'Sesión expirada. Vuelve a iniciar sesión.', status: response.status };
+      if (!refreshRes.ok) {
+        throw new Error('Sesión expirada');
+      }
+
+      const refreshData = await refreshRes.json();
+      const newAccessToken = refreshData.accessToken;
+
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('accessToken', newAccessToken);
+      }
+
+      processQueue(null, newAccessToken);
+
+      return apiCall<T>(endpoint, { ...options, token: newAccessToken });
+    } catch (refreshErr) {
+      processQueue(refreshErr, null);
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('user');
+        if (window.location.pathname !== '/' && !window.location.pathname.includes('/login')) {
+          window.location.href = '/';
         }
       }
-      return {
-        error: data.error || 'Error en la solicitud',
-        status: response.status,
-      };
+      throw refreshErr;
+    } finally {
+      isRefreshing = false;
     }
-
-    return {
-      data,
-      status: response.status,
-    };
-  } catch (error: any) {
-    return {
-      error: error.message || 'Error de conexión',
-      status: 0,
-    };
   }
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    const message = errorData.message || `Error en la petición: ${response.statusText}`;
+    throw new Error(Array.isArray(message) ? message.join(', ') : message);
+  }
+
+  return response.json();
 }
 
 // ============================================
-// AUTH ENDPOINTS
+// AUTENTICACIÓN
 // ============================================
 
-export interface LoginRequest {
+export interface LoginPayload {
   username: string;
   password: string;
+  subdomain?: string;
 }
 
-export interface AuthResponse {
-  accessToken: string;
-  refreshToken: string;
-  user: {
-    id: string;
-    username: string;
-    nombre: string;
-    apellido: string;
-    rol: string;
-  };
-}
+export const login = async (credentials: LoginPayload) => {
+  try {
+    const subdomain = credentials.subdomain || getSubdomain();
+    const data = await apiCall('/auth/login', {
+      method: 'POST',
+      body: {
+        identifier: credentials.username,
+        password: credentials.password,
+        subdomain,
+      },
+    });
+    return { data, error: null };
+  } catch (error: any) {
+    return { data: null, error: error.message || 'Error al iniciar sesión' };
+  }
+};
 
-export async function login(credentials: LoginRequest) {
-  return apiCall<AuthResponse>('/auth/login', {
-    method: 'POST',
-    body: credentials,
-  });
-}
+export const logout = async () => {
+  try {
+    const subdomain = getSubdomain();
+    await apiCall('/auth/logout', {
+      method: 'POST',
+      body: { subdomain },
+    });
+  } finally {
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('user');
+    window.location.href = '/';
+  }
+};
 
-export async function getMe(token: string) {
-  return apiCall('/auth/me', {
-    method: 'GET',
-    token,
-  });
-}
+export const getProfile = async (token?: string) => {
+  return apiCall('/auth/me', { method: 'GET', token });
+};
 
 // ============================================
 // PACIENTES ENDPOINTS
@@ -130,7 +196,7 @@ export interface CreatePacienteRequest {
   ciudad?: string;
 }
 
-export async function createPaciente(data: CreatePacienteRequest, token: string) {
+export async function createPaciente(data: CreatePacienteRequest, token?: string) {
   return apiCall('/pacientes', {
     method: 'POST',
     body: data,
@@ -138,14 +204,14 @@ export async function createPaciente(data: CreatePacienteRequest, token: string)
   });
 }
 
-export async function getPaciente(id: string, token: string) {
+export async function getPaciente(id: string, token?: string) {
   return apiCall(`/pacientes/${id}`, {
     method: 'GET',
     token,
   });
 }
 
-export async function getAllPacientes(page: number = 1, limit: number = 10, token: string) {
+export async function getAllPacientes(page: number = 1, limit: number = 10, token?: string) {
   return apiCall(`/pacientes?page=${page}&limit=${limit}`, {
     method: 'GET',
     token,
@@ -155,7 +221,7 @@ export async function getAllPacientes(page: number = 1, limit: number = 10, toke
 export async function updatePaciente(
   id: string,
   data: Partial<CreatePacienteRequest>,
-  token: string
+  token?: string
 ) {
   return apiCall(`/pacientes/${id}`, {
     method: 'PUT',
@@ -164,14 +230,14 @@ export async function updatePaciente(
   });
 }
 
-export async function deletePaciente(id: string, token: string) {
+export async function deletePaciente(id: string, token?: string) {
   return apiCall(`/pacientes/${id}`, {
     method: 'DELETE',
     token,
   });
 }
 
-export async function searchPacientes(query: string, token: string) {
+export async function searchPacientes(query: string, token?: string) {
   return apiCall(`/pacientes/search?q=${encodeURIComponent(query)}`, {
     method: 'GET',
     token,
@@ -194,7 +260,7 @@ export interface CreateHistoriaClinicaRequest {
 
 export async function createHistoriaClinica(
   data: CreateHistoriaClinicaRequest,
-  token: string
+  token?: string
 ) {
   return apiCall('/historia-clinica', {
     method: 'POST',
@@ -203,21 +269,21 @@ export async function createHistoriaClinica(
   });
 }
 
-export async function getHistoriaClinica(id: string, token: string) {
+export async function getHistoriaClinica(id: string, token?: string) {
   return apiCall(`/historia-clinica/${id}`, {
     method: 'GET',
     token,
   });
 }
 
-export async function getHistoriasPaciente(pacienteId: string, token: string) {
+export async function getHistoriasPaciente(pacienteId: string, token?: string) {
   return apiCall(`/historia-clinica/paciente/${pacienteId}`, {
     method: 'GET',
     token,
   });
 }
 
-export async function getHistoriasMedico(page: number = 1, limit: number = 20, token: string) {
+export async function getHistoriasMedico(page: number = 1, limit: number = 20, token?: string) {
   return apiCall(`/historia-clinica/por-medico?page=${page}&limit=${limit}`, {
     method: 'GET',
     token,
@@ -227,7 +293,7 @@ export async function getHistoriasMedico(page: number = 1, limit: number = 20, t
 export async function updateHistoriaClinica(
   id: string,
   data: Partial<CreateHistoriaClinicaRequest>,
-  token: string
+  token?: string
 ) {
   return apiCall(`/historia-clinica/${id}`, {
     method: 'PUT',
@@ -240,19 +306,19 @@ export async function updateHistoriaClinica(
 // CITAS ENDPOINTS
 // ============================================
 
-export async function getCitasMedico(token: string) {
+export async function getCitasMedico(token?: string) {
   return apiCall('/citas/medico/agenda', { method: 'GET', token });
 }
 
-export async function completarCita(citaId: string, token: string) {
+export async function completarCita(citaId: string, token?: string) {
   return apiCall(`/citas/${citaId}/completar`, { method: 'POST', token });
 }
 
-export async function cancelarCitaApi(citaId: string, token: string) {
+export async function cancelarCitaApi(citaId: string, token?: string) {
   return apiCall(`/citas/${citaId}`, { method: 'DELETE', token });
 }
 
-export async function updateCitaEstado(citaId: string, estado: string, token: string) {
+export async function updateCitaEstado(citaId: string, estado: string, token?: string) {
   return apiCall(`/citas/${citaId}`, { method: 'PUT', body: { estado }, token });
 }
 
@@ -269,7 +335,6 @@ export interface CreateUserRequest {
   telefono?: string;
   rol: string;
   especialidad?: string;
-  // Campos para profesionales (MEDICO, AUXILIAR)
   tipoDocumento?: string;
   numeroDocumento?: string;
   registroProfesional?: string;
@@ -282,7 +347,7 @@ export interface UpdateUserRequest extends Partial<Omit<CreateUserRequest, 'pass
   password?: string;
 }
 
-export async function createUsuario(data: CreateUserRequest, token: string) {
+export async function createUsuario(data: CreateUserRequest, token?: string) {
   return apiCall('/usuarios', {
     method: 'POST',
     body: data,
@@ -290,21 +355,21 @@ export async function createUsuario(data: CreateUserRequest, token: string) {
   });
 }
 
-export async function getAllUsuarios(token: string) {
+export async function getAllUsuarios(token?: string) {
   return apiCall('/usuarios', {
     method: 'GET',
     token,
   });
 }
 
-export async function getUsuarioById(id: string, token: string) {
+export async function getUsuarioById(id: string, token?: string) {
   return apiCall(`/usuarios/${id}`, {
     method: 'GET',
     token,
   });
 }
 
-export async function updateUsuario(id: string, data: UpdateUserRequest, token: string) {
+export async function updateUsuario(id: string, data: UpdateUserRequest, token?: string) {
   return apiCall(`/usuarios/${id}`, {
     method: 'PUT',
     body: data,
@@ -312,7 +377,7 @@ export async function updateUsuario(id: string, data: UpdateUserRequest, token: 
   });
 }
 
-export async function toggleUsuarioStatus(id: string, token: string) {
+export async function toggleUsuarioStatus(id: string, token?: string) {
   return apiCall(`/usuarios/${id}/toggle-status`, {
     method: 'PATCH',
     token,
@@ -329,7 +394,7 @@ export interface EspecialidadItem {
   nombre: string;
 }
 
-export async function getEspecialidades(token: string) {
+export async function getEspecialidades(token?: string) {
   return apiCall<EspecialidadItem[]>('/especialidades', {
     method: 'GET',
     token,
@@ -362,7 +427,7 @@ export interface SaveMapaCorporalRequest {
   anotacionesClinics?: string;
 }
 
-export async function saveMapaCorporal(data: SaveMapaCorporalRequest, token: string) {
+export async function saveMapaCorporal(data: SaveMapaCorporalRequest, token?: string) {
   return apiCall('/mapa-corporal', {
     method: 'POST',
     body: data,
@@ -373,7 +438,7 @@ export async function saveMapaCorporal(data: SaveMapaCorporalRequest, token: str
 export async function getMapaCorporalByProcedimiento(
   procedimientoId: string,
   pacienteId: string,
-  token: string
+  token?: string
 ) {
   return apiCall(
     `/mapa-corporal/procedimiento/${procedimientoId}/${pacienteId}`,
@@ -381,7 +446,7 @@ export async function getMapaCorporalByProcedimiento(
   );
 }
 
-export async function getMapaCorporalPorPaciente(pacienteId: string, token: string) {
+export async function getMapaCorporalPorPaciente(pacienteId: string, token?: string) {
   return apiCall(`/mapa-corporal/paciente/${pacienteId}`, {
     method: 'GET',
     token,
@@ -391,7 +456,7 @@ export async function getMapaCorporalPorPaciente(pacienteId: string, token: stri
 export async function updateMapaCorporal(
   id: string,
   data: Partial<SaveMapaCorporalRequest>,
-  token: string
+  token?: string
 ) {
   return apiCall(`/mapa-corporal/${id}`, {
     method: 'PUT',
@@ -400,29 +465,29 @@ export async function updateMapaCorporal(
   });
 }
 
-export async function deleteMapaCorporal(id: string, token: string) {
+export async function deleteMapaCorporal(id: string, token?: string) {
   return apiCall(`/mapa-corporal/${id}`, {
     method: 'DELETE',
     token,
   });
 }
 
-// ─────────────────────────────────────────
-// Cotizaciones
-// ─────────────────────────────────────────
-export async function getCotizaciones(token: string) {
+// ============================================
+// COTIZACIONES ENDPOINTS
+// ============================================
+
+export async function getCotizaciones(token?: string) {
   return apiCall<{ cotizaciones: any[] }>('/cotizaciones', { token });
 }
 
-export async function createCotizacion(data: any, token: string) {
+export async function createCotizacion(data: any, token?: string) {
   return apiCall('/cotizaciones', { method: 'POST', body: data, token });
 }
 
-export async function aceptarCotizacion(id: string, token: string) {
+export async function aceptarCotizacion(id: string, token?: string) {
   return apiCall(`/cotizaciones/${id}/aceptar`, { method: 'POST', token });
 }
 
-export async function rechazarCotizacion(id: string, token: string) {
+export async function rechazarCotizacion(id: string, token?: string) {
   return apiCall(`/cotizaciones/${id}/rechazar`, { method: 'POST', token });
 }
-

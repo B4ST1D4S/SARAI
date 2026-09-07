@@ -70,7 +70,8 @@ export default function AuthPage() {
         return;
       }
       localStorage.setItem('accessToken', response.data?.accessToken || '');
-      localStorage.setItem('user', JSON.stringify(response.data?.user));
+      // El backend devuelve 'usuario' en vez de 'user'
+      localStorage.setItem('user', JSON.stringify(response.data?.usuario || response.data?.user));
       window.location.href = '/dashboard';
     } catch (err: any) {
       setError(err.message || 'Error al iniciar sesion');

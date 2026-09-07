@@ -58,12 +58,20 @@ export class TenancyConnectionService implements OnModuleDestroy {
         this.configService?.get<number>('masterDb.port') ??
         parseInt(process.env.MASTER_DB_PORT ?? '5432', 10);
 
+      const resolvedPassword = String(
+        (dbConfig as any)?.password ??
+        (dbConfig as any)?.dbPassword ??
+        (dbConfig as any)?.db_password ??
+        defaultPassword ??
+        ''
+      );
+
       pool = new Pool({
-        host: dbConfig.host,
-        port: dbConfig.port || 5432,
+        host: dbConfig.host || defaultHost,
+        port: Number(dbConfig.port || defaultPort),
         database: dbConfig.database || 'postgres',
-        user: dbConfig.username || 'postgres',
-        password: dbConfig.password,
+        user: (dbConfig as any)?.username || (dbConfig as any)?.user || (dbConfig as any)?.db_user || defaultUser,
+        password: resolvedPassword,
         ssl: { rejectUnauthorized: false },
         max: 10,
         idleTimeoutMillis: 30000,

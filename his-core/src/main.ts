@@ -5,6 +5,7 @@ import { AppModule } from './app.module';
 import { AuditService } from './modules/audit/services/audit.service';
 import { TenantContextService } from './core/tenancy/services/tenant-context.service';
 import { AuditInterceptor } from './core/interceptors/audit.interceptor';
+import cookieParser = require('cookie-parser');
 
 async function bootstrap() {
   const logger = new Logger('HIS-Bootstrap');
@@ -38,12 +39,22 @@ async function bootstrap() {
 
   // CORS para frontend de salud y clínicas
   app.enableCors({
-    origin: true,
-    credentials: true,
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
-  });
+  origin: ['http://localhost:5173', 'http://127.0.0.1:5173'],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'x-tenant-id',
+    'Accept',
+    'Origin',
+    'X-Requested-With',
+  ],
+});
 
   app.setGlobalPrefix('api/v1');
+
+  app.use(cookieParser());
 
   await app.listen(port);
   logger.log(`🚀 [${appName}] running in [${env}] mode on port ${port}`);

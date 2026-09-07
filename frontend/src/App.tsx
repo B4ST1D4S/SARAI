@@ -1,5 +1,6 @@
 ﻿import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { LayoutGrid, Columns } from 'lucide-react';
 import AuthPage from './pages/AuthPage';
 import NeuralCanvas from './components/NeuralCanvas';
 import DashboardPage from './pages/DashboardPage';
@@ -18,7 +19,7 @@ import FacturacionPage from './pages/FacturacionPage';
 import PlantillasPage from './pages/PlantillasPage';
 import MapaCorporalPage from './pages/MapaCorporalPage';
 import OdontogramaPage from './pages/OdontogramaPage';
-import SeguridadPage   from './pages/SeguridadPage';
+import SeguridadPage from './pages/SeguridadPage';
 import { Body3DTestPage } from './pages/Body3DTestPage';
 import UsuariosPage from './pages/UsuariosPage';
 import AdminPage from './pages/AdminPage';
@@ -31,9 +32,10 @@ import saraiLogo from './assets/LOGO.png';
 import { getParametrosSistema } from './services/adminService';
 import { useTheme } from './hooks/useTheme';
 import { useIam } from './context/IamContext';
+import LaunchpadHub, { SARAI_DEFAULT_TILES } from './components/layout/LaunchpadHub';
 
-// Mapeo id de nav → código de recurso IAM
-// Items sin entrada siempre son visibles (no tienen recurso IAM asignado)
+export type NavMode = 'hub' | 'sidebar';
+
 const NAV_RECURSO: Record<string, string> = {
   dashboard:          'DASHBOARD',
   pacientes:          'CLINICA.PACIENTES',
@@ -56,57 +58,55 @@ const NAV_RECURSO: Record<string, string> = {
   seguridad:          'SEGURIDAD',
 };
 
-const NAV_SECTIONS = [
-  {
-    label: 'CLINICA',
-    items: [
-      { id: 'dashboard',     label: 'Dashboard',          sym: 'D' },
-      { id: 'pacientes',     label: 'Pacientes',          sym: 'P' },
-      { id: 'historia',      label: 'Historia Clinica',   sym: 'H' },
-      { id: 'fotos',         label: 'Visual Clínico',     sym: 'V' },
-      { id: 'odontograma',   label: 'Odontograma',        sym: 'O' },
-      { id: 'mapa-corporal', label: 'Mapa Corporal',      sym: 'M' },
-    ],
-  },
-  {
-    label: 'AGENDA',
+export const MACRO_MODULES_NAV: Record<string, { label: string; items: { id: string; label: string; sym: string }[] }> = {
+  CONSULTA: {
+    label: 'CONSULTA EXTERNA',
     items: [
       { id: 'agenda',            label: 'Agenda Paciente',    sym: 'A' },
-      { id: 'admision',          label: 'Admisión',           sym: 'N' },
-      { id: 'agendaProfesional', label: 'Agenda Profesional', sym: 'G' },
-      { id: 'config-agenda',     label: 'Config Agenda',      sym: 'C' },
-      { id: 'vista-cirujano',    label: 'Quirofano',          sym: 'Q' },
-      { id: 'followup',          label: 'Follow-up',          sym: 'W' },
+      { id: 'agendaProfesional', label: 'Mi Agenda Médica',   sym: 'G' },
+      { id: 'admision',          label: 'Admisión / Triaje',  sym: 'N' },
+      { id: 'pacientes',         label: 'Pacientes',          sym: 'P' },
+      { id: 'historia',          label: 'Historia Clínica',   sym: 'H' },
+      { id: 'followup',          label: 'Seguimiento',        sym: 'W' },
     ],
   },
-  {
-    label: 'GESTION',
+  CIRUGIA: {
+    label: 'CIRUGÍA & QUIRÓFANO',
     items: [
-      { id: 'consentimiento', label: 'Consentimiento', sym: 'K' },
-      { id: 'cotizaciones',   label: 'Cotizaciones',   sym: 'O' },
-      { id: 'contratacion',   label: 'Contratacion',   sym: 'N' },
-      { id: 'consentimiento', label: 'Consentimiento', sym: 'S' },
-      { id: 'cotizaciones',   label: 'Cotizaciones',   sym: 'T' },
-      { id: 'crm',            label: 'CRM',            sym: 'R' },
-      { id: 'facturacion',    label: 'Facturacion',    sym: 'F' },
-      { id: 'plantillas',     label: 'Plantillas',     sym: 'L' },
-      { id: 'impresion',      label: 'Central Impresión', sym: 'I' },
+      { id: 'vista-cirujano',    label: 'Quirófano Activo',   sym: 'Q' },
+      { id: 'fotos',             label: 'Registro Visual',    sym: 'V' },
+      { id: 'consentimiento',    label: 'Consentimientos',    sym: 'K' },
     ],
   },
-  {
-    label: 'ADMINISTRACIÓN',
+  FACTURACION: {
+    label: 'FACTURACIÓN & RIPS',
     items: [
-      { id: 'admin',    label: 'Parametrización',   sym: 'Z' },
-      { id: 'usuarios', label: 'Usuarios',          sym: 'U' },
-      { id: 'seguridad', label: 'Seguridad & IAM',  sym: 'E' },
-      { id: 'manual',   label: 'Manual de Usuario', sym: '?' },
+      { id: 'facturacion',       label: 'Cuentas & Facturas', sym: 'F' },
+      { id: 'cotizaciones',      label: 'Cotizaciones',       sym: 'T' },
+      { id: 'contratacion',      label: 'Contratación',       sym: 'C' },
+      { id: 'crm',               label: 'CRM Comercial',      sym: 'R' },
+      { id: 'impresion',         label: 'Central Impresión',  sym: 'I' },
     ],
   },
-];
+  ADMINISTRACION: {
+    label: 'ADMINISTRACIÓN & TI',
+    items: [
+      { id: 'admin',             label: 'Parametrización',    sym: 'Z' },
+      { id: 'usuarios',          label: 'Usuarios',           sym: 'U' },
+      { id: 'seguridad',         label: 'Seguridad & IAM',    sym: 'E' },
+      { id: 'config-agenda',     label: 'Configurar Agenda',  sym: 'S' },
+      { id: 'plantillas',        label: 'Plantillas Médicas', sym: 'L' },
+      { id: 'manual',            label: 'Manual de Usuario',  sym: '?' },
+    ],
+  },
+};
 
 function Sidebar({
   currentPage,
   setCurrentPage,
+  navMode,
+  activeMacroModule,
+  onVolverAlHub,
   user,
   handleLogout,
   collapsed,
@@ -116,6 +116,9 @@ function Sidebar({
 }: {
   currentPage: string;
   setCurrentPage: (p: string) => void;
+  navMode: NavMode;
+  activeMacroModule: string | null;
+  onVolverAlHub: () => void;
   user: any;
   handleLogout: () => void;
   collapsed: boolean;
@@ -123,14 +126,12 @@ function Sidebar({
   mobileOpen: boolean;
   setMobileOpen: (v: boolean) => void;
 }) {
-  // En móvil el sidebar siempre se muestra expandido cuando está abierto
   const effectiveCollapsed = mobileOpen ? false : collapsed;
   const { canDo } = useIam();
 
-  // Filtra un item según permisos IAM (mapa null = sin perfil = acceso total)
   const itemVisible = (id: string) => {
     const recurso = NAV_RECURSO[id];
-    if (!recurso) return true;       // sin código IAM → siempre visible
+    if (!recurso) return true;
     return canDo(recurso, 'VER');
   };
 
@@ -138,6 +139,11 @@ function Sidebar({
     setCurrentPage(id);
     setMobileOpen(false);
   };
+
+  // Si está en modo Hub y hay módulo activo, se filtra solo esa sección; si es modo Sidebar, se toman todas
+  const sectionsToRender = (navMode === 'hub' && activeMacroModule)
+    ? [{ key: activeMacroModule, ...MACRO_MODULES_NAV[activeMacroModule] }]
+    : Object.entries(MACRO_MODULES_NAV).map(([key, val]) => ({ key, ...val }));
 
   return (
     <>
@@ -157,63 +163,68 @@ function Sidebar({
           ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}
           lg:translate-x-0`}
       >
-        {/* Header */}
+        {/* Header con botón Volver al Hub o Logo */}
         <div className="flex items-center justify-between px-3 h-14 border-b border-white/5 flex-shrink-0">
-          <AnimatePresence mode="wait">
-            {effectiveCollapsed ? (
-              <motion.div
-                key="logo-mini"
-                initial={{ opacity: 0, scale: 0.7 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.7 }}
-                transition={{ duration: 0.2 }}
-                className="w-7 h-7 rounded-xl bg-[#1a1a3e] flex items-center justify-center mx-auto shadow-md overflow-hidden"
-              >
-                <img src={saraiLogo} alt="SARAI" className="w-7 h-7 object-contain" />
-              </motion.div>
-            ) : (
-              <motion.span
-                key="logo-full"
-                initial={{ opacity: 0, x: -8 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -8 }}
-                transition={{ duration: 0.2 }}
-                className="text-xl font-black tracking-tight whitespace-nowrap pl-1"
-              >
-                <span className="bg-gradient-to-r from-yellow-400 to-amber-500 bg-clip-text text-transparent">SAR</span>
-                <span className="text-white">AI</span>
-              </motion.span>
-            )}
-          </AnimatePresence>
+          {navMode === 'hub' ? (
+            <button
+              onClick={onVolverAlHub}
+              title="Volver a todos los módulos"
+              className="flex items-center gap-2 text-xs font-bold text-gray-400 hover:text-yellow-400 transition-colors w-full overflow-hidden"
+            >
+              <div className="w-7 h-7 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center flex-shrink-0">
+                ⊞
+              </div>
+              {!effectiveCollapsed && <span className="tracking-wider uppercase text-[11px]">← Menú Hub</span>}
+            </button>
+          ) : (
+            <AnimatePresence mode="wait">
+              {effectiveCollapsed ? (
+                <motion.div
+                  key="logo-mini"
+                  initial={{ opacity: 0, scale: 0.7 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.7 }}
+                  transition={{ duration: 0.2 }}
+                  className="w-7 h-7 rounded-xl bg-[#1a1a3e] flex items-center justify-center mx-auto shadow-md overflow-hidden"
+                >
+                  <img src={saraiLogo} alt="SARAI" className="w-7 h-7 object-contain" />
+                </motion.div>
+              ) : (
+                <motion.span
+                  key="logo-full"
+                  initial={{ opacity: 0, x: -8 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -8 }}
+                  transition={{ duration: 0.2 }}
+                  className="text-xl font-black tracking-tight whitespace-nowrap pl-1"
+                >
+                  <span className="bg-gradient-to-r from-yellow-400 to-amber-500 bg-clip-text text-transparent">SAR</span>
+                  <span className="text-white">AI</span>
+                </motion.span>
+              )}
+            </AnimatePresence>
+          )}
         </div>
 
-        {/* Nav con scrollbar estilizada */}
+        {/* Submódulos organizados */}
         <nav className="flex-1 overflow-y-auto overflow-x-hidden py-3 sidebar-scroll">
-          {NAV_SECTIONS.map((section) => (
-            <div key={section.label} className="mb-2">
-              <AnimatePresence>
+          {sectionsToRender.map((section) => (
+            <div key={section.key} className="mb-3">
               {!effectiveCollapsed && (
-                  <motion.p
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.15 }}
-                    className="px-4 mb-1 text-[9px] font-bold text-gray-600 tracking-widest whitespace-nowrap"
-                  >
-                    {section.label}
-                  </motion.p>
-                )}
-              </AnimatePresence>
+                <p className="px-4 mb-1 text-[9px] font-bold text-yellow-500/70 tracking-widest uppercase truncate">
+                  {section.label}
+                </p>
+              )}
               {effectiveCollapsed && <div className="mx-3 mb-1 border-t border-white/5" />}
 
-              {section.items.filter(item => itemVisible(item.id)).map((item) => {
+              {section.items?.filter((item) => itemVisible(item.id)).map((item) => {
                 const active = currentPage === item.id;
                 return (
                   <button
                     key={item.id}
                     onClick={() => handleNavClick(item.id)}
                     title={effectiveCollapsed ? item.label : undefined}
-                    className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium transition-all duration-150 relative group ${
+                    className={`w-full flex items-center gap-3 px-4 py-2 text-sm font-medium transition-all duration-150 relative group ${
                       active
                         ? 'text-yellow-400 bg-yellow-500/[0.08]'
                         : 'text-gray-500 hover:text-gray-200 hover:bg-white/[0.04]'
@@ -233,19 +244,9 @@ function Sidebar({
                     }`}>
                       {item.sym}
                     </span>
-                    <AnimatePresence>
-                      {!effectiveCollapsed && (
-                        <motion.span
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          exit={{ opacity: 0 }}
-                          transition={{ duration: 0.18 }}
-                          className="whitespace-nowrap text-[13px]"
-                        >
-                          {item.label}
-                        </motion.span>
-                      )}
-                    </AnimatePresence>
+                    {!effectiveCollapsed && (
+                      <span className="whitespace-nowrap text-[13px]">{item.label}</span>
+                    )}
                   </button>
                 );
               })}
@@ -259,32 +260,20 @@ function Sidebar({
             <div className="w-8 h-8 flex-shrink-0 rounded-full bg-gradient-to-br from-yellow-400 to-amber-600 flex items-center justify-center text-slate-900 font-bold text-xs">
               {user?.nombre?.[0]}{user?.apellido?.[0]}
             </div>
-            <AnimatePresence>
-              {!effectiveCollapsed && (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1, transition: { delay: 0.05 } }}
-                  exit={{ opacity: 0 }}
-                  className="flex-1 min-w-0"
-                >
-                  <p className="text-white text-xs font-semibold truncate">{user?.nombre} {user?.apellido}</p>
-                  <p className="text-gray-600 text-[10px] truncate">{user?.especialidad || user?.rol}</p>
-                </motion.div>
-              )}
-            </AnimatePresence>
-            <AnimatePresence>
-              {!effectiveCollapsed && (
-                <motion.button
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  onClick={handleLogout}
-                  className="text-gray-600 hover:text-red-400 transition-colors text-xs font-bold px-1.5 py-0.5 rounded border border-white/10 hover:border-red-500/30 whitespace-nowrap"
-                >
-                  salir
-                </motion.button>
-              )}
-            </AnimatePresence>
+            {!effectiveCollapsed && (
+              <div className="flex-1 min-w-0">
+                <p className="text-white text-xs font-semibold truncate">{user?.nombre} {user?.apellido}</p>
+                <p className="text-gray-600 text-[10px] truncate">{user?.especialidad || user?.rol}</p>
+              </div>
+            )}
+            {!effectiveCollapsed && (
+              <button
+                onClick={handleLogout}
+                className="text-gray-600 hover:text-red-400 transition-colors text-xs font-bold px-1.5 py-0.5 rounded border border-white/10 hover:border-red-500/30 whitespace-nowrap"
+              >
+                salir
+              </button>
+            )}
           </div>
         </div>
       </motion.aside>
@@ -293,7 +282,13 @@ function Sidebar({
 }
 
 function App() {
-  const [currentPage, setCurrentPage] = useState('auth');
+  const [currentPage, setCurrentPage] = useState('dashboard');
+  const [activeMacroModule, setActiveMacroModule] = useState<string | null>(null);
+  const [navMode, setNavMode] = useState<NavMode>(() => {
+    return (localStorage.getItem('sarai_nav_mode') as NavMode) || 'hub';
+  });
+
+  const { canDo } = useIam();
   const [user, setUser] = useState<any>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -310,25 +305,32 @@ function App() {
   });
   const { theme } = useTheme();
   const [hotkeyToast, setHotkeyToast] = useState<string | null>(null);
-  // Ref para currentPage — evita stale closure en callbacks de SARAI
   const currentPageRef = useRef(currentPage);
+
   useEffect(() => { currentPageRef.current = currentPage; }, [currentPage]);
 
-  // ── Atajos de teclado globales Alt + sym ─────────────────────────────────
+  const handleCambiarNavMode = (mode: NavMode) => {
+    setNavMode(mode);
+    localStorage.setItem('sarai_nav_mode', mode);
+    if (mode === 'sidebar') {
+      setActiveMacroModule(null);
+    }
+  };
+
+  // Atajos de teclado globales Alt + sym
   useEffect(() => {
     if (!user) return;
     const handler = (e: KeyboardEvent) => {
       if (!e.altKey || e.ctrlKey || e.metaKey) return;
       const tag = (e.target as HTMLElement).tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-      // Bloquear si SARAI está grabando/procesando
       const saraiRoot = document.querySelector('[data-sarai-estado]');
       if (saraiRoot) {
         const estado = saraiRoot.getAttribute('data-sarai-estado') || '';
         if (['grabando', 'transcribiendo', 'procesando'].includes(estado)) return;
       }
       const key = e.key.toUpperCase();
-      const allItems = NAV_SECTIONS.flatMap((s) => s.items);
+      const allItems = Object.values(MACRO_MODULES_NAV).flatMap((s) => s.items);
       const match = allItems.find((item) => item.sym.toUpperCase() === key);
       if (!match) return;
       e.preventDefault();
@@ -350,7 +352,6 @@ function App() {
     }
   }, []);
 
-  // Cargar configuración de la clínica al iniciar sesión
   useEffect(() => {
     if (!user) return;
     (getParametrosSistema('clinica') as Promise<any[]>)
@@ -361,7 +362,7 @@ function App() {
         setClinicaConfig(config);
         localStorage.setItem('sarai_clinica_config', JSON.stringify(config));
       })
-      .catch(() => { /* mantener cache existente */ });
+      .catch(() => {});
   }, [user]);
 
   const handleLogout = () => {
@@ -377,15 +378,13 @@ function App() {
     return <AuthPage />;
   }
 
-  const sidebarWidth = sidebarCollapsed ? 68 : 236;
-  const allItems = NAV_SECTIONS.flatMap((s) => s.items);
-  const currentLabel = allItems.find((i) => i.id === currentPage)?.label || 'EstetIA';
+  const isHubViewActive = navMode === 'hub' && activeMacroModule === null && currentPage === 'dashboard';
+  const shouldRenderSidebar = navMode === 'sidebar' || (navMode === 'hub' && activeMacroModule !== null);
 
   return (
     <div className="min-h-screen bg-[#080a0f] flex">
       <NeuralCanvas opacity={0.13} nodeCount={100} />
 
-      {/* Toast de atajos de teclado */}
       {hotkeyToast && (
         <div
           style={{
@@ -409,149 +408,205 @@ function App() {
           ⌨️ {hotkeyToast}
         </div>
       )}
-      <Sidebar
-        currentPage={currentPage}
-        setCurrentPage={setCurrentPage}
-        user={user}
-        handleLogout={handleLogout}
-        collapsed={sidebarCollapsed}
-        setCollapsed={setSidebarCollapsed}
-        mobileOpen={mobileMenuOpen}
-        setMobileOpen={setMobileMenuOpen}
-      />
-      {/* En lg+ → margin izquierdo dinámico; en móvil → sin margin (sidebar es overlay) */}
-      <main
-        className="flex-1 min-h-screen overflow-auto"
-        style={{
-          marginLeft: mobileMenuOpen ? 0 : undefined,
-          transition: 'margin-left 0.25s ease-in-out',
-        }}
-      >
-        {/* Wrapper que en lg+ aplica el margin del sidebar */}
+
+      {shouldRenderSidebar && (
+        <Sidebar
+          currentPage={currentPage}
+          setCurrentPage={setCurrentPage}
+          navMode={navMode}
+          activeMacroModule={activeMacroModule}
+          onVolverAlHub={() => {
+            setActiveMacroModule(null);
+            setCurrentPage('dashboard');
+          }}
+          user={user}
+          handleLogout={handleLogout}
+          collapsed={sidebarCollapsed}
+          setCollapsed={setSidebarCollapsed}
+          mobileOpen={mobileMenuOpen}
+          setMobileOpen={setMobileMenuOpen}
+        />
+      )}
+
+      <main className="flex-1 min-h-screen overflow-auto">
         <div
           className={`min-h-screen transition-[margin] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${
-            sidebarCollapsed ? 'lg:ml-[68px]' : 'lg:ml-[236px]'
+            isHubViewActive
+              ? 'ml-0'
+              : sidebarCollapsed ? 'lg:ml-[68px]' : 'lg:ml-[236px]'
           }`}
         >
-        {/* ══════ TOPBAR PREMIUM ══════ */}
-        {(() => {
-          const T = {
-            'dark':             { bg: 'bg-[#0a0c13]',    border: 'border-white/[0.06]',   nameGrad: 'from-yellow-300 via-amber-400 to-yellow-500',     sub: 'text-yellow-500/50',   date: 'text-gray-400',    dateSub: 'text-gray-600'    },
-            'premium-light':    { bg: 'bg-white',         border: 'border-slate-200',      nameGrad: 'from-blue-700 via-indigo-600 to-blue-800',         sub: 'text-blue-500/60',     date: 'text-slate-600',   dateSub: 'text-slate-400'   },
-            'soft-medical':     { bg: 'bg-slate-50',      border: 'border-slate-200',      nameGrad: 'from-teal-600 via-cyan-600 to-teal-700',           sub: 'text-teal-500/60',     date: 'text-slate-500',   dateSub: 'text-slate-400'   },
-            'executive-ai':     { bg: 'bg-[#0c1220]',     border: 'border-blue-400/12',    nameGrad: 'from-blue-400 via-violet-400 to-blue-500',         sub: 'text-blue-400/45',     date: 'text-blue-300/70', dateSub: 'text-blue-400/40' },
-            'rose-care':        { bg: 'bg-white',         border: 'border-rose-200',       nameGrad: 'from-rose-600 via-pink-500 to-rose-700',           sub: 'text-rose-500/60',     date: 'text-slate-500',   dateSub: 'text-slate-400'   },
-            'fuchsia-premium':  { bg: 'bg-white',         border: 'border-fuchsia-200',    nameGrad: 'from-fuchsia-600 via-purple-500 to-fuchsia-700',   sub: 'text-fuchsia-500/60',  date: 'text-slate-500',   dateSub: 'text-slate-400'   },
-            'purple-care':      { bg: 'bg-white',         border: 'border-violet-200',     nameGrad: 'from-violet-700 via-purple-600 to-violet-800',     sub: 'text-violet-500/60',   date: 'text-slate-500',   dateSub: 'text-slate-400'   },
-            'arctic-blue':      { bg: 'bg-white',         border: 'border-sky-200',        nameGrad: 'from-sky-700 via-blue-600 to-sky-800',             sub: 'text-sky-500/60',      date: 'text-slate-500',   dateSub: 'text-slate-400'   },
-            'mint-premium':     { bg: 'bg-white',         border: 'border-teal-200',       nameGrad: 'from-teal-700 via-emerald-600 to-teal-800',        sub: 'text-teal-500/60',     date: 'text-slate-500',   dateSub: 'text-slate-400'   },
-            'sunset-care':      { bg: 'bg-white',         border: 'border-amber-200',      nameGrad: 'from-amber-600 via-orange-500 to-amber-700',       sub: 'text-amber-500/60',    date: 'text-slate-500',   dateSub: 'text-slate-400'   },
-          }[theme] ?? { bg: 'bg-[#0a0c13]', border: 'border-white/[0.06]', nameGrad: 'from-yellow-300 via-amber-400 to-yellow-500', sub: 'text-yellow-500/50', date: 'text-gray-400', dateSub: 'text-gray-600' };
+          {/* ══════ TOPBAR ══════ */}
+          {(() => {
+            const T = {
+              'dark':             { bg: 'bg-[#0a0c13]',    border: 'border-white/[0.06]',   nameGrad: 'from-yellow-300 via-amber-400 to-yellow-500',     sub: 'text-yellow-500/50',   date: 'text-gray-400',    dateSub: 'text-gray-600'    },
+              'premium-light':    { bg: 'bg-white',         border: 'border-slate-200',      nameGrad: 'from-blue-700 via-indigo-600 to-blue-800',         sub: 'text-blue-500/60',     date: 'text-slate-600',   dateSub: 'text-slate-400'   },
+              'soft-medical':     { bg: 'bg-slate-50',      border: 'border-slate-200',      nameGrad: 'from-teal-600 via-cyan-600 to-teal-700',           sub: 'text-teal-500/60',     date: 'text-slate-500',   dateSub: 'text-slate-400'   },
+              'executive-ai':     { bg: 'bg-[#0c1220]',     border: 'border-blue-400/12',    nameGrad: 'from-blue-400 via-violet-400 to-blue-500',         sub: 'text-blue-400/45',     date: 'text-blue-300/70', dateSub: 'text-blue-400/40' },
+              'rose-care':        { bg: 'bg-white',         border: 'border-rose-200',       nameGrad: 'from-rose-600 via-pink-500 to-rose-700',           sub: 'text-rose-500/60',     date: 'text-slate-500',   dateSub: 'text-slate-400'   },
+              'fuchsia-premium':  { bg: 'bg-white',         border: 'border-fuchsia-200',    nameGrad: 'from-fuchsia-600 via-purple-500 to-fuchsia-700',   sub: 'text-fuchsia-500/60',  date: 'text-slate-500',   dateSub: 'text-slate-400'   },
+              'purple-care':      { bg: 'bg-white',         border: 'border-violet-200',     nameGrad: 'from-violet-700 via-purple-600 to-violet-800',     sub: 'text-violet-500/60',   date: 'text-slate-500',   dateSub: 'text-slate-400'   },
+              'arctic-blue':      { bg: 'bg-white',         border: 'border-sky-200',        nameGrad: 'from-sky-700 via-blue-600 to-sky-800',             sub: 'text-sky-500/60',      date: 'text-slate-500',   dateSub: 'text-slate-400'   },
+              'mint-premium':     { bg: 'bg-white',         border: 'border-teal-200',       nameGrad: 'from-teal-700 via-emerald-600 to-teal-800',        sub: 'text-teal-500/60',     date: 'text-slate-500',   dateSub: 'text-slate-400'   },
+              'sunset-care':      { bg: 'bg-white',         border: 'border-amber-200',      nameGrad: 'from-amber-600 via-orange-500 to-amber-700',       sub: 'text-amber-500/60',    date: 'text-slate-500',   dateSub: 'text-slate-400'   },
+            }[theme] ?? { bg: 'bg-[#0a0c13]', border: 'border-white/[0.06]', nameGrad: 'from-yellow-300 via-amber-400 to-yellow-500', sub: 'text-yellow-500/50', date: 'text-gray-400', dateSub: 'text-gray-600' };
 
-          const hoy = new Date();
-          const diaSemana = hoy.toLocaleDateString('es-CO', { weekday: 'long' });
-          const fechaCompleta = hoy.toLocaleDateString('es-CO', { day: '2-digit', month: 'long', year: 'numeric' });
+            const hoy = new Date();
+            const diaSemana = hoy.toLocaleDateString('es-CO', { weekday: 'long' });
+            const fechaCompleta = hoy.toLocaleDateString('es-CO', { day: '2-digit', month: 'long', year: 'numeric' });
 
-          return (
-            <div className={`sticky top-0 z-20 ${T.bg} backdrop-blur-xl border-b ${T.border} shadow-[0_2px_24px_rgba(0,0,0,0.45)] h-[80px] flex items-center px-4 sm:px-6 relative`}>
+            return (
+              <div className={`sticky top-0 z-20 ${T.bg} backdrop-blur-xl border-b ${T.border} shadow-[0_2px_24px_rgba(0,0,0,0.45)] h-[80px] flex items-center px-4 sm:px-6 relative`}>
+                <div className="flex items-center gap-3 flex-shrink-0 z-10">
+                  <button className="lg:hidden flex flex-col gap-[5px] p-2 rounded-lg text-gray-400 hover:text-yellow-400 hover:bg-yellow-500/10 transition-all"
+                    onClick={() => setMobileMenuOpen(true)} aria-label="Abrir menú">
+                    <span className="block w-5 h-[2px] bg-current rounded-full" />
+                    <span className="block w-5 h-[2px] bg-current rounded-full" />
+                    <span className="block w-3.5 h-[2px] bg-current rounded-full" />
+                  </button>
+                  {clinicaConfig.logoUrl && (
+                    <img
+                      src={clinicaConfig.logoUrl}
+                      alt="Logo clínica"
+                      className="h-14 w-auto object-contain"
+                      style={{ maxWidth: '140px', filter: 'drop-shadow(0 2px 10px rgba(0,0,0,0.5))' }}
+                    />
+                  )}
+                </div>
 
-              {/* ── IZQUIERDA: hamburger + logo ── */}
-              <div className="flex items-center gap-3 flex-shrink-0 z-10">
-                <button className="lg:hidden flex flex-col gap-[5px] p-2 rounded-lg text-gray-400 hover:text-yellow-400 hover:bg-yellow-500/10 transition-all"
-                  onClick={() => setMobileMenuOpen(true)} aria-label="Abrir menú">
-                  <span className="block w-5 h-[2px] bg-current rounded-full" />
-                  <span className="block w-5 h-[2px] bg-current rounded-full" />
-                  <span className="block w-3.5 h-[2px] bg-current rounded-full" />
-                </button>
-                {clinicaConfig.logoUrl && (
-                  <img
-                    src={clinicaConfig.logoUrl}
-                    alt="Logo clínica"
-                    className="h-14 w-auto object-contain"
-                    style={{ maxWidth: '140px', filter: 'drop-shadow(0 2px 10px rgba(0,0,0,0.5))' }}
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none select-none">
+                  <h1 className={`text-[28px] sm:text-[34px] font-black tracking-wide bg-gradient-to-r ${T.nameGrad} bg-clip-text text-transparent leading-none whitespace-nowrap`}>
+                    {clinicaConfig.nombre || 'SARAI'}
+                  </h1>
+                </div>
+
+                <div className="flex items-center gap-3 flex-shrink-0 ml-auto z-10">
+                  {/* Selector de modo de navegación: Hub vs Sidebar */}
+                  <div className="hidden sm:flex items-center gap-1 bg-white/5 p-1 rounded-lg border border-white/10 text-xs mr-2">
+                    <button
+                      onClick={() => handleCambiarNavMode('hub')}
+                      className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md transition-all ${
+                        navMode === 'hub'
+                          ? 'bg-yellow-500/20 text-yellow-400 font-semibold'
+                          : 'text-gray-400 hover:text-white'
+                      }`}
+                      title="Modo Launchpad Hub"
+                    >
+                      <LayoutGrid className="w-3.5 h-3.5" />
+                      <span>Hub</span>
+                    </button>
+                    <button
+                      onClick={() => handleCambiarNavMode('sidebar')}
+                      className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md transition-all ${
+                        navMode === 'sidebar'
+                          ? 'bg-yellow-500/20 text-yellow-400 font-semibold'
+                          : 'text-gray-400 hover:text-white'
+                      }`}
+                      title="Modo Barra Lateral Permanente"
+                    >
+                      <Columns className="w-3.5 h-3.5" />
+                      <span>Barra</span>
+                    </button>
+                  </div>
+
+                  <div className="hidden md:flex flex-col items-end leading-snug">
+                    <span className={`text-[11px] font-semibold capitalize ${T.date}`}>{diaSemana}</span>
+                    <span className={`text-[10px] capitalize ${T.dateSub}`}>{fechaCompleta}</span>
+                  </div>
+                  <div className="w-px h-8 hidden md:block" style={{ background: 'linear-gradient(to bottom, transparent, rgba(255,255,255,0.1), transparent)' }} />
+                  <div className="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/25 rounded-full px-3 py-1.5">
+                    <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
+                    <span className="text-emerald-400 text-[10px] font-bold tracking-widest">ONLINE</span>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* WORKSPACE PRINCIPAL */}
+          <div>
+            {currentPage === 'dashboard' ? (
+              <div className="p-4 sm:p-8">
+                <LaunchpadHub
+                  userName={user?.nombre ? `Dr. ${user.nombre} ${user.apellido || ''}` : 'Especialista'}
+                  showTiles={navMode === 'hub'}
+                  tiles={SARAI_DEFAULT_TILES.filter((tile) => {
+                    if (tile.id === 'ADMINISTRACION') return canDo('ADMIN.PARAMETRIZACION', 'VER');
+                    if (tile.id === 'FACTURACION') return canDo('GESTION.FACTURACION', 'VER');
+                    return true;
+                  })}
+                  onSelectMacroModule={(macroId, defaultPage) => {
+                    setActiveMacroModule(macroId);
+                    setCurrentPage(defaultPage);
+                  }}
+                  onQuickAction={(actionId, targetPage) => {
+                    if (actionId === 'nueva-historia') {
+                      if (navMode === 'hub') setActiveMacroModule('CONSULTA');
+                      setHistoriaShowForm(true);
+                      setHistoriaSeccion('motivo-consulta');
+                      setCurrentPage('historia');
+                    } else if (targetPage) {
+                      if (navMode === 'hub') {
+                        setActiveMacroModule(targetPage === 'admin' ? 'ADMINISTRACION' : 'CONSULTA');
+                      }
+                      setCurrentPage(targetPage);
+                    }
+                  }}
+                />
+              </div>
+            ) : (
+              <>
+                {currentPage === 'pacientes'           && <PacientesPage />}
+                {currentPage === 'historia'            && (
+                  <HistoriaClinicaPage
+                    onNavegar={setCurrentPage}
+                    showFormExternal={historiaShowForm}
+                    onShowFormChange={setHistoriaShowForm}
+                    seccionExterna={historiaSeccion}
+                    onSeccionChange={setHistoriaSeccion}
+                    onSeccionActivaChange={setHistoriaSeccionActiva}
+                    onRegisterCampos={(fn) => { camposHandlerRef.current = fn; }}
+                    pacienteIdExterno={historiaPacienteId}
                   />
                 )}
-              </div>
-
-              {/* ── CENTRO ABSOLUTO: nombre clínica ── */}
-              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none select-none">
-                <h1
-                  className={`text-[28px] sm:text-[34px] font-black tracking-wide bg-gradient-to-r ${T.nameGrad} bg-clip-text text-transparent leading-none whitespace-nowrap`}
-                  style={{ letterSpacing: '0.04em' }}
-                >
-                  {clinicaConfig.nombre || 'EstetIA'}
-                </h1>
-                {/* Línea decorativa bajo el nombre */}
-                <div className="mt-[5px] h-[2px] w-48 sm:w-64 rounded-full"
-                  style={{ background: `linear-gradient(90deg, transparent, ${{ 'premium-light': 'rgba(37,99,235,0.45)', 'soft-medical': 'rgba(5,150,105,0.45)', 'rose-care': 'rgba(225,29,72,0.45)', 'fuchsia-premium': 'rgba(162,28,175,0.45)', 'purple-care': 'rgba(124,58,237,0.45)', 'arctic-blue': 'rgba(2,132,199,0.45)', 'mint-premium': 'rgba(13,148,136,0.45)', 'sunset-care': 'rgba(217,119,6,0.45)' }[theme] ?? 'rgba(212,175,55,0.55)'}, transparent)` }} />
-              </div>
-
-              {/* ── DERECHA: fecha + online ── */}
-              <div className="flex items-center gap-3 flex-shrink-0 ml-auto z-10">
-                <div className="hidden sm:flex flex-col items-end leading-snug">
-                  <span className={`text-[11px] font-semibold capitalize ${T.date}`}>{diaSemana}</span>
-                  <span className={`text-[10px] capitalize ${T.dateSub}`}>{fechaCompleta}</span>
-                </div>
-                <div className="w-px h-8 hidden sm:block" style={{ background: 'linear-gradient(to bottom, transparent, rgba(255,255,255,0.1), transparent)' }} />
-                <div className="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/25 rounded-full px-3 py-1.5">
-                  <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse"/>
-                  <span className="text-emerald-400 text-[10px] font-bold tracking-widest">ONLINE</span>
-                </div>
-              </div>
-
-            </div>
-          );
-        })()}
-        <div>
-          {currentPage === 'dashboard'          && <DashboardPage onNavegar={setCurrentPage} />}
-          {currentPage === 'pacientes'           && <PacientesPage />}
-          {currentPage === 'historia' && (
-            <HistoriaClinicaPage
-              onNavegar={setCurrentPage}
-              showFormExternal={historiaShowForm}
-              onShowFormChange={setHistoriaShowForm}
-              seccionExterna={historiaSeccion}
-              onSeccionChange={setHistoriaSeccion}
-              onSeccionActivaChange={setHistoriaSeccionActiva}
-              onRegisterCampos={(fn) => { camposHandlerRef.current = fn; }}
-              pacienteIdExterno={historiaPacienteId}
-            />
-          )}
-          {currentPage === 'fotos'               && <VisualClinicoPage />}
-          {currentPage === 'consentimiento'      && <ConsentimientoPage />}
-          {currentPage === 'agenda'              && <AgendaPage />}
-          {currentPage === 'admision'            && <AdmisionPage />}
-          {currentPage === 'config-agenda'       && <ConfigAgendaPage />}
-          {currentPage === 'agendaProfesional'   && (
-            <AgendaProfesionalPage
-              onNavegar={setCurrentPage}
-              onAbrirHistoriaPaciente={(pacienteId, _nombre) => {
-                setHistoriaPacienteId(pacienteId);
-                setHistoriaShowForm(true);
-                setHistoriaSeccion('motivo-consulta');
-                setCurrentPage('historia');
-              }}
-            />
-          )}
-          {currentPage === 'vista-cirujano'      && <VistaCirujanoPage />}
-          {currentPage === 'followup'            && <FollowUpPage />}
-          {currentPage === 'crm'                 && <CRMPage onNavegar={setCurrentPage} />}
-          {currentPage === 'cotizaciones'        && <CotizacionesPage />}
-          {currentPage === 'contratacion'        && <ContratacionPage />}
-          {currentPage === 'facturacion'         && <FacturacionPage />}
-          {currentPage === 'plantillas'          && <PlantillasPage />}
-          {currentPage === 'impresion'           && <CentralImpresionPage />}
-          {currentPage === 'mapa-corporal'       && <MapaCorporalPage />}
-          {currentPage === 'odontograma'         && <OdontogramaPage />}
-          {currentPage === 'body3d-test'         && <Body3DTestPage />}
-          {currentPage === 'usuarios'            && <UsuariosPage />}
-          {currentPage === 'admin'               && <AdminPage />}
-          {currentPage === 'seguridad'            && <SeguridadPage />}
-          {currentPage === 'manual'              && <ManualPage />}
-        </div>
+                {currentPage === 'fotos'               && <VisualClinicoPage />}
+                {currentPage === 'consentimiento'      && <ConsentimientoPage />}
+                {currentPage === 'agenda'              && <AgendaPage />}
+                {currentPage === 'admision'            && <AdmisionPage />}
+                {currentPage === 'config-agenda'       && <ConfigAgendaPage />}
+                {currentPage === 'agendaProfesional'   && (
+                  <AgendaProfesionalPage
+                    onNavegar={setCurrentPage}
+                    onAbrirHistoriaPaciente={(pacienteId, _nombre) => {
+                      setHistoriaPacienteId(pacienteId);
+                      setHistoriaShowForm(true);
+                      setHistoriaSeccion('motivo-consulta');
+                      if (navMode === 'hub') setActiveMacroModule('CONSULTA');
+                      setCurrentPage('historia');
+                    }}
+                  />
+                )}
+                {currentPage === 'vista-cirujano'      && <VistaCirujanoPage />}
+                {currentPage === 'followup'            && <FollowUpPage />}
+                {currentPage === 'crm'                 && <CRMPage onNavegar={setCurrentPage} />}
+                {currentPage === 'cotizaciones'        && <CotizacionesPage />}
+                {currentPage === 'contratacion'        && <ContratacionPage />}
+                {currentPage === 'facturacion'         && <FacturacionPage />}
+                {currentPage === 'plantillas'          && <PlantillasPage />}
+                {currentPage === 'impresion'           && <CentralImpresionPage />}
+                {currentPage === 'mapa-corporal'       && <MapaCorporalPage />}
+                {currentPage === 'odontograma'         && <OdontogramaPage />}
+                {currentPage === 'body3d-test'         && <Body3DTestPage />}
+                {currentPage === 'usuarios'            && <UsuariosPage />}
+                {currentPage === 'admin'               && <AdminPage />}
+                {currentPage === 'seguridad'           && <SeguridadPage />}
+                {currentPage === 'manual'              && <ManualPage />}
+              </>
+            )}
+          </div>
         </div>
       </main>
-      {/* ── SARAI Global — flotante en todas las páginas ── */}
+
       <SaraiAssistant
         onCamposDetectados={(campos) => camposHandlerRef.current?.(campos)}
         token={localStorage.getItem('accessToken') || ''}
@@ -564,6 +619,7 @@ function App() {
           setCurrentPage(pagina);
         }}
         onAbrirNuevaHistoria={() => {
+          if (navMode === 'hub') setActiveMacroModule('CONSULTA');
           setHistoriaShowForm(true);
           setHistoriaSeccion('motivo-consulta');
           setCurrentPage('historia');

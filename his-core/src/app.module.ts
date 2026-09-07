@@ -40,7 +40,7 @@ export class AppModule implements NestModule {
 
         // Rutas públicas de autenticación y gestión a nivel maestro (Superadmin)
         { path: 'auth/master/(.*)', method: RequestMethod.ALL },
-        { path: 'api/v1/auth/master/(.*)', method: RequestMethod.ALL },
+        { path: 'api/v1/auth/(.*)', method: RequestMethod.ALL },
         { path: 'admin/tenants/onboarding', method: RequestMethod.POST },
         { path: 'api/v1/admin/tenants/onboarding', method: RequestMethod.POST },
       )

@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS usuarios (
     primer_apellido VARCHAR(60) NOT NULL,
     rol rol_usuario_enum NOT NULL DEFAULT 'RECEPCIONISTA',
     activo BOOLEAN NOT NULL DEFAULT TRUE,
+    preferencias JSONB DEFAULT '{"navMode": "hub", "theme": "dark"}'::jsonb,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

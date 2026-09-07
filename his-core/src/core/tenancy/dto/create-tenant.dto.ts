@@ -12,7 +12,6 @@ import {
 import {
   TenantPlan,
   TenantStatus,
-  ClinicalSettings,
 } from '../entities/tenant.entity';
 
 export class CreateTenantDto {
@@ -86,5 +85,5 @@ export class CreateTenantDto {
 
   @IsOptional()
   @IsObject()
-  clinicalSettings?: ClinicalSettings;
+  clinicalSettings?: Record<string, any>;
 }

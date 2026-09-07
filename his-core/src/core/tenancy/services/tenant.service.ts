@@ -47,7 +47,7 @@ export class TenantService {
     const tenant = await this.tenantRepository
       .createQueryBuilder('tenant')
       .where('tenant.subdomain = :subdomain', { subdomain: cleanSubdomain })
-      .addSelect('tenant.dbPasswordEncrypted')
+      .addSelect('tenant.dbPassword')
       .getOne();
 
     if (!tenant) {
