@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { TenancyConnectionService } from '../../core/tenancy/services/tenancy-connection.service';
 import {
+  CreateAgendaMasivaDto,
   CreateSedeDto,
   CreateDepartamentoDto,
   CreateConsultorioDto,
@@ -522,6 +523,187 @@ export class AgendaOrganizacionalService {
     return this.mapTurnoRow(row);
   }
 
+  async generarAgendaMasiva(dto: CreateAgendaMasivaDto): Promise<{
+    totalTurnosGenerados: number;
+    totalGenerados: number;
+    totalOmitidos: number;
+    fechasProcesadas: number;
+    conflictos: number;
+  }> {
+    const fechaDesde = this.parseIsoDate(dto.fechaDesde, 'fechaDesde');
+    const fechaHasta = this.parseIsoDate(dto.fechaHasta, 'fechaHasta');
+
+    if (fechaDesde > fechaHasta) {
+      throw new BadRequestException(
+        'fechaDesde no puede ser posterior a fechaHasta',
+      );
+    }
+
+    const diasSemana = new Set(dto.diasSemana);
+    const fechasExcluidas = new Set(dto.fechasExcluidas ?? []);
+    const jornadas = dto.jornadas.map((jornada) => {
+      const horaInicio = this.normalizeTimeString(jornada.horaInicio);
+      const horaFin = this.normalizeTimeString(jornada.horaFin);
+      const minutosInicio = this.timeStringToMinutes(horaInicio);
+      const minutosFin = this.timeStringToMinutes(horaFin);
+
+      if (minutosInicio >= minutosFin) {
+        throw new BadRequestException(
+          `La jornada ${jornada.horaInicio}-${jornada.horaFin} tiene un rango horario inválido`,
+        );
+      }
+      if (minutosFin - minutosInicio < dto.intervaloMinutos) {
+        throw new BadRequestException(
+          `La jornada ${jornada.horaInicio}-${jornada.horaFin} es menor que el intervalo de ${dto.intervaloMinutos} minutos`,
+        );
+      }
+
+      return { horaInicio, horaFin };
+    });
+
+    const resultado = await this.tenancyConnectionService.transaction(
+      async (client) => {
+        const [sedeRes, departamentoRes, consultorioRes, profesionalRes, especialidadRes] =
+          await Promise.all([
+            client.query('SELECT id FROM sedes WHERE id = $1', [dto.sedeId]),
+            client.query(
+              'SELECT id FROM centros_costo_departamentos WHERE id = $1 AND sede_id = $2',
+              [dto.departamentoId, dto.sedeId],
+            ),
+            client.query(
+              'SELECT id FROM consultorios_recursos WHERE id = $1 AND departamento_id = $2',
+              [dto.consultorioId, dto.departamentoId],
+            ),
+            client.query('SELECT id FROM usuarios WHERE id = $1', [
+              dto.profesionalId,
+            ]),
+            client.query('SELECT id FROM especialidades WHERE id = $1', [
+              dto.especialidadId,
+            ]),
+          ]);
+
+        if (sedeRes.rowCount === 0) {
+          throw new NotFoundException(`Sede con ID '${dto.sedeId}' no encontrada`);
+        }
+        if (departamentoRes.rowCount === 0) {
+          throw new NotFoundException(
+            `Departamento con ID '${dto.departamentoId}' no pertenece a la sede especificada`,
+          );
+        }
+        if (consultorioRes.rowCount === 0) {
+          throw new NotFoundException(
+            `Consultorio con ID '${dto.consultorioId}' no pertenece al departamento especificado`,
+          );
+        }
+        if (profesionalRes.rowCount === 0) {
+          throw new NotFoundException(
+            `Profesional/Usuario con ID '${dto.profesionalId}' no encontrado`,
+          );
+        }
+        if (especialidadRes.rowCount === 0) {
+          throw new NotFoundException(
+            `Especialidad con ID '${dto.especialidadId}' no encontrada`,
+          );
+        }
+
+        if (dto.tipoConsultaId) {
+          const tipoConsultaRes = await client.query(
+            'SELECT id FROM tipos_consulta WHERE id = $1',
+            [dto.tipoConsultaId],
+          );
+          if (tipoConsultaRes.rowCount === 0) {
+            throw new NotFoundException(
+              `Tipo de consulta con ID '${dto.tipoConsultaId}' no encontrado`,
+            );
+          }
+        }
+
+        let totalGenerados = 0;
+        let totalOmitidos = 0;
+        let fechasProcesadas = 0;
+
+        for (
+          let fecha = fechaDesde;
+          fecha <= fechaHasta;
+          fecha = this.addDays(fecha, 1)
+        ) {
+          const fechaTexto = this.formatIsoDate(fecha);
+          const diaSemana = fecha.getUTCDay() || 7;
+
+          if (
+            !diasSemana.has(diaSemana) ||
+            fechasExcluidas.has(fechaTexto) ||
+            (dto.excluirFestivos && this.isColombianHoliday(fecha))
+          ) {
+            continue;
+          }
+
+          fechasProcesadas++;
+          for (const jornada of jornadas) {
+            const conflicto = await client.query(
+              `SELECT id
+                 FROM agenda_turnos_profesional
+                WHERE fecha = $1
+                  AND estado = 'HABILITADO'
+                  AND (consultorio_id = $2 OR profesional_id = $3)
+                  AND hora_inicio < $4::time
+                  AND hora_fin > $5::time
+                LIMIT 1`,
+              [
+                fechaTexto,
+                dto.consultorioId,
+                dto.profesionalId,
+                jornada.horaFin,
+                jornada.horaInicio,
+              ],
+            );
+
+            if (conflicto.rowCount > 0) {
+              totalOmitidos++;
+              continue;
+            }
+
+            await client.query(
+              `INSERT INTO agenda_turnos_profesional (
+                 sede_id, departamento_id, consultorio_id, profesional_id,
+                 especialidad_id, fecha, hora_inicio, hora_fin,
+                 intervalo_minutos, sobrecupos_max, modalidad, estado
+               ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'HABILITADO')`,
+              [
+                dto.sedeId,
+                dto.departamentoId,
+                dto.consultorioId,
+                dto.profesionalId,
+                dto.especialidadId,
+                fechaTexto,
+                jornada.horaInicio,
+                jornada.horaFin,
+                dto.intervaloMinutos,
+                dto.sobrecuposMax ?? 0,
+                dto.modalidad ?? 'PRESENCIAL',
+              ],
+            );
+            totalGenerados++;
+          }
+        }
+
+        return { totalGenerados, totalOmitidos, fechasProcesadas };
+      },
+    );
+
+    this.logger.log(
+      `Agenda masiva generada: ${resultado.totalGenerados} turnos creados, ${resultado.totalOmitidos} omitidos`,
+    );
+
+    return {
+      totalTurnosGenerados: resultado.totalGenerados,
+      totalGenerados: resultado.totalGenerados,
+      totalOmitidos: resultado.totalOmitidos,
+      fechasProcesadas: resultado.fechasProcesadas,
+      conflictos: resultado.totalOmitidos,
+    };
+  }
+
   // ===========================================================================
   // 5. CONSULTA DE SLOTS Y DISPONIBILIDAD DE AGENDAMIENTO
   // ===========================================================================
@@ -735,6 +917,85 @@ export class AgendaOrganizacionalService {
   // ===========================================================================
   // MAPPERS Y UTILIDADES DE TIEMPO / FORMATO
   // ===========================================================================
+
+  private parseIsoDate(value: string, fieldName: string): Date {
+    const date = new Date(`${value}T00:00:00.000Z`);
+    if (
+      Number.isNaN(date.getTime()) ||
+      this.formatIsoDate(date) !== value
+    ) {
+      throw new BadRequestException(
+        `${fieldName} debe ser una fecha válida en formato YYYY-MM-DD`,
+      );
+    }
+    return date;
+  }
+
+  private formatIsoDate(date: Date): string {
+    return date.toISOString().slice(0, 10);
+  }
+
+  private addDays(date: Date, days: number): Date {
+    const next = new Date(date);
+    next.setUTCDate(next.getUTCDate() + days);
+    return next;
+  }
+
+  private isColombianHoliday(date: Date): boolean {
+    const year = date.getUTCFullYear();
+    const key = this.formatIsoDate(date);
+    const fixed = new Set([
+      `${year}-01-01`,
+      `${year}-05-01`,
+      `${year}-07-20`,
+      `${year}-08-07`,
+      `${year}-12-08`,
+      `${year}-12-25`,
+    ]);
+    if (fixed.has(key)) return true;
+
+    const easter = this.calculateEaster(year);
+    const movable = [
+      this.addDays(easter, -3),
+      this.addDays(easter, -2),
+      this.nextMonday(this.addDays(easter, 43)),
+      this.nextMonday(this.addDays(easter, 64)),
+      this.nextMonday(this.addDays(easter, 71)),
+    ];
+
+    // Colombia trasladó al lunes varios festivos de fecha fija (Ley 51 de 1983).
+    const emiliani = [
+      [1, 6], [3, 19], [6, 29], [8, 15], [10, 12], [11, 1], [11, 11],
+    ];
+    for (const [month, day] of emiliani) {
+      movable.push(this.nextMonday(new Date(Date.UTC(year, month - 1, day))));
+    }
+
+    return movable.some((holiday) => this.formatIsoDate(holiday) === key);
+  }
+
+  private calculateEaster(year: number): Date {
+    const a = year % 19;
+    const b = Math.floor(year / 100);
+    const c = year % 100;
+    const d = Math.floor(b / 4);
+    const e = b % 4;
+    const f = Math.floor((b + 8) / 25);
+    const g = Math.floor((b - f + 1) / 3);
+    const h = (19 * a + b - d - g + 15) % 30;
+    const i = Math.floor(c / 4);
+    const k = c % 4;
+    const l = (32 + 2 * e + 2 * i - h - k) % 7;
+    const m = Math.floor((a + 11 * h + 22 * l) / 451);
+    const month = Math.floor((h + l - 7 * m + 114) / 31);
+    const day = ((h + l - 7 * m + 114) % 31) + 1;
+    return new Date(Date.UTC(year, month - 1, day));
+  }
+
+  private nextMonday(date: Date): Date {
+    const day = date.getUTCDay();
+    return this.addDays(date, day === 0 ? 1 : (8 - day) % 7);
+  }
 
   private mapSedeRow(row: any): SedeResponse {
     return {

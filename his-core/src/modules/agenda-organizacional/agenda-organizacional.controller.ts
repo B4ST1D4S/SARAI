@@ -20,6 +20,7 @@ import {
   TurnoOperativoResponse,
 } from './agenda-organizacional.service';
 import {
+  CreateAgendaMasivaDto,
   CreateConsultorioDto,
   CreateDepartamentoDto,
   CreateSedeDto,
@@ -133,6 +134,11 @@ export class AgendaOrganizacionalController {
     @Body() dto: CreateTurnoDto,
   ): Promise<TurnoOperativoResponse> {
     return this.agendaOrganizacionalService.crearTurno(dto);
+  }
+
+  @Post('turnos/masivos')
+  async generarAgendaMasiva(@Body() dto: CreateAgendaMasivaDto) {
+    return this.agendaOrganizacionalService.generarAgendaMasiva(dto);
   }
 
   // ===========================================================================

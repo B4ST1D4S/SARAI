@@ -1,7 +1,7 @@
 "use client"
 
-import { useMemo, useState } from "react"
-import { motion, AnimatePresence } from "motion/react"
+import { useEffect, useMemo, useState } from "react"
+import { motion, AnimatePresence } from "framer-motion"
 import {
   Calendar,
   Clock,
@@ -20,50 +20,56 @@ import {
   Trash2,
   Video,
   Repeat,
+  Loader2,
   type LucideIcon,
 } from "lucide-react"
+import { API_BASE_URL } from "../../config"
 
 type SelectOption = { value: string; label: string; hint?: string }
+type TipoConsultaOption = SelectOption & { duration: number }
 
-const SEDES: SelectOption[] = [
-  { value: "norte", label: "Sede Principal Norte", hint: "Av. Libertador 1200" },
-  { value: "sur", label: "Sede Sur - Ambulatorio", hint: "Calle 45 #22-10" },
-  { value: "este", label: "Sede Este - Torre Médica", hint: "Cra. 7 #90-33" },
-]
+const AGENDA_API = `${API_BASE_URL}/v1/agenda-organizacional`
 
-const DEPARTAMENTOS: SelectOption[] = [
-  { value: "consulta-externa", label: "Consulta Externa Ambulatoria" },
-  { value: "urgencias", label: "Urgencias y Observación" },
-  { value: "cirugia", label: "Cirugía Programada" },
-  { value: "imagenes", label: "Imágenes Diagnósticas" },
-]
+async function fetchAuthJson<T>(url: string, options: RequestInit = {}): Promise<T> {
+  const token = localStorage.getItem("accessToken") || ""
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+      ...options.headers,
+    },
+  })
+  const data = await response.json().catch(() => null)
+  if (!response.ok) {
+    throw new Error(data?.message || data?.error || `Error HTTP ${response.status}`)
+  }
+  return data as T
+}
 
-const CONSULTORIOS: SelectOption[] = [
-  { value: "101", label: "Consultorio 101", hint: "Piso 1 · Ala A" },
-  { value: "102", label: "Consultorio 102", hint: "Piso 1 · Ala A" },
-  { value: "205", label: "Consultorio 205", hint: "Piso 2 · Ala B" },
-  { value: "eco-1", label: "Sala de Ecografía 1", hint: "Piso 2 · Ala C" },
-]
+function toOptions(items: any[] | null | undefined, hintKey?: string): SelectOption[] {
+  return (items || []).map((item) => ({
+    value: item.id,
+    label: item.nombre || item.nombreCompleto || String(item.label ?? ""),
+    hint: hintKey ? item[hintKey] : undefined,
+  }))
+}
 
-const ESPECIALIDADES: SelectOption[] = [
-  { value: "cardiologia", label: "Cardiología" },
-  { value: "dermatologia", label: "Dermatología" },
-  { value: "pediatria", label: "Pediatría" },
-  { value: "ortopedia", label: "Ortopedia y Traumatología" },
-]
+function toProfesionalOptions(items: any[] | null | undefined): SelectOption[] {
+  return (items || []).map((item) => ({
+    value: item.id,
+    label: item.nombreCompleto || `${item.nombres ?? ""} ${item.apellidos ?? ""}`.trim() || item.nombre || "",
+    hint: item.registroMedico ? `RM ${item.registroMedico}` : item.especialidad,
+  }))
+}
 
-const PROFESIONALES: SelectOption[] = [
-  { value: "cruiz", label: "Dr. Carlos Ruiz", hint: "Cardiólogo · RM 45291" },
-  { value: "mlopez", label: "Dra. María López", hint: "Cardióloga · RM 51022" },
-  { value: "jgomez", label: "Dr. Javier Gómez", hint: "Internista · RM 38771" },
-]
-
-const TIPOS_CONSULTA: (SelectOption & { duration: number })[] = [
-  { value: "primera-vez", label: "Primera Vez", duration: 30 },
-  { value: "control", label: "Control / Seguimiento", duration: 20 },
-  { value: "procedimiento", label: "Procedimiento Menor", duration: 45 },
-  { value: "teleconsulta", label: "Teleconsulta", duration: 15 },
-]
+function toTipoConsultaOptions(items: any[] | null | undefined): TipoConsultaOption[] {
+  return (items || []).map((item) => ({
+    value: item.id,
+    label: item.nombre,
+    duration: Number(item.duracionMinutos ?? item.duration ?? 20),
+  }))
+}
 
 const DIAS = [
   { key: "lun", label: "Lun", weekday: true },
@@ -89,6 +95,16 @@ const MODALIDADES = [
   { key: "telemedicina", label: "Telemedicina", icon: Video },
   { key: "hibrida", label: "Híbrida", icon: Zap },
 ] as const
+
+const DIA_WEEKDAY_NUMBER: Record<string, number> = {
+  lun: 1,
+  mar: 2,
+  mie: 3,
+  jue: 4,
+  vie: 5,
+  sab: 6,
+  dom: 7,
+}
 
 type Shift = { id: string; start: string; end: string }
 
@@ -237,17 +253,36 @@ function Card({ children, className = "" }: { children: React.ReactNode; classNa
 
 export default function AgendaConfig() {
   // Step 1
-  const [sede, setSede] = useState("norte")
-  const [departamento, setDepartamento] = useState("consulta-externa")
-  const [consultorio, setConsultorio] = useState("101")
-  const [especialidad, setEspecialidad] = useState("cardiologia")
-  const [profesional, setProfesional] = useState("cruiz")
-  const [tipoConsulta, setTipoConsulta] = useState("control")
+  const [sede, setSede] = useState("")
+  const [departamento, setDepartamento] = useState("")
+  const [consultorio, setConsultorio] = useState("")
+  const [especialidad, setEspecialidad] = useState("")
+  const [profesional, setProfesional] = useState("")
+  const [tipoConsulta, setTipoConsulta] = useState("")
+
+  // Catalogs loaded from the API
+  const [sedes, setSedes] = useState<SelectOption[]>([])
+  const [departamentos, setDepartamentos] = useState<SelectOption[]>([])
+  const [consultorios, setConsultorios] = useState<SelectOption[]>([])
+  const [especialidades, setEspecialidades] = useState<SelectOption[]>([])
+  const [profesionales, setProfesionales] = useState<SelectOption[]>([])
+  const [tiposConsulta, setTiposConsulta] = useState<TipoConsultaOption[]>([])
+
+  const [loadingSedes, setLoadingSedes] = useState(true)
+  const [loadingDepartamentos, setLoadingDepartamentos] = useState(false)
+  const [loadingConsultorios, setLoadingConsultorios] = useState(false)
+  const [loadingEspecialidades, setLoadingEspecialidades] = useState(true)
+  const [loadingProfesionales, setLoadingProfesionales] = useState(true)
+  const [loadingTiposConsulta, setLoadingTiposConsulta] = useState(false)
 
   // Step 2
   const [horizonte, setHorizonte] = useState<(typeof HORIZONTES)[number]["key"]>("mes")
-  const [startDate, setStartDate] = useState("2026-09-08")
-  const [endDate, setEndDate] = useState("2026-10-08")
+  const [startDate, setStartDate] = useState(() => new Date().toISOString().slice(0, 10))
+  const [endDate, setEndDate] = useState(() => {
+    const d = new Date()
+    d.setDate(d.getDate() + 30)
+    return d.toISOString().slice(0, 10)
+  })
   const [days, setDays] = useState<Record<string, boolean>>({
     lun: true,
     mar: true,
@@ -258,7 +293,7 @@ export default function AgendaConfig() {
     dom: false,
   })
   const [excludeHolidays, setExcludeHolidays] = useState(true)
-  const [exclusions, setExclusions] = useState<string[]>(["25 Dic", "01 Ene"])
+  const [exclusions, setExclusions] = useState<string[]>([])
   const [newExclusion, setNewExclusion] = useState("")
 
   // Step 3
@@ -271,10 +306,105 @@ export default function AgendaConfig() {
   const [overbooking, setOverbooking] = useState("2")
   const [modalidad, setModalidad] = useState<(typeof MODALIDADES)[number]["key"]>("presencial")
 
-  const tipo = TIPOS_CONSULTA.find((t) => t.value === tipoConsulta)
+  // Submit state
+  const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState("")
+  const [submitSuccess, setSubmitSuccess] = useState("")
+
+  const tipo = tiposConsulta.find((t) => t.value === tipoConsulta)
   const activeInterval = customInterval ? Number(customInterval) : interval
 
   const activeDaysCount = Object.values(days).filter(Boolean).length
+
+  const diasSemana = useMemo(
+    () =>
+      Object.entries(days)
+        .filter(([, active]) => active)
+        .map(([key]) => DIA_WEEKDAY_NUMBER[key]),
+    [days],
+  )
+
+  // Initial catalogs: sedes, especialidades and profesionales load in parallel.
+  useEffect(() => {
+    let cancelled = false
+
+    setLoadingSedes(true)
+    fetchAuthJson<any[]>(`${AGENDA_API}/sedes`)
+      .then((data) => !cancelled && setSedes(toOptions(data)))
+      .catch(() => !cancelled && setSedes([]))
+      .finally(() => !cancelled && setLoadingSedes(false))
+
+    setLoadingEspecialidades(true)
+    fetchAuthJson<any[]>(`${API_BASE_URL}/v1/especialidades`)
+      .then((data) => !cancelled && setEspecialidades(toOptions(data)))
+      .catch(() => !cancelled && setEspecialidades([]))
+      .finally(() => !cancelled && setLoadingEspecialidades(false))
+
+    setLoadingProfesionales(true)
+    fetchAuthJson<any[]>(`${API_BASE_URL}/v1/usuarios?rol=MEDICO`)
+      .then((data) => !cancelled && setProfesionales(toProfesionalOptions(data)))
+      .catch(() => !cancelled && setProfesionales([]))
+      .finally(() => !cancelled && setLoadingProfesionales(false))
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  // Cascade: sede -> departamentos
+  useEffect(() => {
+    setDepartamento("")
+    setDepartamentos([])
+    if (!sede) return
+    let cancelled = false
+    setLoadingDepartamentos(true)
+    fetchAuthJson<any[]>(`${AGENDA_API}/sedes/${sede}/departamentos`)
+      .then((data) => !cancelled && setDepartamentos(toOptions(data)))
+      .catch(() => !cancelled && setDepartamentos([]))
+      .finally(() => !cancelled && setLoadingDepartamentos(false))
+    return () => {
+      cancelled = true
+    }
+  }, [sede])
+
+  // Cascade: departamento -> consultorios
+  useEffect(() => {
+    setConsultorio("")
+    setConsultorios([])
+    if (!departamento) return
+    let cancelled = false
+    setLoadingConsultorios(true)
+    fetchAuthJson<any[]>(`${AGENDA_API}/departamentos/${departamento}/consultorios`)
+      .then((data) => !cancelled && setConsultorios(toOptions(data, "pisoBloque")))
+      .catch(() => !cancelled && setConsultorios([]))
+      .finally(() => !cancelled && setLoadingConsultorios(false))
+    return () => {
+      cancelled = true
+    }
+  }, [departamento])
+
+  // Cascade: especialidad -> tipos de consulta
+  useEffect(() => {
+    setTipoConsulta("")
+    setTiposConsulta([])
+    if (!especialidad) return
+    let cancelled = false
+    setLoadingTiposConsulta(true)
+    fetchAuthJson<any[]>(`${API_BASE_URL}/v1/tipos-consulta?especialidadId=${especialidad}`)
+      .then((data) => !cancelled && setTiposConsulta(toTipoConsultaOptions(data)))
+      .catch(() => !cancelled && setTiposConsulta([]))
+      .finally(() => !cancelled && setLoadingTiposConsulta(false))
+    return () => {
+      cancelled = true
+    }
+  }, [especialidad])
+
+  // Suggested duration from the selected tipo de consulta feeds the interval.
+  useEffect(() => {
+    if (!tipo) return
+    setInterval(tipo.duration)
+    setCustomInterval("")
+  }, [tipo])
 
   const dailyMinutes = useMemo(
     () => shifts.reduce((sum, s) => sum + minutesBetween(s.start, s.end), 0),
@@ -324,6 +454,81 @@ export default function AgendaConfig() {
     setNewExclusion("")
   }
 
+  const resetForm = () => {
+    setSede("")
+    setEspecialidad("")
+    setProfesional("")
+    setHorizonte("mes")
+    setStartDate(new Date().toISOString().slice(0, 10))
+    setEndDate(() => {
+      const d = new Date()
+      d.setDate(d.getDate() + 30)
+      return d.toISOString().slice(0, 10)
+    })
+    setDays({ lun: true, mar: true, mie: true, jue: true, vie: true, sab: false, dom: false })
+    setExcludeHolidays(true)
+    setExclusions([])
+    setNewExclusion("")
+    setShifts([{ id: "s1", start: "08:00", end: "12:00" }])
+    setInterval(20)
+    setCustomInterval("")
+    setOverbooking("2")
+    setModalidad("presencial")
+    setSubmitError("")
+    setSubmitSuccess("")
+  }
+
+  const handleGenerarAgenda = async () => {
+    setSubmitError("")
+    setSubmitSuccess("")
+
+    if (!sede || !departamento || !consultorio || !especialidad || !profesional) {
+      setSubmitError("Complete sede, departamento, consultorio, especialidad y profesional antes de continuar.")
+      return
+    }
+    if (!startDate || !endDate) {
+      setSubmitError("Defina la fecha de inicio y fin del horizonte temporal.")
+      return
+    }
+    if (diasSemana.length === 0) {
+      setSubmitError("Seleccione al menos un día de la semana.")
+      return
+    }
+
+    setSubmitting(true)
+    try {
+      const payload = {
+        sedeId: sede,
+        departamentoId: departamento,
+        consultorioId: consultorio,
+        profesionalId: profesional,
+        especialidadId: especialidad,
+        tipoConsultaId: tipoConsulta || undefined,
+        fechaDesde: startDate,
+        fechaHasta: endDate,
+        diasSemana,
+        excluirFestivos: excludeHolidays,
+        fechasExcluidas: exclusions,
+        jornadas: shifts.map((s) => ({ horaInicio: s.start, horaFin: s.end })),
+        intervaloMinutos: activeInterval,
+        sobrecuposMax: Number(overbooking) || 0,
+        modalidad: modalidad.toUpperCase(),
+      }
+
+      const data = await fetchAuthJson<{ totalTurnosGenerados?: number; totalGenerados?: number }>(
+        `${AGENDA_API}/turnos/masivos`,
+        { method: "POST", body: JSON.stringify(payload) },
+      )
+
+      const total = data.totalTurnosGenerados ?? data.totalGenerados ?? 0
+      setSubmitSuccess(`Se generaron ${total} turnos correctamente.`)
+    } catch (err: any) {
+      setSubmitError(err?.message || "No se pudo generar la agenda masiva")
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-[#080a0f] px-4 py-8 text-gray-200 md:px-8">
       <div className="mx-auto max-w-7xl">
@@ -358,51 +563,65 @@ export default function AgendaConfig() {
                 <CustomSelect
                   icon={MapPin}
                   label="Sede"
-                  options={SEDES}
+                  options={sedes}
                   value={sede}
                   onChange={setSede}
-                  placeholder="Seleccione sede"
+                  placeholder={loadingSedes ? "Cargando sedes..." : "Seleccione sede"}
                 />
                 <CustomSelect
                   icon={Building2}
                   label="Departamento / Servicio"
-                  options={DEPARTAMENTOS}
+                  options={departamentos}
                   value={departamento}
                   onChange={setDepartamento}
-                  placeholder="Seleccione servicio"
+                  placeholder={
+                    loadingDepartamentos ? "Cargando..." : !sede ? "Seleccione una sede primero" : "Seleccione servicio"
+                  }
                 />
                 <CustomSelect
                   icon={Building2}
                   label="Consultorio / Recurso"
-                  options={CONSULTORIOS}
+                  options={consultorios}
                   value={consultorio}
                   onChange={setConsultorio}
-                  placeholder="Seleccione recurso"
+                  placeholder={
+                    loadingConsultorios
+                      ? "Cargando..."
+                      : !departamento
+                        ? "Seleccione un departamento primero"
+                        : "Seleccione recurso"
+                  }
                 />
                 <CustomSelect
                   icon={Stethoscope}
                   label="Especialidad Médica"
-                  options={ESPECIALIDADES}
+                  options={especialidades}
                   value={especialidad}
                   onChange={setEspecialidad}
-                  placeholder="Seleccione especialidad"
+                  placeholder={loadingEspecialidades ? "Cargando especialidades..." : "Seleccione especialidad"}
                 />
                 <CustomSelect
                   icon={User}
                   label="Profesional Asignado"
-                  options={PROFESIONALES}
+                  options={profesionales}
                   value={profesional}
                   onChange={setProfesional}
-                  placeholder="Seleccione profesional"
+                  placeholder={loadingProfesionales ? "Cargando profesionales..." : "Seleccione profesional"}
                 />
                 <div>
                   <CustomSelect
                     icon={Filter}
                     label="Tipo de Consulta"
-                    options={TIPOS_CONSULTA}
+                    options={tiposConsulta}
                     value={tipoConsulta}
                     onChange={setTipoConsulta}
-                    placeholder="Seleccione tipo"
+                    placeholder={
+                      loadingTiposConsulta
+                        ? "Cargando..."
+                        : !especialidad
+                          ? "Seleccione una especialidad primero"
+                          : "Seleccione tipo"
+                    }
                   />
                   {tipo && (
                     <motion.span
@@ -567,6 +786,7 @@ export default function AgendaConfig() {
                       ))}
                     </AnimatePresence>
                     <input
+                      type="date"
                       value={newExclusion}
                       onChange={(e) => setNewExclusion(e.target.value)}
                       onKeyDown={(e) => {
@@ -575,9 +795,16 @@ export default function AgendaConfig() {
                           addExclusion()
                         }
                       }}
-                      placeholder="+ Fecha"
-                      className="w-24 rounded-lg border border-slate-800/80 bg-slate-950/60 px-2.5 py-1 text-xs text-gray-200 outline-none placeholder:text-gray-600 focus:border-amber-500/50"
+                      className="rounded-lg border border-slate-800/80 bg-slate-950/60 px-2.5 py-1 text-xs text-gray-200 outline-none [color-scheme:dark] focus:border-amber-500/50"
                     />
+                    <button
+                      type="button"
+                      onClick={addExclusion}
+                      disabled={!newExclusion}
+                      className="rounded-lg border border-slate-800/80 px-2.5 py-1 text-xs font-medium text-amber-400 transition-colors hover:border-amber-500/40 hover:text-amber-300 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      + Agregar
+                    </button>
                   </div>
                 </div>
               </div>
@@ -770,19 +997,52 @@ export default function AgendaConfig() {
                 <span className="text-xs font-medium text-emerald-300">Sin cruces de agenda detectados</span>
               </div>
 
+              <AnimatePresence>
+                {submitError && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="mb-4 flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2.5"
+                  >
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-400" aria-hidden="true" />
+                    <span className="text-xs font-medium text-red-300">{submitError}</span>
+                  </motion.div>
+                )}
+                {submitSuccess && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="mb-4 flex items-start gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2.5"
+                  >
+                    <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" aria-hidden="true" />
+                    <span className="text-xs font-medium text-emerald-300">{submitSuccess}</span>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
               <div className="flex flex-col gap-2">
                 <motion.button
                   type="button"
-                  whileHover={{ scale: 1.01 }}
-                  whileTap={{ scale: 0.99 }}
-                  className="group relative flex items-center justify-center gap-2 overflow-hidden rounded-xl bg-gradient-to-r from-yellow-400 to-amber-600 px-4 py-3 text-sm font-semibold text-slate-950 shadow-lg shadow-amber-500/25 transition-shadow hover:shadow-amber-500/40"
+                  whileHover={{ scale: submitting ? 1 : 1.01 }}
+                  whileTap={{ scale: submitting ? 1 : 0.99 }}
+                  onClick={handleGenerarAgenda}
+                  disabled={submitting}
+                  className="group relative flex items-center justify-center gap-2 overflow-hidden rounded-xl bg-gradient-to-r from-yellow-400 to-amber-600 px-4 py-3 text-sm font-semibold text-slate-950 shadow-lg shadow-amber-500/25 transition-shadow hover:shadow-amber-500/40 disabled:cursor-not-allowed disabled:opacity-70"
                 >
-                  <Zap className="h-4 w-4" aria-hidden="true" />
-                  Confirmar y Generar Agenda
+                  {submitting ? (
+                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                  ) : (
+                    <Zap className="h-4 w-4" aria-hidden="true" />
+                  )}
+                  {submitting ? "Generando agenda..." : "Confirmar y Generar Agenda"}
                 </motion.button>
                 <button
                   type="button"
-                  className="rounded-xl border border-slate-800/80 px-4 py-2.5 text-sm font-medium text-gray-400 transition-colors hover:border-slate-700 hover:text-gray-200"
+                  onClick={resetForm}
+                  disabled={submitting}
+                  className="rounded-xl border border-slate-800/80 px-4 py-2.5 text-sm font-medium text-gray-400 transition-colors hover:border-slate-700 hover:text-gray-200 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Cancelar / Limpiar
                 </button>
