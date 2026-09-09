@@ -98,4 +98,7 @@ export async function runAcrossTenants(options: RunnerOptions): Promise<void> {
 
   console.log('[TenantRunner] Procesamiento finalizado.');
 }
-5. Comandos de Operación HabitualesComandoAcciónnpm run tenant:migrateEjecuta las migraciones pendientes en todos los tenants activos.npm run tenant:migrate -- --subdomain=demoEjecuta las migraciones exclusivamente en el tenant demo.npm run tenant:seed:catalogsInserta o sincroniza los catálogos normativos (CIE-10 / CUPS) en todos los clientes.npm run tenant:statusComprueba la conectividad de red y handshake SCRAM con cada base de datos registrada.
+5. Comandos de Operación Habituales npm run migrate:tenants Ejecuta las migraciones pendientes en todos los tenants activos.
+npm run migrate:tenants -- --subdomain=demoEjecuta las migraciones exclusivamente en el tenant demo.
+npm run tenant:seed:catalogs Inserta o sincroniza los catálogos normativos (CIE-10 / CUPS) en todos los clientes.
+npm run tenant:status Comprueba la conectividad de red y handshake SCRAM con cada base de datos registrada.
