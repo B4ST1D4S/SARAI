@@ -1,4 +1,7 @@
-import { InternalServerErrorException } from '@nestjs/common';
+import {
+  InternalServerErrorException,
+  NotFoundException,
+} from '@nestjs/common';
 import { ClinicalRecordService } from '../src/modules/clinical-record/services/clinical-record.service';
 import { ClinicalRecordValidatorService } from '../src/modules/clinical-record/services/clinical-record-validator.service';
 import { TenancyConnectionService } from '../src/core/tenancy/services/tenancy-connection.service';
@@ -279,5 +282,196 @@ describe('ClinicalRecordService (Transactional Persistence)', () => {
     await expect(service.crearFolioConsultaExterna(payload)).rejects.toThrow(
       InternalServerErrorException,
     );
+  });
+
+  describe('obtenerPlantillaParaCita (Dynamic Template Resolution)', () => {
+    const citaId = 'c1111111-2222-3333-4444-555555555555';
+    const pacienteId = 'p1111111-2222-3333-4444-555555555555';
+    const profesionalId = 'u1111111-2222-3333-4444-555555555555';
+    const sedeId = 's1111111-2222-3333-4444-555555555555';
+    const tipoConsultaId = 't1111111-2222-3333-4444-555555555555';
+
+    const mockCitaRow = {
+      id: citaId,
+      paciente_id: pacienteId,
+      profesional_id: profesionalId,
+      sede_id: sedeId,
+      tipo_consulta_id: tipoConsultaId,
+    };
+
+    const mockEstructura = {
+      secciones: [
+        {
+          id: 'sec_valoracion',
+          titulo: 'Valoración Clínica',
+          submodulos: [{ id: 'motivo_consulta', requerido: true }],
+        },
+      ],
+    };
+
+    it('debe lanzar NotFoundException si la cita no existe', async () => {
+      jest.spyOn(tenancyConnectionService, 'query').mockResolvedValueOnce({
+        rows: [],
+      } as any);
+
+      await expect(
+        service.obtenerPlantillaParaCita('non-existent-cita-id'),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('debe resolver con prioridad 1 (PROFESIONAL_OVERRIDE) si existe personalización médica', async () => {
+      jest.spyOn(tenancyConnectionService, 'query').mockImplementation((queryText: string) => {
+        if (queryText.includes('FROM citas')) {
+          return Promise.resolve({ rows: [mockCitaRow] } as any);
+        }
+        if (queryText.includes('FROM tipos_consulta_cups')) {
+          return Promise.resolve({ rows: [{ finalidad: 'PRIMERA_VEZ' }] } as any);
+        }
+        if (queryText.includes('FROM hc_configuracion_plantillas')) {
+          return Promise.resolve({
+            rows: [
+              {
+                plantilla_id: 'plantilla-prof-111',
+                codigo_plantilla: 'PLANT-CARDIO-DR-PEREZ',
+                nombre_plantilla: 'Cardiología - Dr. Pérez (Personalizada)',
+                estructura: mockEstructura,
+                origen_resolucion: 'PROFESIONAL_OVERRIDE',
+                prioridad: 1,
+              },
+            ],
+          } as any);
+        }
+        return Promise.resolve({ rows: [] } as any);
+      });
+
+      const result = await service.obtenerPlantillaParaCita(citaId);
+
+      expect(result).toEqual({
+        plantillaId: 'plantilla-prof-111',
+        codigoPlantilla: 'PLANT-CARDIO-DR-PEREZ',
+        nombrePlantilla: 'Cardiología - Dr. Pérez (Personalizada)',
+        origenResolucion: 'PROFESIONAL_OVERRIDE',
+        estructura: mockEstructura,
+        metadataAtencion: {
+          citaId,
+          pacienteId,
+          profesionalId,
+          sedeId,
+          tipoConsultaId,
+        },
+      });
+    });
+
+    it('debe resolver con prioridad 2 (SEDE_OVERRIDE) si no hay override profesional pero sí de sede', async () => {
+      jest.spyOn(tenancyConnectionService, 'query').mockImplementation((queryText: string) => {
+        if (queryText.includes('FROM citas')) {
+          return Promise.resolve({ rows: [mockCitaRow] } as any);
+        }
+        if (queryText.includes('FROM tipos_consulta_cups')) {
+          return Promise.resolve({ rows: [{ finalidad: 'CONTROL' }] } as any);
+        }
+        if (queryText.includes('FROM hc_configuracion_plantillas')) {
+          return Promise.resolve({
+            rows: [
+              {
+                plantilla_id: 'plantilla-sede-222',
+                codigo_plantilla: 'PLANT-CARDIO-SEDE-NORTE',
+                nombre_plantilla: 'Cardiología - Sede Norte',
+                estructura: JSON.stringify(mockEstructura), // probar parseo JSON string
+                origen_resolucion: 'SEDE_OVERRIDE',
+                prioridad: 2,
+              },
+            ],
+          } as any);
+        }
+        return Promise.resolve({ rows: [] } as any);
+      });
+
+      const result = await service.obtenerPlantillaParaCita(citaId);
+
+      expect(result.origenResolucion).toBe('SEDE_OVERRIDE');
+      expect(result.plantillaId).toBe('plantilla-sede-222');
+      expect(result.codigoPlantilla).toBe('PLANT-CARDIO-SEDE-NORTE');
+      expect(result.estructura).toEqual(mockEstructura);
+    });
+
+    it('debe resolver con prioridad 3 (INSTITUCIONAL_DEFAULT) desde configuración de plantilla', async () => {
+      jest.spyOn(tenancyConnectionService, 'query').mockImplementation((queryText: string) => {
+        if (queryText.includes('FROM citas')) {
+          return Promise.resolve({ rows: [mockCitaRow] } as any);
+        }
+        if (queryText.includes('FROM tipos_consulta_cups')) {
+          return Promise.resolve({ rows: [] } as any); // finalidad asume 'PRIMERA_VEZ'
+        }
+        if (queryText.includes('FROM hc_configuracion_plantillas')) {
+          return Promise.resolve({
+            rows: [
+              {
+                plantilla_id: 'plantilla-inst-333',
+                codigo_plantilla: 'PLANT-CONS-PRIMERA-VEZ',
+                nombre_plantilla: 'Consulta Ambulatoria - Primera Vez (Estándar)',
+                estructura: mockEstructura,
+                origen_resolucion: 'INSTITUCIONAL_DEFAULT',
+                prioridad: 3,
+              },
+            ],
+          } as any);
+        }
+        return Promise.resolve({ rows: [] } as any);
+      });
+
+      const result = await service.obtenerPlantillaParaCita(citaId);
+
+      expect(result.origenResolucion).toBe('INSTITUCIONAL_DEFAULT');
+      expect(result.plantillaId).toBe('plantilla-inst-333');
+      expect(result.codigoPlantilla).toBe('PLANT-CONS-PRIMERA-VEZ');
+    });
+
+    it('debe recurrir al fallback de catálogo PLANT-CONS-PRIMERA-VEZ si no hay configuración', async () => {
+      jest.spyOn(tenancyConnectionService, 'query').mockImplementation((queryText: string) => {
+        if (queryText.includes('FROM citas')) {
+          return Promise.resolve({ rows: [mockCitaRow] } as any);
+        }
+        if (queryText.includes('FROM tipos_consulta_cups')) {
+          return Promise.resolve({ rows: [] } as any);
+        }
+        if (queryText.includes('FROM hc_configuracion_plantillas')) {
+          return Promise.resolve({ rows: [] } as any); // sin registros de configuración
+        }
+        if (queryText.includes('FROM hc_plantillas_catalogo') && queryText.includes('codigo = $1')) {
+          return Promise.resolve({
+            rows: [
+              {
+                plantilla_id: 'plantilla-catalogo-444',
+                codigo_plantilla: 'PLANT-CONS-PRIMERA-VEZ',
+                nombre_plantilla: 'Consulta Ambulatoria - Primera Vez (Estándar)',
+                estructura: mockEstructura,
+              },
+            ],
+          } as any);
+        }
+        return Promise.resolve({ rows: [] } as any);
+      });
+
+      const result = await service.obtenerPlantillaParaCita(citaId);
+
+      expect(result.origenResolucion).toBe('INSTITUCIONAL_DEFAULT');
+      expect(result.plantillaId).toBe('plantilla-catalogo-444');
+      expect(result.codigoPlantilla).toBe('PLANT-CONS-PRIMERA-VEZ');
+      expect(result.metadataAtencion.citaId).toBe(citaId);
+    });
+
+    it('debe lanzar NotFoundException si no existe ninguna plantilla activa en catálogo', async () => {
+      jest.spyOn(tenancyConnectionService, 'query').mockImplementation((queryText: string) => {
+        if (queryText.includes('FROM citas')) {
+          return Promise.resolve({ rows: [mockCitaRow] } as any);
+        }
+        return Promise.resolve({ rows: [] } as any);
+      });
+
+      await expect(service.obtenerPlantillaParaCita(citaId)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
   });
 });

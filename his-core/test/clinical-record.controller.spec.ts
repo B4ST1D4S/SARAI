@@ -16,6 +16,7 @@ describe('ClinicalRecordController', () => {
 
   const mockService = {
     crearFolioConsultaExterna: jest.fn(),
+    obtenerPlantillaParaCita: jest.fn(),
   };
 
   const mockPdfService = {
@@ -112,5 +113,38 @@ describe('ClinicalRecordController', () => {
       't-tenant-controller-123',
       folioId,
     );
+  });
+
+  it('debe obtener la plantilla resuelta para una cita en GET /clinical-records/citas/:citaId/plantilla', async () => {
+    const citaId = 'a1111111-2222-3333-4444-555555555555';
+    const mockPlantillaResponse = {
+      plantillaId: 'p0000000-1111-2222-3333-444444444444',
+      codigoPlantilla: 'PLANT-CONS-PRIMERA-VEZ',
+      nombrePlantilla: 'Consulta Ambulatoria - Primera Vez (Estándar)',
+      origenResolucion: 'INSTITUCIONAL_DEFAULT',
+      estructura: {
+        secciones: [
+          {
+            id: 'sec_valoracion',
+            titulo: 'Valoración Clínica',
+            submodulos: [{ id: 'motivo_consulta', requerido: true }],
+          },
+        ],
+      },
+      metadataAtencion: {
+        citaId,
+        pacienteId: '9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d',
+        profesionalId: '123e4567-e89b-12d3-a456-426614174000',
+        sedeId: 's1111111-2222-3333-4444-555555555555',
+        tipoConsultaId: 'tc111111-2222-3333-4444-555555555555',
+      },
+    };
+
+    mockService.obtenerPlantillaParaCita.mockResolvedValue(mockPlantillaResponse);
+
+    const result = await controller.obtenerPlantillaParaCita(citaId);
+
+    expect(result).toEqual(mockPlantillaResponse);
+    expect(service.obtenerPlantillaParaCita).toHaveBeenCalledWith(citaId);
   });
 });

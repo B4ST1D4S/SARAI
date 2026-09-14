@@ -134,6 +134,195 @@ body {
 }
 
 /* ═══════════════════════════════════════════════════════════════
+   SARAI SEMANTIC DESIGN TOKENS (ZERO HARDCODED COLORS SYSTEM)
+   Used by bg-app, bg-surface, bg-subtle, border-border,
+   text-primary, text-secondary, text-muted, bg-primary,
+   text-primary-foreground, text-success, text-danger, text-warning
+═══════════════════════════════════════════════════════════════ */
+:root, [data-theme="dark"] {
+  --color-app: 11 15 25;
+  --color-surface: 17 24 39;
+  --color-subtle: 30 41 59;
+  --color-border: 51 65 85;
+  --color-primary: 245 158 11;
+  --color-primary-foreground: 15 23 42;
+  --color-secondary: 148 163 184;
+  --color-muted: 100 116 139;
+  --color-success: 16 185 129;
+  --color-success-foreground: 255 255 255;
+  --color-danger: 239 68 68;
+  --color-danger-foreground: 255 255 255;
+  --color-warning: 245 158 11;
+  --color-warning-foreground: 15 23 42;
+}
+
+[data-theme="premium-light"] {
+  --color-app: 240 244 248;
+  --color-surface: 255 255 255;
+  --color-subtle: 232 237 245;
+  --color-border: 203 213 225;
+  --color-primary: 37 99 235;
+  --color-primary-foreground: 255 255 255;
+  --color-secondary: 71 85 105;
+  --color-muted: 148 163 184;
+  --color-success: 16 185 129;
+  --color-success-foreground: 255 255 255;
+  --color-danger: 239 68 68;
+  --color-danger-foreground: 255 255 255;
+  --color-warning: 217 119 6;
+  --color-warning-foreground: 255 255 255;
+}
+
+[data-theme="soft-medical"] {
+  --color-app: 232 240 235;
+  --color-surface: 247 251 247;
+  --color-subtle: 218 234 220;
+  --color-border: 192 212 196;
+  --color-primary: 5 150 105;
+  --color-primary-foreground: 255 255 255;
+  --color-secondary: 61 102 84;
+  --color-muted: 122 162 136;
+  --color-success: 5 150 105;
+  --color-success-foreground: 255 255 255;
+  --color-danger: 225 29 72;
+  --color-danger-foreground: 255 255 255;
+  --color-warning: 217 119 6;
+  --color-warning-foreground: 255 255 255;
+}
+
+[data-theme="executive-ai"] {
+  --color-app: 3 7 18;
+  --color-surface: 6 14 26;
+  --color-subtle: 9 21 37;
+  --color-border: 30 58 138;
+  --color-primary: 6 182 212;
+  --color-primary-foreground: 3 7 18;
+  --color-secondary: 148 163 184;
+  --color-muted: 100 116 139;
+  --color-success: 16 185 129;
+  --color-success-foreground: 255 255 255;
+  --color-danger: 239 68 68;
+  --color-danger-foreground: 255 255 255;
+  --color-warning: 245 158 11;
+  --color-warning-foreground: 3 7 18;
+}
+
+[data-theme="rose-care"] {
+  --color-app: 253 242 245;
+  --color-surface: 255 255 255;
+  --color-subtle: 252 231 237;
+  --color-border: 240 192 204;
+  --color-primary: 225 29 72;
+  --color-primary-foreground: 255 255 255;
+  --color-secondary: 127 48 64;
+  --color-muted: 184 112 128;
+  --color-success: 16 185 129;
+  --color-success-foreground: 255 255 255;
+  --color-danger: 225 29 72;
+  --color-danger-foreground: 255 255 255;
+  --color-warning: 217 119 6;
+  --color-warning-foreground: 255 255 255;
+}
+
+[data-theme="fuchsia-premium"] {
+  --color-app: 253 244 255;
+  --color-surface: 255 255 255;
+  --color-subtle: 245 208 254;
+  --color-border: 232 121 249;
+  --color-primary: 162 28 175;
+  --color-primary-foreground: 255 255 255;
+  --color-secondary: 112 26 117;
+  --color-muted: 168 85 247;
+  --color-success: 16 185 129;
+  --color-success-foreground: 255 255 255;
+  --color-danger: 225 29 72;
+  --color-danger-foreground: 255 255 255;
+  --color-warning: 217 119 6;
+  --color-warning-foreground: 255 255 255;
+}
+
+[data-theme="purple-care"] {
+  --color-app: 245 243 255;
+  --color-surface: 255 255 255;
+  --color-subtle: 237 233 254;
+  --color-border: 196 181 253;
+  --color-primary: 124 58 237;
+  --color-primary-foreground: 255 255 255;
+  --color-secondary: 91 33 182;
+  --color-muted: 139 92 246;
+  --color-success: 16 185 129;
+  --color-success-foreground: 255 255 255;
+  --color-danger: 225 29 72;
+  --color-danger-foreground: 255 255 255;
+  --color-warning: 217 119 6;
+  --color-warning-foreground: 255 255 255;
+}
+
+[data-theme="arctic-blue"] {
+  /* Fondo general: Gris frío atenuado (slate-100/50), sin reflejo encandilante */
+  --color-app: 241 245 249;
+
+  /* Tarjetas y paneles: Blanco puro para generar contraste natural */
+  --color-surface: 255 255 255;
+
+  /* Inputs, contenedores secundarios y chips (slate-50) */
+  --color-subtle: 248 250 252;
+
+  /* Bordes: Gris suave delimitador (slate-200), no azul neón */
+  --color-border: 226 232 240;
+
+  /* Acento de acción: Azul médico nítido (sky-600) */
+  --color-primary: 2 132 199;
+  --color-primary-foreground: 255 255 255;
+
+  /* Tipografía jerárquica con alto contraste (WCAG AAA) */
+  --color-secondary: 71 85 105;   /* Slate 600: labels e indicadores */
+  --color-muted: 148 163 184;     /* Slate 400: placeholders legibles */
+
+  /* Estados clínicos funcionales */
+  --color-success: 16 185 129;
+  --color-success-foreground: 255 255 255;
+  --color-danger: 225 29 72;
+  --color-danger-foreground: 255 255 255;
+  --color-warning: 217 119 6;
+  --color-warning-foreground: 255 255 255;
+}
+
+[data-theme="mint-premium"] {
+  --color-app: 240 253 250;
+  --color-surface: 255 255 255;
+  --color-subtle: 204 251 241;
+  --color-border: 153 246 228;
+  --color-primary: 13 148 136;
+  --color-primary-foreground: 255 255 255;
+  --color-secondary: 19 78 74;
+  --color-muted: 45 212 191;
+  --color-success: 13 148 136;
+  --color-success-foreground: 255 255 255;
+  --color-danger: 225 29 72;
+  --color-danger-foreground: 255 255 255;
+  --color-warning: 217 119 6;
+  --color-warning-foreground: 255 255 255;
+}
+
+[data-theme="sunset-care"] {
+  --color-app: 255 251 235;
+  --color-surface: 255 255 255;
+  --color-subtle: 254 243 199;
+  --color-border: 253 230 138;
+  --color-primary: 217 119 6;
+  --color-primary-foreground: 255 255 255;
+  --color-secondary: 146 64 14;
+  --color-muted: 245 158 11;
+  --color-success: 16 185 129;
+  --color-success-foreground: 255 255 255;
+  --color-danger: 225 29 72;
+  --color-danger-foreground: 255 255 255;
+  --color-warning: 217 119 6;
+  --color-warning-foreground: 255 255 255;
+}
+
+/* ═══════════════════════════════════════════════════════════════
    SARAI THEME SYSTEM
    Solo aplica cuando data-theme="X" está en <html>.
    El tema "dark" (default) NO tiene overrides: usa Tailwind normal.

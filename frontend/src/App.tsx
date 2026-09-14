@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import NeuralCanvas from './components/NeuralCanvas';
 import SaraiAssistant from './components/SaraiAssistant';
@@ -16,9 +16,11 @@ import DashboardPage from './pages/dashboard/DashboardPage';
 // Consulta Externa
 import PacientesPage from './pages/consulta-externa/PacientesPage';
 import HistoriaClinicaPage from './pages/consulta-externa/HistoriaClinicaPage';
+import HistoriaClinicaWorkbench from './pages/HistoriaClinicaWorkbench';
 import AgendaPage from './pages/consulta-externa/AgendaPage';
 import AgendaProfesionalPage from './pages/consulta-externa/AgendaProfesionalPage';
 import ConfigAgendaPage from './pages/consulta-externa/ConfigAgendaPage';
+// import AgendaConfig from './pages/consulta-externa/Agenda-Config';
 import AdmisionPage from './pages/consulta-externa/AdmisionPage';
 import FollowUpPage from './pages/consulta-externa/FollowUpPage';
 import OdontogramaPage from './pages/consulta-externa/OdontogramaPage';
@@ -46,10 +48,13 @@ import ManualPage from './pages/admin/ManualPage';
 
 export type NavMode = 'hub' | 'sidebar';
 
+
+
 const NAV_RECURSO: Record<string, string> = {
   dashboard:          'DASHBOARD',
   pacientes:          'CLINICA.PACIENTES',
   historia:           'CLINICA.HISTORIA',
+  workbench:          'CLINICA.HISTORIA',
   fotos:              'CLINICA.VISUAL',
   odontograma:        'CLINICA.ODONTOGRAMA',
   'mapa-corporal':    'CLINICA.MAPA',
@@ -536,7 +541,16 @@ function App() {
               <>
                 {/* Páginas de Consulta Externa */}
                 {currentPage === 'pacientes'           && <PacientesPage />}
-                {currentPage === 'historia'            && (
+
+                {/* HISTORIA CLÍNICA: Versión modular continua con lazy loading */}
+                {currentPage === 'historia' && (
+                  <HistoriaClinicaWorkbench
+                    onBack={() => setCurrentPage('dashboard')}
+                  />
+                )}
+
+                {/* Versión anterior de Historia Clínica (comentada temporalmente) */}
+                {/* {currentPage === 'historia-legacy' && (
                   <HistoriaClinicaPage
                     onNavegar={setCurrentPage}
                     showFormExternal={historiaShowForm}
@@ -546,6 +560,12 @@ function App() {
                     onSeccionActivaChange={setHistoriaSeccionActiva}
                     onRegisterCampos={(fn) => { camposHandlerRef.current = fn; }}
                     pacienteIdExterno={historiaPacienteId}
+                  />
+                )} */}
+
+                {currentPage === 'workbench'           && (
+                  <HistoriaClinicaWorkbench
+                    onBack={() => setCurrentPage('dashboard')}
                   />
                 )}
                 {currentPage === 'agenda'              && <AgendaPage />}

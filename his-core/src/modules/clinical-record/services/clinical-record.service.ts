@@ -2,6 +2,7 @@ import {
   Injectable,
   Logger,
   InternalServerErrorException,
+  NotFoundException,
 } from '@nestjs/common';
 import * as crypto from 'node:crypto';
 import { TenancyConnectionService } from '../../../core/tenancy/services/tenancy-connection.service';
@@ -10,6 +11,10 @@ import {
   CreateFolioConsultaExternaDto,
   EspecialidadClinica,
 } from '../dto/create-folio-consulta-externa.dto';
+import {
+  PlantillaResolucionResponseDto,
+  OrigenResolucion,
+} from '../dto/plantilla-resolucion-response.dto';
 
 export interface FolioCreationResult {
   folioId: string;
@@ -281,5 +286,192 @@ export class ClinicalRecordService {
         );
       }
     });
+  }
+
+  /**
+   * Resuelve dinámicamente la plantilla de Historia Clínica para una cita
+   * consultando la base de datos del tenant activo y aplicando resolución en cascada:
+   * 1. Prioridad profesional (profesional_id)
+   * 2. Prioridad sede (sede_id)
+   * 3. Fallback institucional (NULL, NULL)
+   * 4. Fallback por defecto 'PLANT-CONS-PRIMERA-VEZ'
+   */
+  async obtenerPlantillaParaCita(
+    citaId: string,
+  ): Promise<PlantillaResolucionResponseDto> {
+    // 1. Consultar cita en la base de datos del tenant
+    const citaQuery = `
+      SELECT 
+        id,
+        paciente_id,
+        profesional_id,
+        sede_id,
+        tipo_consulta_id
+      FROM citas
+      WHERE id = $1
+    `;
+
+    const citaResult = await this.tenancyConnectionService.query<{
+      id: string;
+      paciente_id: string;
+      profesional_id: string;
+      sede_id: string;
+      tipo_consulta_id: string;
+    }>(citaQuery, [citaId]);
+
+    if (!citaResult.rows || citaResult.rows.length === 0) {
+      throw new NotFoundException(
+        `Cita con ID [${citaId}] no encontrada en el sistema.`,
+      );
+    }
+
+    const cita = citaResult.rows[0];
+
+    // 2. Determinar finalidad clínica de la consulta (desde tipos_consulta_cups o fallback)
+    const cupsQuery = `
+      SELECT finalidad 
+      FROM tipos_consulta_cups 
+      WHERE tipo_consulta_id = $1 AND activo = true 
+      ORDER BY es_principal DESC, created_at ASC 
+      LIMIT 1
+    `;
+
+    const cupsResult = await this.tenancyConnectionService.query<{
+      finalidad: string;
+    }>(cupsQuery, [cita.tipo_consulta_id]);
+
+    const finalidad =
+      cupsResult.rows && cupsResult.rows.length > 0 && cupsResult.rows[0].finalidad
+        ? cupsResult.rows[0].finalidad
+        : 'PRIMERA_VEZ';
+
+    // 3. Resolución en cascada de configuración de plantilla
+    const cascadeQuery = `
+      SELECT 
+        p.id AS plantilla_id,
+        p.codigo AS codigo_plantilla,
+        p.nombre AS nombre_plantilla,
+        p.estructura AS estructura,
+        CASE
+          WHEN c.profesional_id IS NOT NULL THEN 'PROFESIONAL_OVERRIDE'
+          WHEN c.sede_id IS NOT NULL THEN 'SEDE_OVERRIDE'
+          ELSE 'INSTITUCIONAL_DEFAULT'
+        END AS origen_resolucion,
+        CASE
+          WHEN c.profesional_id IS NOT NULL THEN 1
+          WHEN c.sede_id IS NOT NULL THEN 2
+          ELSE 3
+        END AS prioridad
+      FROM hc_configuracion_plantillas c
+      JOIN hc_plantillas_catalogo p ON p.id = c.plantilla_id
+      WHERE c.tipo_consulta_id = $1
+        AND (c.finalidad = $2 OR c.finalidad IS NULL)
+        AND (
+          (c.profesional_id = $3 AND (c.sede_id = $4 OR c.sede_id IS NULL))
+          OR (c.sede_id = $4 AND c.profesional_id IS NULL)
+          OR (c.profesional_id IS NULL AND c.sede_id IS NULL)
+        )
+        AND p.activo = true
+      ORDER BY prioridad ASC, (c.finalidad IS NOT NULL) DESC
+      LIMIT 1
+    `;
+
+    const cascadeResult = await this.tenancyConnectionService.query<{
+      plantilla_id: string;
+      codigo_plantilla: string;
+      nombre_plantilla: string;
+      estructura: any;
+      origen_resolucion: string;
+      prioridad: number;
+    }>(cascadeQuery, [
+      cita.tipo_consulta_id,
+      finalidad,
+      cita.profesional_id,
+      cita.sede_id,
+    ]);
+
+    let plantillaId: string;
+    let codigoPlantilla: string;
+    let nombrePlantilla: string;
+    let estructura: Record<string, any>;
+    let origenResolucion: OrigenResolucion;
+
+    if (cascadeResult.rows && cascadeResult.rows.length > 0) {
+      const match = cascadeResult.rows[0];
+      plantillaId = match.plantilla_id;
+      codigoPlantilla = match.codigo_plantilla;
+      nombrePlantilla = match.nombre_plantilla;
+      estructura =
+        typeof match.estructura === 'string'
+          ? JSON.parse(match.estructura)
+          : match.estructura;
+      origenResolucion = match.origen_resolucion as OrigenResolucion;
+    } else {
+      // 4. Fallback a plantilla base del catálogo: 'PLANT-CONS-PRIMERA-VEZ'
+      const fallbackQuery = `
+        SELECT 
+          id AS plantilla_id,
+          codigo AS codigo_plantilla,
+          nombre AS nombre_plantilla,
+          estructura
+        FROM hc_plantillas_catalogo
+        WHERE codigo = $1 AND activo = true
+        LIMIT 1
+      `;
+
+      let fallbackResult = await this.tenancyConnectionService.query<{
+        plantilla_id: string;
+        codigo_plantilla: string;
+        nombre_plantilla: string;
+        estructura: any;
+      }>(fallbackQuery, ['PLANT-CONS-PRIMERA-VEZ']);
+
+      if (!fallbackResult.rows || fallbackResult.rows.length === 0) {
+        // Fallback secundario si el código exacto no existe: cualquier plantilla institucional activa
+        const anyActiveQuery = `
+          SELECT 
+            id AS plantilla_id,
+            codigo AS codigo_plantilla,
+            nombre AS nombre_plantilla,
+            estructura
+          FROM hc_plantillas_catalogo
+          WHERE activo = true
+          ORDER BY es_institucional DESC, created_at ASC
+          LIMIT 1
+        `;
+        fallbackResult = await this.tenancyConnectionService.query(anyActiveQuery);
+      }
+
+      if (!fallbackResult.rows || fallbackResult.rows.length === 0) {
+        throw new NotFoundException(
+          'No se encontró ninguna plantilla clínica activa en el catálogo.',
+        );
+      }
+
+      const defaultMatch = fallbackResult.rows[0];
+      plantillaId = defaultMatch.plantilla_id;
+      codigoPlantilla = defaultMatch.codigo_plantilla;
+      nombrePlantilla = defaultMatch.nombre_plantilla;
+      estructura =
+        typeof defaultMatch.estructura === 'string'
+          ? JSON.parse(defaultMatch.estructura)
+          : defaultMatch.estructura;
+      origenResolucion = 'INSTITUCIONAL_DEFAULT';
+    }
+
+    return {
+      plantillaId,
+      codigoPlantilla,
+      nombrePlantilla,
+      origenResolucion,
+      estructura,
+      metadataAtencion: {
+        citaId: cita.id,
+        pacienteId: cita.paciente_id,
+        profesionalId: cita.profesional_id,
+        sedeId: cita.sede_id,
+        tipoConsultaId: cita.tipo_consulta_id,
+      },
+    };
   }
 }

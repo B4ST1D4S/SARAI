@@ -18,6 +18,7 @@ import {
 } from '../services/clinical-pdf.service';
 import { TenantContextService } from '../../../core/tenancy/services/tenant-context.service';
 import { CreateFolioConsultaExternaDto } from '../dto/create-folio-consulta-externa.dto';
+import { PlantillaResolucionResponseDto } from '../dto/plantilla-resolucion-response.dto';
 
 @Controller('clinical-records')
 export class ClinicalRecordController {
@@ -52,5 +53,13 @@ export class ClinicalRecordController {
   ): Promise<ClinicalPdfStatusResponse> {
     const tenantId = this.tenantContextService.getRequiredTenantId();
     return this.clinicalPdfService.obtenerOEncolarPdfFolio(tenantId, folioId);
+  }
+
+  @Get('citas/:citaId/plantilla')
+  @HttpCode(HttpStatus.OK)
+  async obtenerPlantillaParaCita(
+    @Param('citaId', new ParseUUIDPipe({ version: '4' })) citaId: string,
+  ): Promise<PlantillaResolucionResponseDto> {
+    return this.clinicalRecordService.obtenerPlantillaParaCita(citaId);
   }
 }

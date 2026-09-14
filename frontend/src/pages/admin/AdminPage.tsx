@@ -846,16 +846,17 @@ function TabTemasistema() {
     },
     {
       id: 'arctic-blue',
-      name: 'Arctic Blue',
-      tagline: 'Azul Ártico · Ciencia · Precisión',
-      desc: 'Azul cielo frío y preciso. Evoca confianza médica, tecnología de punta y entornos clínicos de alta precisión.',
-      bg: ['#f0f9ff', '#f5fbff', '#ffffff'],
-      accent: '#0284c7',
+      name: 'Arctic Blue Pro',
+      tagline: 'Azul Nórdico · Confort Visual · Precisión',
+      desc: 'Superficies slate-azul suave con contraste balanceado para reducir fatiga en turnos continuos.',
+      // Fondo calibrado: no blanco reflectante, sino un grisáceo frío de bajo brillo
+      bg: ['#f1f5f9', '#f8fafc', '#ffffff'], 
+      accent: '#0284c7', // Sky 600 médico nítido
       card: '#ffffff',
-      txt: '#0c2d48',
-      border: 'rgba(12,45,72,0.10)',
-      swatches: ['#f0f9ff', '#0284c7', '#ffffff', '#0ea5e9'],
-      ideal: ['Laboratorios clínicos', 'Radiología', 'Diagnóstico por imágenes'],
+      txt: '#0f172a', // Slate 900 de alta legibilidad
+      border: 'rgba(148, 163, 184, 0.25)', // Borde definido pero sin saturar
+      swatches: ['#f1f5f9', '#0284c7', '#ffffff', '#38bdf8'],
+      ideal: ['Consulta Externa', 'Laboratorio', 'Imágenes Diagnósticas'],
     },
     {
       id: 'mint-premium',
