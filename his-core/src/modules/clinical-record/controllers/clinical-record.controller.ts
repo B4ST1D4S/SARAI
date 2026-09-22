@@ -10,6 +10,7 @@ import {
   ValidationPipe,
   ParseUUIDPipe,
   Ip,
+  UseGuards,
 } from '@nestjs/common';
 import { ClinicalRecordService, FolioCreationResult } from '../services/clinical-record.service';
 import {
@@ -19,8 +20,10 @@ import {
 import { TenantContextService } from '../../../core/tenancy/services/tenant-context.service';
 import { CreateFolioConsultaExternaDto } from '../dto/create-folio-consulta-externa.dto';
 import { PlantillaResolucionResponseDto } from '../dto/plantilla-resolucion-response.dto';
+import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 
 @Controller('clinical-records')
+@UseGuards(JwtAuthGuard)
 export class ClinicalRecordController {
   constructor(
     private readonly clinicalRecordService: ClinicalRecordService,

@@ -16,7 +16,8 @@ import DashboardPage from './pages/dashboard/DashboardPage';
 // Consulta Externa
 import PacientesPage from './pages/consulta-externa/PacientesPage';
 import HistoriaClinicaPage from './pages/consulta-externa/HistoriaClinicaPage';
-import HistoriaClinicaWorkbench from './pages/HistoriaClinicaWorkbench';
+import HistoriaClinicaWorkbench, { PacienteInfo } from './pages/HistoriaClinicaWorkbench';
+import { getPaciente } from './services/api';
 import AgendaPage from './pages/consulta-externa/AgendaPage';
 import AgendaProfesionalPage from './pages/consulta-externa/AgendaProfesionalPage';
 import ConfigAgendaPage from './pages/consulta-externa/ConfigAgendaPage';
@@ -316,6 +317,8 @@ function App() {
   const [historiaSeccion, setHistoriaSeccion] = useState<string>('motivo-consulta');
   const [historiaSeccionActiva, setHistoriaSeccionActiva] = useState<string>('motivo-consulta');
   const [historiaPacienteId, setHistoriaPacienteId] = useState<string | undefined>(undefined);
+  const [historiaCitaId, setHistoriaCitaId] = useState<string | undefined>(undefined);
+  const [pacienteHistoria, setPacienteHistoria] = useState<PacienteInfo | undefined>(undefined);
   const camposHandlerRef = useRef<((c: Record<string, string>) => void) | null>(null);
   const [clinicaConfig, setClinicaConfig] = useState<{ nombre: string; logoUrl: string }>(() => {
     try {
@@ -328,6 +331,37 @@ function App() {
   const currentPageRef = useRef(currentPage);
 
   useEffect(() => { currentPageRef.current = currentPage; }, [currentPage]);
+
+  // Trae los datos reales del paciente asignado a la cita que se está atendiendo,
+  // en vez de dejar que HistoriaClinicaWorkbench caiga en su paciente mock por defecto.
+  useEffect(() => {
+    if (!historiaPacienteId) { setPacienteHistoria(undefined); return; }
+    let cancelado = false;
+    getPaciente(historiaPacienteId)
+      .then((data: any) => {
+        if (cancelado || !data) return;
+        const edad = data.fechaNacimiento
+          ? Math.floor((Date.now() - new Date(data.fechaNacimiento).getTime()) / (365.25 * 24 * 60 * 60 * 1000))
+          : undefined;
+        setPacienteHistoria({
+          id: data.id,
+          nombreCompleto: data.nombreCompleto,
+          primerNombre: data.primerNombre ?? undefined,
+          primerApellido: data.primerApellido ?? undefined,
+          segundoApellido: data.segundoApellido ?? undefined,
+          tipoDocumento: data.tipoDocumento,
+          numeroDocumento: data.numeroDocumento,
+          edad,
+          sexo: data.genero === 'F' ? 'Femenino' : data.genero === 'M' ? 'Masculino' : data.genero,
+          fechaNacimiento: data.fechaNacimiento,
+          telefono: data.telefonos?.[0] ?? data.telefonoFijo ?? undefined,
+          email: data.email ?? undefined,
+          eps: data.entidadSalud ?? undefined,
+        });
+      })
+      .catch((e) => console.error('Error cargando paciente para Historia Clínica:', e));
+    return () => { cancelado = true; };
+  }, [historiaPacienteId]);
 
   useEffect(() => {
     if (!user) return;
@@ -545,6 +579,8 @@ function App() {
                 {/* HISTORIA CLÍNICA: Versión modular continua con lazy loading */}
                 {currentPage === 'historia' && (
                   <HistoriaClinicaWorkbench
+                    paciente={pacienteHistoria}
+                    citaId={historiaCitaId}
                     onBack={() => setCurrentPage('dashboard')}
                   />
                 )}
@@ -574,8 +610,9 @@ function App() {
                 {currentPage === 'agendaProfesional'   && (
                   <AgendaProfesionalPage
                     onNavegar={setCurrentPage}
-                    onAbrirHistoriaPaciente={(pacienteId, _nombre) => {
+                    onAbrirHistoriaPaciente={(pacienteId, _nombre, citaId) => {
                       setHistoriaPacienteId(pacienteId);
+                      setHistoriaCitaId(citaId);
                       setHistoriaShowForm(true);
                       setHistoriaSeccion('motivo-consulta');
                       if (navMode === 'hub') setActiveMacroModule('CONSULTA');

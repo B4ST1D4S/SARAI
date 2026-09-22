@@ -19,7 +19,6 @@ import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 @Controller('auth')
 export class AuthController {
   private readonly REFRESH_COOKIE_NAME = '__Host-refresh_token';
-  private readonly isProduction = process.env.NODE_ENV === 'production';
 
   constructor(private readonly authService: AuthService) {}
 
@@ -29,9 +28,13 @@ export class AuthController {
   private setRefreshTokenCookie(res: Response, token: string): void {
     res.cookie(this.REFRESH_COOKIE_NAME, token, {
       httpOnly: true,
-      secure: this.isProduction, // HTTPS obligatorio en producción
+      // El prefijo __Host- exige Secure siempre, incluso en local
+      // (localhost es tratado como contexto seguro por los navegadores modernos).
+      secure: true,
       sameSite: 'strict',        // Mitiga ataques CSRF
-      path: '/api/v1/auth/refresh', // Debe coincidir con el prefijo global api/v1
+      // El prefijo __Host- exige Path=/ exacto (junto con Secure y sin Domain);
+      // con cualquier otro path el navegador descarta la cookie silenciosamente.
+      path: '/',
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 días
     });
   }
@@ -42,9 +45,9 @@ export class AuthController {
   private clearRefreshTokenCookie(res: Response): void {
     res.clearCookie(this.REFRESH_COOKIE_NAME, {
       httpOnly: true,
-      secure: this.isProduction,
+      secure: true,
       sameSite: 'strict',
-      path: '/api/v1/auth/refresh', // Mismo path para que el navegador la destruya
+      path: '/', // Mismo path que al setearla, si no el navegador no la reconoce
     });
   }
 

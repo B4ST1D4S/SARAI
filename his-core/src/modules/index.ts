@@ -3,6 +3,10 @@ import { AuditModule } from './audit/audit.module';
 import { BillingRipsModule } from './billing-rips/billing-rips.module';
 import { UsuariosModule } from './users/usuarios.module';
 import { AgendaOrganizacionalModule } from './agenda-organizacional/agenda-organizacional.module';
+import { PacientesModule } from './pacientes/pacientes.module';
+import { EspecialidadesModule } from './especialidades/especialidades.module';
+import { TiposConsultaModule } from './tipos-consulta/tipos-consulta.module';
+import { CitasModule } from './citas/citas.module';
 
 /**
  * Punto de entrada para los módulos de dominio y funcionalidades clínicas del HIS:
@@ -11,7 +15,7 @@ import { AgendaOrganizacionalModule } from './agenda-organizacional/agenda-organ
  * - BillingRipsModule (Facturación electrónica en salud, RIPS Resolución 2275 de 2023)
  * - UsuariosModule (Gestión de usuarios, perfiles y preferencias)
  * - AgendaOrganizacionalModule (Estructura física, sedes, consultorios y turnos operativos)
- * - PacientesModule
+ * - PacientesModule (CRUD de pacientes)
  * - CitasModule
  * - InventarioFarmaciaModule
  * - etc.
@@ -22,6 +26,10 @@ export const CLINICAL_MODULES = [
   BillingRipsModule,
   UsuariosModule,
   AgendaOrganizacionalModule,
+  PacientesModule,
+  EspecialidadesModule,
+  TiposConsultaModule,
+  CitasModule,
 ];
 
 export * from './clinical-record';
@@ -29,5 +37,9 @@ export * from './audit';
 export * from './billing-rips';
 export * from './users';
 export * from './agenda-organizacional';
+export * from './pacientes';
+export * from './especialidades';
+export * from './tipos-consulta';
+export * from './citas';
 
 

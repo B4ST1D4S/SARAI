@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { EBadge, ErrBanner, ErrBox, Field, FormFooter, Modal, SecHeader, Sel, Sw, Table } from '../components';
-import { API_BASE_URL } from '../../../config';
+import { API_URL, authFetch } from '../../../services/api';
 
 type Sede = { id: string; codigo: string; nombre: string; activo: boolean };
 type Departamento = {
@@ -8,7 +8,7 @@ type Departamento = {
 };
 type DepartamentoForm = { sedeId: string; codigo: string; nombre: string; tipo: string; pisoBloque: string; activo: boolean };
 
-const API = `${API_BASE_URL}/v1/agenda-organizacional`;
+const API = `${API_URL}/agenda-organizacional`;
 const tipos = [
   { value: 'ASISTENCIAL', label: 'Asistencial' },
   { value: 'APOYO', label: 'Apoyo' },
@@ -16,19 +16,7 @@ const tipos = [
 ];
 const emptyForm: DepartamentoForm = { sedeId: '', codigo: '', nombre: '', tipo: 'ASISTENCIAL', pisoBloque: '', activo: true };
 
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const response = await fetch(`${API}${path}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${localStorage.getItem('accessToken') || ''}`,
-      ...options.headers,
-    },
-  });
-  const data = await response.json().catch(() => null);
-  if (!response.ok) throw new Error(data?.message || data?.error || `Error HTTP ${response.status}`);
-  return data as T;
-}
+const request = <T,>(path: string, options?: RequestInit) => authFetch<T>(`${API}${path}`, options);
 
 export default function TabDepartamentos() {
   const [sedes, setSedes] = useState<Sede[]>([]);

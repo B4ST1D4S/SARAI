@@ -1,51 +1,66 @@
-﻿/**
- * CU-01: Configuración de Agenda del Profesional — v3
+/**
+ * CU-01: Configuración de Agenda del Profesional — v4 (his-core)
  * + Calendario integrado Mes / Semana / Día (estilo AgendaPage)
  * + Filtro profesional dinámico: nombre, especialidad, cédula/documento
+ *
+ * Migrado del modelo viejo de "Disponibilidad" (horario semanal recurrente + bloqueos,
+ * ambos abstractos y sin sede/consultorio reales) al modelo nuevo de his-core: los
+ * "turnos" son aperturas de agenda reales y fechadas, ligadas a Sede → Departamento →
+ * Consultorio → Profesional → Especialidad. "Nueva Franja" ahora genera turnos reales
+ * en lote (POST /agenda-organizacional/turnos/masivos) sobre un rango de fechas concreto;
+ * "Bloqueo" y "Eliminar" cancelan turnos existentes (no hay concepto de bloqueo aparte).
  */
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { API_BASE_URL } from '../../config';
+import { API_URL, authFetch } from '../../services/api';
 import {
   Settings, Plus, Trash2, Clock,
   AlertCircle, Check, X, User, ChevronDown, Search,
   Zap, Sun, Sunset, CalendarX2, CalendarCheck2,
-  ToggleLeft, ToggleRight, RefreshCw,
+  RefreshCw, MapPin, Stethoscope,
   ChevronLeft, ChevronRight, LayoutGrid, CalendarDays, CalendarRange,
 } from 'lucide-react';
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 const DIAS_CORTO  = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 const DIAS_LARGO  = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
-const MESES       = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 const MESES_CORTO = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 const INTERVALOS  = [10, 15, 20, 30, 45, 60, 90, 120];
 const DIAS_LABORALES = [1, 2, 3, 4, 5, 6];
-
-const PLANTILLAS = [
-  { label: 'Mañana',  icon: Sun,    horaInicio: '07:00', horaFin: '12:00', slot: 30 },
-  { label: 'Tarde',   icon: Sunset, horaInicio: '13:00', horaFin: '18:00', slot: 30 },
-  { label: 'Jornada', icon: Zap,    horaInicio: '07:00', horaFin: '17:00', slot: 30 },
-  { label: 'Completa',icon: Check,  horaInicio: '07:00', horaFin: '18:00', slot: 30 },
+const MODALIDADES: { value: 'PRESENCIAL' | 'TELEMEDICINA' | 'HIBRIDA'; label: string }[] = [
+  { value: 'PRESENCIAL', label: 'Presencial' },
+  { value: 'TELEMEDICINA', label: 'Telemedicina' },
+  { value: 'HIBRIDA', label: 'Híbrida' },
 ];
 
-// ─── Interfaces ───────────────────────────────────────────────────────────────
-interface Medico {
-  id: string; nombre: string; apellido: string;
-  especialidad: string | null; registroMedico: string | null;
-  email: string | null; numeroDocumento: string | null;
+const PLANTILLAS = [
+  { label: 'Mañana',  icon: Sun,    horaInicio: '07:00', horaFin: '12:00' },
+  { label: 'Tarde',   icon: Sunset, horaInicio: '13:00', horaFin: '18:00' },
+  { label: 'Jornada', icon: Zap,    horaInicio: '07:00', horaFin: '17:00' },
+  { label: 'Completa',icon: Check,  horaInicio: '07:00', horaFin: '18:00' },
+];
+
+// ─── Interfaces (contrato real de his-core) ───────────────────────────────────
+interface Profesional {
+  id: string; nombreCompleto: string;
+  especialidadPrincipal: string | null; registroMedico: string | null;
 }
-interface TipoConsulta {
-  id: string; nombre: string; duracionMinutos: number; clasificacion: string;
-}
-interface Disponibilidad {
-  id: string; diaSemana: number; horaInicio: string; horaFin: string;
-  duracionSlot: number; sede: string; tipoAtencion: string;
-  consultorio: string; activo: boolean;
-  fechaDesde?: string | null; fechaHasta?: string | null;
-}
-interface Bloqueo {
-  id: string; fechaInicio: string; fechaFin: string; motivo: string; todoElDia: boolean;
+interface Sede { id: string; codigo: string; nombre: string; activo: boolean; ciudad?: string | null }
+interface Departamento { id: string; codigo: string; nombre: string; activo: boolean }
+interface Consultorio { id: string; codigo: string; nombre: string; activo: boolean }
+interface Especialidad { id: string; codigo: string; nombre: string; estado: boolean }
+interface TipoConsultaItem { id: string; especialidadId: string; codigo: string; nombre: string; estado: boolean }
+interface Turno {
+  id: string;
+  sede: { id: string; nombre: string };
+  departamento: { id: string; nombre: string };
+  consultorio: { id: string; nombre: string };
+  profesional: { id: string; nombreCompleto: string };
+  especialidadId: string;
+  fecha: string; horaInicio: string; horaFin: string;
+  intervaloMinutos: number; sobrecuposMax: number; modalidad: string; estado: string;
+  motivoBloqueo?: string | null;
+  citasActivas: number;
 }
 type Vista = 'mes' | 'semana' | 'dia';
 
@@ -60,14 +75,6 @@ const calcTurnos = (hI: string, hF: string, slot: number) => {
 const fmtFecha = (iso: string) =>
   iso ? new Date(iso + 'T12:00:00').toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' }) : '';
 const isoDate = (d: Date) => d.toISOString().slice(0, 10);
-const estaEnBloqueo = (fecha: Date, bloqueos: Bloqueo[]) => {
-  const iso = isoDate(fecha);
-  return bloqueos.some(b => b.fechaInicio.slice(0, 10) <= iso && iso <= b.fechaFin.slice(0, 10));
-};
-const getBloqueosDia = (fecha: Date, bloqueos: Bloqueo[]) => {
-  const iso = isoDate(fecha);
-  return bloqueos.filter(b => b.fechaInicio.slice(0, 10) <= iso && iso <= b.fechaFin.slice(0, 10));
-};
 const startOfWeek = (d: Date) => {
   const c = new Date(d);
   const dow = c.getDay(); // 0=Dom
@@ -76,6 +83,11 @@ const startOfWeek = (d: Date) => {
   c.setHours(0, 0, 0, 0);
   return c;
 };
+
+// ─── Cliente HTTP hacia his-core (con rotación automática de token vía authFetch) ─
+const AGENDA_API = `${API_URL}/agenda-organizacional`;
+const agenda = <T,>(path: string, options?: RequestInit) => authFetch<T>(`${AGENDA_API}${path}`, options);
+const nucleo = <T,>(path: string, options?: RequestInit) => authFetch<T>(`${API_URL}${path}`, options);
 
 // ─── Sub-componente: Barra mini horario ───────────────────────────────────────
 function HoraBarra({ inicio, fin }: { inicio: string; fin: string }) {
@@ -95,10 +107,10 @@ function HoraBarra({ inicio, fin }: { inicio: string; fin: string }) {
 
 // ─── Sub-componente: Calendario Mes ──────────────────────────────────────────
 function CalMes({
-  fecha, setFecha, setVista, dispPorDia, bloqueos, onClickDia, diaActivo, onClickMes,
+  fecha, setFecha, setVista, turnosPorFecha, onClickDia, diaActivo, onClickMes,
 }: {
   fecha: Date; setFecha: (d: Date) => void; setVista: (v: Vista) => void;
-  dispPorDia: Record<number, Disponibilidad[]>; bloqueos: Bloqueo[];
+  turnosPorFecha: Record<string, Turno[]>;
   onClickDia: (d: Date) => void; diaActivo: Date | null;
   onClickMes?: (mes: number, año: number) => void;
 }) {
@@ -120,7 +132,7 @@ function CalMes({
 
   const decadaInicio = Math.floor(añoNav / 10) * 10;
   const tituloNav =
-    subVista === 'cal'  ? `${MESES[month]} ${year}` :
+    subVista === 'cal'  ? `${['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'][month]} ${year}` :
     subVista === 'meses'? `${añoNav}` :
     `${decadaInicio} – ${decadaInicio + 9}`;
 
@@ -217,11 +229,10 @@ function CalMes({
               const fecha_ = new Date(year, month, dia);
               fecha_.setHours(0,0,0,0);
               const dow         = fecha_.getDay();
-              const franjas     = dispPorDia[dow] || [];
-              const bloqueado   = estaEnBloqueo(fecha_, bloqueos);
+              const turnosDia   = turnosPorFecha[isoDate(fecha_)] || [];
               const esHoy       = isoDate(fecha_) === isoDate(hoy);
               const esActivo    = diaActivo ? isoDate(fecha_) === isoDate(diaActivo) : false;
-              const tieneFranja = franjas.length > 0;
+              const tieneTurnos = turnosDia.length > 0;
               const esDom       = dow === 0;
               return (
                 <button key={i}
@@ -231,14 +242,13 @@ function CalMes({
                     relative h-10 flex flex-col items-center justify-center rounded-lg text-xs font-bold transition-all
                     ${esDom ? 'opacity-20 cursor-not-allowed' : 'cursor-pointer'}
                     ${esActivo ? 'bg-yellow-500 text-slate-900 shadow-md shadow-yellow-500/25' :
-                      bloqueado ? 'bg-orange-500/15 border border-orange-500/30 text-orange-300 hover:bg-orange-500/25' :
-                      tieneFranja && !esDom ? 'bg-yellow-500/10 border border-yellow-500/20 text-white hover:bg-yellow-500/20' :
+                      tieneTurnos && !esDom ? 'bg-yellow-500/10 border border-yellow-500/20 text-white hover:bg-yellow-500/20' :
                       'bg-white/[0.02] border border-white/[0.04] text-gray-500 hover:bg-white/[0.06] hover:text-gray-300'}
                     ${esHoy && !esActivo ? 'ring-1 ring-yellow-400/60' : ''}
                   `}>
                   <span>{dia}</span>
-                  {tieneFranja && !esActivo && !esDom && (
-                    <span className={`absolute bottom-1 w-1 h-1 rounded-full ${bloqueado ? 'bg-orange-400' : 'bg-yellow-400'}`}/>
+                  {tieneTurnos && !esActivo && !esDom && (
+                    <span className="absolute bottom-1 w-1 h-1 rounded-full bg-yellow-400"/>
                   )}
                 </button>
               );
@@ -248,10 +258,7 @@ function CalMes({
           {/* Leyenda */}
           <div className="flex items-center gap-4 mt-3">
             <span className="flex items-center gap-1.5 text-[9px] text-gray-600">
-              <span className="w-1.5 h-1.5 rounded-full bg-yellow-400/70"/> Agenda configurada
-            </span>
-            <span className="flex items-center gap-1.5 text-[9px] text-gray-600">
-              <span className="w-1.5 h-1.5 rounded-full bg-orange-400/70"/> Bloqueado
+              <span className="w-1.5 h-1.5 rounded-full bg-yellow-400/70"/> Turnos abiertos
             </span>
           </div>
         </>
@@ -262,15 +269,14 @@ function CalMes({
 
 // ─── Sub-componente: Calendario Semana ───────────────────────────────────────
 function CalSemana({
-  fecha, setFecha, dispPorDia, bloqueos, onClickDia, diaActivo, eliminarDisp, setPanelActivo, setFranja, emptyFranja,
+  fecha, setFecha, turnosPorFecha, onClickDia, diaActivo, eliminarDisp, setPanelActivo, setFranja,
 }: {
   fecha: Date; setFecha: (d: Date) => void;
-  dispPorDia: Record<number, Disponibilidad[]>; bloqueos: Bloqueo[];
+  turnosPorFecha: Record<string, Turno[]>;
   onClickDia: (d: Date) => void; diaActivo: Date | null;
   eliminarDisp: (id: string) => void;
   setPanelActivo: (p: 'franja' | 'bloqueo' | 'eliminar' | null) => void;
   setFranja: (fn: (p: any) => any) => void;
-  emptyFranja: any;
 }) {
   const lunes = startOfWeek(fecha);
   const dias7 = Array.from({ length: 7 }, (_, i) => {
@@ -296,77 +302,92 @@ function CalSemana({
       </div>
 
       {/* Columnas */}
-      <div className="grid grid-cols-7 gap-1.5 flex-1 overflow-y-auto">
+      <div className="grid grid-cols-7 gap-2 flex-1 overflow-y-auto">
         {dias7.map((d, i) => {
           const dow       = d.getDay();
-          const franjas   = dispPorDia[dow] || [];
-          const bloqueado = estaEnBloqueo(d, bloqueos);
+          const turnosDia = [...(turnosPorFecha[isoDate(d)] || [])].sort((a, b) => a.horaInicio.localeCompare(b.horaInicio));
           const esHoy     = isoDate(d) === isoDate(hoy);
           const esDom     = dow === 0;
           const esActivo  = diaActivo ? isoDate(d) === isoDate(diaActivo) : false;
+          const totalCitas = turnosDia.reduce((acc, t) => acc + t.citasActivas, 0);
 
           return (
             <div key={i}
-              className={`rounded-xl border flex flex-col transition-all
+              className={`rounded-xl border flex flex-col transition-all overflow-hidden
                 ${esDom ? 'opacity-25' : ''}
-                ${bloqueado ? 'border-orange-500/25 bg-orange-500/[0.04]' :
-                  franjas.length > 0 ? 'border-yellow-500/20 bg-yellow-500/[0.04]' :
-                  'border-white/[0.05] bg-white/[0.015]'}
+                ${esHoy ? 'border-yellow-400/40 bg-yellow-500/[0.06] shadow-lg shadow-yellow-500/5'
+                  : turnosDia.length > 0 ? 'border-white/[0.08] bg-white/[0.02]' : 'border-white/[0.05] bg-white/[0.015]'}
                 ${esActivo ? 'ring-1 ring-yellow-400/50' : ''}
               `}>
 
               {/* Cabecera día */}
-              <div className={`flex items-center justify-between px-2 pt-2 pb-1.5 border-b
-                ${bloqueado ? 'border-orange-500/15' : franjas.length > 0 ? 'border-yellow-500/15' : 'border-white/[0.04]'}`}>
-                <div>
-                  <p className={`text-[9px] font-black tracking-wide
-                    ${esHoy ? 'text-yellow-400' : bloqueado ? 'text-orange-400' : franjas.length > 0 ? 'text-yellow-400/80' : 'text-gray-600'}`}>
+              <div className={`flex items-center justify-between px-2.5 pt-2.5 pb-2 border-b flex-shrink-0
+                ${esHoy ? 'border-yellow-500/20' : turnosDia.length > 0 ? 'border-white/[0.06]' : 'border-white/[0.04]'}`}>
+                <div className="flex items-baseline gap-1.5">
+                  <p className={`text-[9px] font-black tracking-wide uppercase
+                    ${esHoy ? 'text-yellow-400' : 'text-gray-600'}`}>
                     {DIAS_CORTO[dow]}
                   </p>
-                  <p className={`text-sm font-black leading-none ${esHoy ? 'text-white' : 'text-gray-500'}`}>
+                  <p className={`text-base font-black leading-none ${esHoy ? 'text-white' : 'text-gray-400'}`}>
                     {d.getDate()}
                   </p>
                 </div>
-                {franjas.length > 0 && (
-                  <span className="text-[8px] bg-yellow-500/15 text-yellow-400 rounded-full px-1 font-bold">{franjas.length}</span>
+                {turnosDia.length > 0 && (
+                  <div className="flex items-center gap-1">
+                    {totalCitas > 0 && (
+                      <span title={`${totalCitas} cita(s) agendada(s)`} className="text-[8px] font-bold bg-emerald-500/15 text-emerald-400 rounded-full px-1.5 py-0.5">
+                        {totalCitas}
+                      </span>
+                    )}
+                    <span className="text-[8px] font-bold bg-yellow-500/15 text-yellow-400 rounded-full px-1.5 py-0.5">
+                      {turnosDia.length}
+                    </span>
+                  </div>
                 )}
               </div>
 
-              {/* Franjas */}
-              <div className="flex-1 p-1 space-y-0.5 overflow-hidden">
-                {bloqueado ? (
-                  <div className="flex flex-col items-center justify-center py-2 text-orange-400/50 text-[8px] gap-0.5">
-                    <CalendarX2 size={10}/>
-                    <span>Bloq.</span>
-                  </div>
-                ) : franjas.length === 0 && !esDom ? (
+              {/* Turnos del día */}
+              <div className="flex-1 p-1.5 space-y-1.5 overflow-y-auto">
+                {turnosDia.length === 0 && !esDom ? (
                   <button
                     onClick={() => { setFranja((p: any) => ({ ...p, diasSeleccionados: [dow] })); setPanelActivo('franja'); }}
-                    className="w-full py-3 flex flex-col items-center justify-center gap-0.5 text-gray-700 hover:text-gray-500 hover:bg-white/[0.03] rounded-lg transition-all group">
-                    <Plus size={11} className="group-hover:text-yellow-500 transition-colors"/>
-                    <span className="text-[8px]">Agregar</span>
+                    className="w-full h-full min-h-[64px] flex flex-col items-center justify-center gap-1 text-gray-700 hover:text-yellow-500 border border-dashed border-white/[0.06] hover:border-yellow-500/30 hover:bg-yellow-500/[0.04] rounded-lg transition-all group">
+                    <Plus size={13} className="transition-colors"/>
+                    <span className="text-[9px] font-semibold">Agregar</span>
                   </button>
                 ) : (
-                  franjas.map(f => (
-                    <div key={f.id}
-                      className="relative group/f flex flex-col gap-0.5 bg-yellow-500/10 border border-yellow-500/15 rounded-md px-1.5 py-1">
-                      <HoraBarra inicio={f.horaInicio} fin={f.horaFin}/>
-                      <p className="text-[8px] text-yellow-300/90 font-mono">{f.horaInicio}–{f.horaFin}</p>
-                      <p className="text-[7px] text-gray-600">{f.duracionSlot}m · {calcTurnos(f.horaInicio, f.horaFin, f.duracionSlot)}t</p>
-                      <button onClick={() => eliminarDisp(f.id)}
-                        className="absolute top-0.5 right-0.5 opacity-0 group-hover/f:opacity-100 text-gray-600 hover:text-red-400 transition-all">
-                        <X size={8}/>
-                      </button>
+                  turnosDia.map(t => (
+                    <div key={t.id}
+                      className="relative group/f bg-white/[0.03] hover:bg-yellow-500/[0.07] border border-white/[0.06] hover:border-yellow-500/25 border-l-2 border-l-yellow-400/60 rounded-lg pl-2 pr-1.5 py-1.5 transition-all">
+                      <div className="flex items-center justify-between gap-1">
+                        <p className="text-[10px] font-bold text-yellow-300/95 font-mono leading-tight">{t.horaInicio}–{t.horaFin}</p>
+                        {!esDom && (
+                          <button onClick={() => eliminarDisp(t.id)}
+                            className="opacity-0 group-hover/f:opacity-100 text-gray-600 hover:text-red-400 hover:bg-red-500/10 rounded p-0.5 -mr-0.5 transition-all flex-shrink-0">
+                            <X size={10}/>
+                          </button>
+                        )}
+                      </div>
+                      <p className="text-[9px] text-gray-400 truncate mt-0.5">{t.consultorio.nombre}</p>
+                      <div className="flex items-center justify-between mt-1 gap-1">
+                        <span className="text-[8px] text-gray-600">{t.intervaloMinutos}min</span>
+                        {t.citasActivas > 0 && (
+                          <span className="text-[8px] font-semibold text-emerald-400 bg-emerald-500/10 rounded-full px-1.5 leading-relaxed">
+                            {t.citasActivas} cita{t.citasActivas !== 1 ? 's' : ''}
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-1.5"><HoraBarra inicio={t.horaInicio} fin={t.horaFin}/></div>
                     </div>
                   ))
                 )}
               </div>
 
-              {franjas.length > 0 && !esDom && !bloqueado && (
+              {turnosDia.length > 0 && !esDom && (
                 <button
                   onClick={() => { setFranja((p: any) => ({ ...p, diasSeleccionados: [dow] })); setPanelActivo('franja'); }}
-                  className="w-full py-0.5 text-[8px] text-gray-700 hover:text-yellow-500 hover:bg-yellow-500/5 transition-all border-t border-white/[0.04] rounded-b-xl flex items-center justify-center gap-0.5">
-                  <Plus size={8}/> franja
+                  className="w-full py-1 text-[9px] font-semibold text-gray-600 hover:text-yellow-500 hover:bg-yellow-500/5 transition-all border-t border-white/[0.04] flex-shrink-0 flex items-center justify-center gap-1">
+                  <Plus size={9}/> turno
                 </button>
               )}
             </div>
@@ -379,17 +400,16 @@ function CalSemana({
 
 // ─── Sub-componente: Calendario Día ──────────────────────────────────────────
 function CalDia({
-  fecha, setFecha, dispPorDia, bloqueos, eliminarDisp, setPanelActivo, setFranja,
+  fecha, setFecha, turnosPorFecha, eliminarDisp, setPanelActivo, setFranja,
 }: {
   fecha: Date; setFecha: (d: Date) => void;
-  dispPorDia: Record<number, Disponibilidad[]>; bloqueos: Bloqueo[];
+  turnosPorFecha: Record<string, Turno[]>;
   eliminarDisp: (id: string) => void;
   setPanelActivo: (p: 'franja' | 'bloqueo' | 'eliminar' | null) => void;
   setFranja: (fn: (p: any) => any) => void;
 }) {
   const dow       = fecha.getDay();
-  const franjas   = dispPorDia[dow] || [];
-  const blqDia    = getBloqueosDia(fecha, bloqueos);
+  const turnosDia = turnosPorFecha[isoDate(fecha)] || [];
   const hoy       = new Date(); hoy.setHours(0,0,0,0);
   const esHoy     = isoDate(fecha) === isoDate(hoy);
   const prevDia   = () => { const d = new Date(fecha); d.setDate(d.getDate() - 1); setFecha(d); };
@@ -416,43 +436,34 @@ function CalDia({
       </div>
 
       <div className="flex-1 overflow-y-auto space-y-3">
-        {/* Bloqueos del día */}
-        {blqDia.length > 0 && (
-          <div className="bg-orange-500/[0.07] border border-orange-500/25 rounded-xl p-3">
-            <p className="text-orange-400 text-xs font-bold flex items-center gap-1.5 mb-2">
-              <CalendarX2 size={13}/> Día bloqueado
-            </p>
-            {blqDia.map(b => (
-              <p key={b.id} className="text-orange-300/80 text-[10px]">
-                {b.motivo || 'Bloqueo'} · {fmtFecha(b.fechaInicio.slice(0,10))} → {fmtFecha(b.fechaFin.slice(0,10))}
-              </p>
-            ))}
-          </div>
-        )}
-
-        {/* Franjas del día */}
-        {franjas.length > 0 ? (
+        {/* Turnos del día */}
+        {turnosDia.length > 0 ? (
           <div>
             <p className="text-[9px] font-bold text-gray-600 uppercase tracking-widest mb-2">
-              Franjas configuradas — {DIAS_LARGO[dow]}s
+              Turnos abiertos — {fmtFecha(isoDate(fecha))}
             </p>
             <div className="space-y-2">
-              {franjas.map(f => {
-                const turnos = calcTurnos(f.horaInicio, f.horaFin, f.duracionSlot);
+              {turnosDia.map(t => {
+                const nTurnos = calcTurnos(t.horaInicio, t.horaFin, t.intervaloMinutos);
                 return (
-                  <div key={f.id}
+                  <div key={t.id}
                     className="group/f flex items-center gap-3 bg-yellow-500/[0.06] border border-yellow-500/20 rounded-xl px-4 py-3">
                     <div className="w-12 h-12 bg-yellow-500/10 rounded-xl flex items-center justify-center flex-shrink-0">
                       <Clock size={18} className="text-yellow-400"/>
                     </div>
                     <div className="flex-1">
-                      <p className="text-white font-bold text-sm">{f.horaInicio} – {f.horaFin}</p>
-                      <p className="text-gray-500 text-xs">{f.duracionSlot}min por turno · {turnos} turnos disponibles</p>
-                      {f.sede && <p className="text-gray-600 text-[10px] mt-0.5">{f.sede}{f.consultorio ? ` · ${f.consultorio}` : ''}</p>}
-                      <HoraBarra inicio={f.horaInicio} fin={f.horaFin}/>
+                      <p className="text-white font-bold text-sm">{t.horaInicio} – {t.horaFin}</p>
+                      <p className="text-gray-500 text-xs">{t.intervaloMinutos}min por turno · {nTurnos} cupos</p>
+                      <p className="text-gray-600 text-[10px] mt-0.5 flex items-center gap-1"><MapPin size={9}/>{t.sede.nombre} · {t.consultorio.nombre}</p>
+                      {t.citasActivas > 0 && (
+                        <p className="text-emerald-400/80 text-[10px] mt-0.5">{t.citasActivas} cita{t.citasActivas !== 1 ? 's' : ''} agendada{t.citasActivas !== 1 ? 's' : ''}</p>
+                      )}
+                      <HoraBarra inicio={t.horaInicio} fin={t.horaFin}/>
                     </div>
-                    <button onClick={() => eliminarDisp(f.id)}
-                      className="opacity-0 group-hover/f:opacity-100 text-gray-600 hover:text-red-400 p-2 rounded-lg transition-all">
+                    <button onClick={() => eliminarDisp(t.id)}
+                      title={t.citasActivas > 0 ? 'Tiene citas activas, no se puede cancelar' : 'Cancelar turno'}
+                      disabled={t.citasActivas > 0}
+                      className="opacity-0 group-hover/f:opacity-100 text-gray-600 hover:text-red-400 disabled:opacity-20 disabled:cursor-not-allowed p-2 rounded-lg transition-all">
                       <Trash2 size={14}/>
                     </button>
                   </div>
@@ -463,11 +474,11 @@ function CalDia({
         ) : (
           <div className="flex flex-col items-center justify-center py-10 text-gray-600 border border-dashed border-white/[0.06] rounded-xl">
             <Clock size={32} className="opacity-20 mb-2"/>
-            <p className="text-sm">Sin franjas para los {DIAS_LARGO[dow]}s</p>
+            <p className="text-sm">Sin turnos para el {DIAS_LARGO[dow]}</p>
             <button
               onClick={() => { setPanelActivo('franja'); setFranja((p: any) => ({ ...p, diasSeleccionados: [dow] })); }}
               className="mt-3 flex items-center gap-1.5 text-xs text-yellow-500 hover:text-yellow-300 transition-colors">
-              <Plus size={12}/> Agregar franja para este día
+              <Plus size={12}/> Agregar turnos para este día
             </button>
           </div>
         )}
@@ -476,14 +487,31 @@ function CalDia({
   );
 }
 
+// ─── Sección con encabezado dentro del modal "Nueva Franja" ───────────────────
+function FranjaSeccion({ icon, titulo, children }: { icon: React.ReactNode; titulo: string; children: React.ReactNode }) {
+  return (
+    <section className="h-full bg-white/[0.02] border border-white/[0.06] rounded-xl p-2.5">
+      <div className="flex items-center gap-2 text-yellow-500/80 text-[11px] font-bold uppercase tracking-widest mb-1.5">
+        {icon} {titulo}
+      </div>
+      {children}
+    </section>
+  );
+}
+
 // ─── Componente principal ─────────────────────────────────────────────────────
 export default function ConfigAgendaPage() {
   // ── Datos ──────────────────────────────────────────────────────────────────
-  const [medicos,          setMedicos]          = useState<Medico[]>([]);
-  const [medicoSel,        setMedicoSel]        = useState<Medico | null>(null);
-  const [tiposConsulta,    setTiposConsulta]    = useState<TipoConsulta[]>([]);
-  const [disponibilidades, setDisponibilidades] = useState<Disponibilidad[]>([]);
-  const [bloqueos,         setBloqueos]         = useState<Bloqueo[]>([]);
+  const [profesionales,    setProfesionales]    = useState<Profesional[]>([]);
+  const [profesionalSel,   setProfesionalSel]   = useState<Profesional | null>(null);
+  const [sedes,            setSedes]            = useState<Sede[]>([]);
+  const [especialidades,   setEspecialidades]   = useState<Especialidad[]>([]);
+  const [turnos,           setTurnos]           = useState<Turno[]>([]);
+
+  // Catálogos en cascada dentro del formulario de "Nueva Franja"
+  const [franjaDeptos,        setFranjaDeptos]        = useState<Departamento[]>([]);
+  const [franjaConsultorios,  setFranjaConsultorios]  = useState<Consultorio[]>([]);
+  const [franjaTiposConsulta, setFranjaTiposConsulta] = useState<TipoConsultaItem[]>([]);
 
   // ── UI ─────────────────────────────────────────────────────────────────────
   const [busqueda,       setBusqueda]       = useState('');
@@ -500,49 +528,51 @@ export default function ConfigAgendaPage() {
 
   // ── Panel lateral ──────────────────────────────────────────────────────────
   const [panelActivo,  setPanelActivo]  = useState<'franja' | 'bloqueo' | 'eliminar' | null>(null);
-  const [vigenciaAño,  setVigenciaAño]  = useState(() => new Date().getFullYear());
 
-  // ── Estado panel Eliminar ──────────────────────────────────────────────────
-  type FranjaConCitas = Disponibilidad & { numCitas: number };
+  // ── Estado panel Eliminar (cancelar en lote) ───────────────────────────────
   const [elimFiltroDias,    setElimFiltroDias]    = useState<number[]>([]);
   const [elimFiltroMeses,   setElimFiltroMeses]   = useState<number[]>([]);
   const [elimFiltroAño,     setElimFiltroAño]     = useState(() => new Date().getFullYear());
-  const [elimFranjas,       setElimFranjas]       = useState<FranjaConCitas[]>([]);
+  const [elimFranjas,       setElimFranjas]       = useState<Turno[]>([]);
   const [elimSel,           setElimSel]           = useState<string[]>([]);
   const [elimCargando,      setElimCargando]      = useState(false);
   const [elimEliminando,    setElimEliminando]    = useState(false);
   const [elimCargado,       setElimCargado]       = useState(false);
 
   const emptyFranja = {
+    sedeId: '', departamentoId: '', consultorioId: '', especialidadId: '', tipoConsultaId: '',
     diasSeleccionados: [1, 2, 3, 4, 5] as number[],
     horaInicio: '08:00', horaFin: '16:00',
-    duracionSlot: 30, sede: 'Principal',
-    tipoConsultaId: '', tipoConsultaNombre: '',
-    consultorio: '', fechaDesde: '', fechaHasta: '',
+    duracionSlot: 30,
     plantillasActivas: [] as string[],
     mesesSeleccionados: [] as number[],
     añoVigencia: new Date().getFullYear(),
+    sobrecuposMax: 0,
+    modalidad: 'PRESENCIAL' as 'PRESENCIAL' | 'TELEMEDICINA' | 'HIBRIDA',
   };
   const [franja,      setFranja]      = useState({ ...emptyFranja });
-  const emptyBloqueo = { fechaInicio: todayStr(), fechaFin: todayStr(), motivo: '', todoElDia: true };
+  const emptyBloqueo = { fechaInicio: todayStr(), fechaFin: todayStr(), motivo: '' };
   const [bloqueoForm, setBloqueoForm] = useState({ ...emptyBloqueo });
 
-  const token   = () => localStorage.getItem('accessToken') || '';
   const getUser = () => { try { return JSON.parse(localStorage.getItem('user') || '{}'); } catch { return {}; } };
 
-  // ── Cargar médicos ─────────────────────────────────────────────────────────
+  // ── Cargar profesionales + catálogos base ──────────────────────────────────
   useEffect(() => {
     (async () => {
       setLoadingMedicos(true);
       try {
-        const r = await fetch(`${API_BASE_URL}/disponibilidad/medicos-list`, { headers: { Authorization: `Bearer ${token()}` } });
-        const d = await r.json();
-        const lista: Medico[] = d.medicos || [];
-        setMedicos(lista);
+        const [profs, sedesList, espList] = await Promise.all([
+          agenda<Profesional[]>('/profesionales'),
+          agenda<Sede[]>('/sedes?soloActivos=true'),
+          nucleo<Especialidad[]>('/especialidades'),
+        ]);
+        setProfesionales(profs);
+        setSedes(sedesList);
+        setEspecialidades(espList.filter(e => e.estado));
         const u = getUser();
-        if (u.rol === 'MEDICO' && lista.length > 0) {
-          const propio = lista.find(m => m.id === (u.id || u.userId));
-          if (propio) await cargarDatosMedico(propio);
+        if (u.rol === 'MEDICO' && profs.length > 0) {
+          const propio = profs.find(p => p.id === (u.id || u.userId));
+          if (propio) await cargarDatosProfesional(propio);
         }
       } catch { setError('Error cargando profesionales'); }
       finally { setLoadingMedicos(false); }
@@ -550,49 +580,63 @@ export default function ConfigAgendaPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── Selección médico ───────────────────────────────────────────────────────
-  const cargarDatosMedico = async (m: Medico) => {
-    setMedicoSel(m);
-    setDisponibilidades([]); setBloqueos([]); setTiposConsulta([]);
-    setLoadingDatos(true); setPanelActivo(null);
+  // Cascada Sede → Departamento → Consultorio dentro del panel "Nueva Franja"
+  useEffect(() => {
+    if (!franja.sedeId) { setFranjaDeptos([]); return; }
+    agenda<Departamento[]>(`/sedes/${franja.sedeId}/departamentos`)
+      .then(d => setFranjaDeptos(d.filter(x => x.activo))).catch(() => setFranjaDeptos([]));
+  }, [franja.sedeId]);
+
+  useEffect(() => {
+    if (!franja.departamentoId) { setFranjaConsultorios([]); return; }
+    agenda<Consultorio[]>(`/departamentos/${franja.departamentoId}/consultorios`)
+      .then(c => setFranjaConsultorios(c.filter(x => x.activo))).catch(() => setFranjaConsultorios([]));
+  }, [franja.departamentoId]);
+
+  useEffect(() => {
+    if (!franja.especialidadId) { setFranjaTiposConsulta([]); return; }
+    nucleo<TipoConsultaItem[]>(`/tipos-consulta?especialidadId=${franja.especialidadId}`)
+      .then(t => setFranjaTiposConsulta(t.filter(x => x.estado))).catch(() => setFranjaTiposConsulta([]));
+  }, [franja.especialidadId]);
+
+  // ── Cargar turnos del profesional (ventana de -1 a +6 meses desde hoy) ─────
+  const cargarTurnos = async (prof: Profesional) => {
+    setLoadingDatos(true);
     try {
-      const [rT, rD, rB] = await Promise.all([
-        fetch(`${API_BASE_URL}/disponibilidad/tipos-consulta/${m.id}`, { headers: { Authorization: `Bearer ${token()}` } }),
-        fetch(`${API_BASE_URL}/disponibilidad/medico/${m.id}`,         { headers: { Authorization: `Bearer ${token()}` } }),
-        fetch(`${API_BASE_URL}/disponibilidad/bloqueos/medico/${m.id}`,{ headers: { Authorization: `Bearer ${token()}` } }),
-      ]);
-      const [dT, dD, dB] = await Promise.all([rT.json(), rD.json(), rB.json()]);
-      setTiposConsulta(dT.tiposConsulta || []);
-      setDisponibilidades(dD.disponibilidades || []);
-      setBloqueos(dB.bloqueos || []);
-      const primer = (dT.tiposConsulta || [])[0];
-      if (primer) setFranja(p => ({ ...p, tipoConsultaId: primer.id, tipoConsultaNombre: primer.nombre, duracionSlot: primer.duracionMinutos || 30 }));
-    } catch { setError('Error cargando datos del profesional'); }
+      const hoy = new Date();
+      const desde = new Date(hoy.getFullYear(), hoy.getMonth() - 1, 1);
+      const hasta = new Date(hoy.getFullYear(), hoy.getMonth() + 7, 0);
+      const data = await agenda<Turno[]>(
+        `/turnos?profesionalId=${prof.id}&fechaInicio=${isoDate(desde)}&fechaFin=${isoDate(hasta)}`,
+      );
+      setTurnos(data);
+    } catch { setError('Error cargando la agenda del profesional'); }
     finally { setLoadingDatos(false); }
   };
 
+  const cargarDatosProfesional = async (p: Profesional) => {
+    setProfesionalSel(p);
+    setTurnos([]);
+    setPanelActivo(null);
+    await cargarTurnos(p);
+  };
+
   const recargar = useCallback(async () => {
-    if (!medicoSel) return;
-    setLoadingDatos(true);
-    try {
-      const [rD, rB] = await Promise.all([
-        fetch(`${API_BASE_URL}/disponibilidad/medico/${medicoSel.id}`,         { headers: { Authorization: `Bearer ${token()}` } }),
-        fetch(`${API_BASE_URL}/disponibilidad/bloqueos/medico/${medicoSel.id}`,{ headers: { Authorization: `Bearer ${token()}` } }),
-      ]);
-      const [dD, dB] = await Promise.all([rD.json(), rB.json()]);
-      setDisponibilidades(dD.disponibilidades || []);
-      setBloqueos(dB.bloqueos || []);
-    } finally { setLoadingDatos(false); }
+    if (!profesionalSel) return;
+    await cargarTurnos(profesionalSel);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [medicoSel]);
+  }, [profesionalSel]);
 
-  // ── Guardar franja ─────────────────────────────────────────────────────────
+  // ── Crear turnos en lote ("Nueva Franja") ──────────────────────────────────
   const guardarFranja = async () => {
-    if (!medicoSel) return;
+    if (!profesionalSel) return;
+    if (!franja.sedeId || !franja.departamentoId || !franja.consultorioId || !franja.especialidadId) {
+      setError('Selecciona sede, departamento, consultorio y especialidad'); return;
+    }
     if (!franja.diasSeleccionados.length) { setError('Selecciona al menos un día'); return; }
+    if (!franja.mesesSeleccionados.length) { setError('Selecciona al menos un mes de vigencia'); return; }
 
-    // Pares de horario a crear (plantillas activas o manual)
-    const pares: { horaInicio: string; horaFin: string }[] =
+    const jornadas: { horaInicio: string; horaFin: string }[] =
       franja.plantillasActivas.length > 0
         ? franja.plantillasActivas.map(lbl => {
             const pl = PLANTILLAS.find(p => p.label === lbl)!;
@@ -600,109 +644,111 @@ export default function ConfigAgendaPage() {
           })
         : [{ horaInicio: franja.horaInicio, horaFin: franja.horaFin }];
 
-    for (const par of pares) {
-      if (calcTurnos(par.horaInicio, par.horaFin, franja.duracionSlot) <= 0) {
-        setError(`Horario inválido: ${par.horaInicio}–${par.horaFin}`); return;
+    for (const j of jornadas) {
+      if (calcTurnos(j.horaInicio, j.horaFin, franja.duracionSlot) <= 0) {
+        setError(`Horario inválido: ${j.horaInicio}–${j.horaFin}`); return;
       }
     }
 
-    // Rangos de fechas: uno por mes seleccionado, o indefinido
-    const rangos: { fechaDesde?: string; fechaHasta?: string }[] =
-      franja.mesesSeleccionados.length > 0
-        ? franja.mesesSeleccionados.map(mes => {
-            const mm      = String(mes).padStart(2, '0');
-            const lastDay = new Date(franja.añoVigencia, mes, 0).toISOString().split('T')[0];
-            return { fechaDesde: `${franja.añoVigencia}-${mm}-01`, fechaHasta: lastDay };
-          })
-        : [{}];
+    // his-core espera días ISO 1(lunes)–7(domingo); la UI usa 0(domingo)–6(sábado)
+    const diasSemanaIso = franja.diasSeleccionados.map(d => (d === 0 ? 7 : d));
 
     setGuardando(true); setError('');
     try {
+      let totalCreados = 0; let totalOmitidos = 0;
       const errores: string[] = [];
-      let totalCreados = 0;
-      for (const rango of rangos) {
-        for (const par of pares) {
-          const base = {
-            medicoId: medicoSel.id, ...par,
-            duracionSlot: franja.duracionSlot, sede: franja.sede || 'Principal',
-            tipoAtencion: franja.tipoConsultaNombre || 'CONSULTA', consultorio: franja.consultorio,
-            ...rango,
-          };
-          for (const dia of franja.diasSeleccionados) {
-            const res = await fetch(`${API_BASE_URL}/disponibilidad`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
-              body: JSON.stringify({ ...base, diaSemana: dia }),
-            });
-            if (!res.ok) { const d = await res.json(); errores.push(`${DIAS_LARGO[dia]}: ${d.error || 'error'}`); }
-            else totalCreados++;
-          }
-        }
+      for (const mes of franja.mesesSeleccionados) {
+        const mm = String(mes).padStart(2, '0');
+        const fechaDesde = `${franja.añoVigencia}-${mm}-01`;
+        const fechaHasta = new Date(franja.añoVigencia, mes, 0).toISOString().split('T')[0];
+        try {
+          const res = await agenda<{ totalGenerados: number; totalOmitidos: number }>('/turnos/masivos', {
+            method: 'POST',
+            body: JSON.stringify({
+              sedeId: franja.sedeId,
+              departamentoId: franja.departamentoId,
+              consultorioId: franja.consultorioId,
+              profesionalId: profesionalSel.id,
+              especialidadId: franja.especialidadId,
+              tipoConsultaId: franja.tipoConsultaId || undefined,
+              fechaDesde, fechaHasta,
+              diasSemana: diasSemanaIso,
+              jornadas,
+              intervaloMinutos: franja.duracionSlot,
+              sobrecuposMax: franja.sobrecuposMax,
+              modalidad: franja.modalidad,
+            }),
+          });
+          totalCreados += res.totalGenerados || 0;
+          totalOmitidos += res.totalOmitidos || 0;
+        } catch (e: any) { errores.push(`${MESES_CORTO[mes - 1]}: ${e.message}`); }
       }
-      setSuccess(`${totalCreados} franja${totalCreados !== 1 ? 's' : ''} creada${totalCreados !== 1 ? 's' : ''}`);
+      setSuccess(`${totalCreados} turno${totalCreados !== 1 ? 's' : ''} creado${totalCreados !== 1 ? 's' : ''}${totalOmitidos ? ` · ${totalOmitidos} omitidos por conflicto de horario` : ''}`);
       if (errores.length) setError(errores.join(' | '));
       setFranja({ ...emptyFranja });
       setPanelActivo(null);
       await recargar();
-      setTimeout(() => setSuccess(''), 4000);
+      setTimeout(() => setSuccess(''), 5000);
     } catch (e: any) { setError(e.message); }
     finally { setGuardando(false); }
   };
 
-  // ── Guardar bloqueo ────────────────────────────────────────────────────────
+  // ── "Bloqueo": cancela los turnos existentes en el rango de fechas ─────────
   const guardarBloqueo = async () => {
-    if (!medicoSel) return;
+    if (!profesionalSel) return;
     if (!bloqueoForm.fechaInicio || !bloqueoForm.fechaFin) { setError('Completa las fechas del bloqueo'); return; }
     setGuardando(true); setError('');
     try {
-      const res = await fetch(`${API_BASE_URL}/disponibilidad/bloqueos`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
-        body: JSON.stringify({ ...bloqueoForm, medicoId: medicoSel.id }),
-      });
-      if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Error'); }
-      setSuccess('Bloqueo creado');
+      const enRango = turnos.filter(t =>
+        t.estado === 'HABILITADO' && t.fecha >= bloqueoForm.fechaInicio && t.fecha <= bloqueoForm.fechaFin,
+      );
+      if (enRango.length === 0) { setError('No hay turnos habilitados en ese rango'); setGuardando(false); return; }
+      let ok = 0; let fail = 0;
+      for (const t of enRango) {
+        try {
+          await agenda(`/turnos/${t.id}/cancelar`, {
+            method: 'PUT',
+            body: JSON.stringify({ motivo: bloqueoForm.motivo || 'Bloqueo de agenda' }),
+          });
+          ok++;
+        } catch { fail++; }
+      }
+      setSuccess(`${ok} turno${ok !== 1 ? 's' : ''} cancelado${ok !== 1 ? 's' : ''}${fail ? ` · ${fail} no se pudieron cancelar (tienen citas activas)` : ''}`);
       setBloqueoForm({ ...emptyBloqueo });
       setPanelActivo(null);
       await recargar();
-      setTimeout(() => setSuccess(''), 3000);
+      setTimeout(() => setSuccess(''), 5000);
     } catch (e: any) { setError(e.message); }
     finally { setGuardando(false); }
   };
 
-  const eliminarDisp    = async (id: string) => {
-    const res = await fetch(`${API_BASE_URL}/disponibilidad/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token()}` } });
-    if (!res.ok) { const d = await res.json(); setError(d.error || 'Error al eliminar la franja'); return; }
-    await recargar();
+  const eliminarDisp = async (id: string) => {
+    try {
+      await agenda(`/turnos/${id}/cancelar`, {
+        method: 'PUT',
+        body: JSON.stringify({ motivo: 'Cancelado desde el calendario' }),
+      });
+      await recargar();
+    } catch (e: any) { setError(e.message || 'No se pudo cancelar el turno (puede tener citas activas)'); }
   };
-  const eliminarBloqueo = async (id: string) => { await fetch(`${API_BASE_URL}/disponibilidad/bloqueos/${id}`,{ method: 'DELETE', headers: { Authorization: `Bearer ${token()}` } }); await recargar(); };
 
-  // ── Eliminar franjas en lote ───────────────────────────────────────────────
+  // ── Cancelar turnos en lote ("Eliminar") ───────────────────────────────────
   const cargarEliminar = async () => {
-    if (!medicoSel) return;
+    if (!profesionalSel) return;
     setElimCargando(true); setElimCargado(false);
     try {
-      const r = await fetch(`${API_BASE_URL}/disponibilidad/con-citas/${medicoSel.id}`, { headers: { Authorization: `Bearer ${token()}` } });
-      const d = await r.json();
-      let lista: FranjaConCitas[] = d.disponibilidades || [];
-      if (elimFiltroDias.length > 0) lista = lista.filter(f => elimFiltroDias.includes(f.diaSemana));
+      let lista = turnos.filter(t => t.estado === 'HABILITADO');
+      if (elimFiltroDias.length > 0) {
+        lista = lista.filter(t => elimFiltroDias.includes(new Date(t.fecha + 'T12:00:00').getDay()));
+      }
       if (elimFiltroMeses.length > 0) {
-        lista = lista.filter(f => {
-          if (!f.fechaDesde && !f.fechaHasta) return true;
-          return elimFiltroMeses.some(mes => {
-            const p1 = new Date(elimFiltroAño, mes - 1, 1);
-            const p2 = new Date(elimFiltroAño, mes, 0);
-            const fd = f.fechaDesde ? new Date(f.fechaDesde) : null;
-            const fh = f.fechaHasta ? new Date(f.fechaHasta) : null;
-            if (!fd && !fh) return true;
-            if (fd && !fh) return fd <= p2;
-            if (!fd && fh) return fh >= p1;
-            return fd <= p2 && fh >= p1;
-          });
+        lista = lista.filter(t => {
+          const d = new Date(t.fecha + 'T12:00:00');
+          return d.getFullYear() === elimFiltroAño && elimFiltroMeses.includes(d.getMonth() + 1);
         });
       }
       setElimFranjas(lista);
-      setElimSel(lista.filter(f => f.numCitas === 0).map(f => f.id));
+      setElimSel(lista.filter(t => t.citasActivas === 0).map(t => t.id));
       setElimCargado(true);
     } catch (e: any) { setError(e.message); }
     finally { setElimCargando(false); }
@@ -713,13 +759,18 @@ export default function ConfigAgendaPage() {
     setElimEliminando(true);
     let ok = 0; let fail = 0;
     for (const id of elimSel) {
-      const r = await fetch(`${API_BASE_URL}/disponibilidad/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token()}` } });
-      if (r.ok) ok++; else fail++;
+      try {
+        await agenda(`/turnos/${id}/cancelar`, {
+          method: 'PUT',
+          body: JSON.stringify({ motivo: 'Cancelación en lote' }),
+        });
+        ok++;
+      } catch { fail++; }
     }
     setElimFranjas([]); setElimSel([]); setElimCargado(false);
     await recargar();
-    setSuccess(`${ok} franja${ok !== 1 ? 's' : ''} eliminada${ok !== 1 ? 's' : ''}`);
-    if (fail) setError(`${fail} no pudieron eliminarse (tienen citas)`);
+    setSuccess(`${ok} turno${ok !== 1 ? 's' : ''} cancelado${ok !== 1 ? 's' : ''}`);
+    if (fail) setError(`${fail} no pudieron cancelarse (tienen citas activas)`);
     setPanelActivo(null);
     setElimEliminando(false);
     setTimeout(() => setSuccess(''), 4000);
@@ -760,28 +811,33 @@ export default function ConfigAgendaPage() {
     return calcTurnos(franja.horaInicio, franja.horaFin, franja.duracionSlot);
   }, [franja.horaInicio, franja.horaFin, franja.duracionSlot, franja.plantillasActivas]);
 
-  // Filtro dinámico: nombre + apellido + especialidad + cédula/documento
+  // Filtro dinámico: nombre + especialidad + registro médico
   const medicosFiltrados = useMemo(() =>
-    medicos.filter(m => {
+    profesionales.filter(m => {
       const q = busqueda.toLowerCase().trim();
       if (!q) return true;
       return (
-        `${m.nombre} ${m.apellido}`.toLowerCase().includes(q) ||
-        (m.especialidad || '').toLowerCase().includes(q) ||
-        (m.numeroDocumento || '').toLowerCase().includes(q) ||
+        m.nombreCompleto.toLowerCase().includes(q) ||
+        (m.especialidadPrincipal || '').toLowerCase().includes(q) ||
         (m.registroMedico || '').toLowerCase().includes(q)
       );
     }),
-  [medicos, busqueda]);
+  [profesionales, busqueda]);
 
-  const dispPorDia = useMemo(() => {
-    const mapa: Record<number, Disponibilidad[]> = {};
-    for (const d of disponibilidades) {
-      if (!mapa[d.diaSemana]) mapa[d.diaSemana] = [];
-      mapa[d.diaSemana].push(d);
+  const turnosPorFecha = useMemo(() => {
+    const mapa: Record<string, Turno[]> = {};
+    for (const t of turnos) {
+      if (t.estado !== 'HABILITADO') continue;
+      if (!mapa[t.fecha]) mapa[t.fecha] = [];
+      mapa[t.fecha].push(t);
     }
     return mapa;
-  }, [disponibilidades]);
+  }, [turnos]);
+
+  const nombreCorto = (nombreCompleto: string) => {
+    const partes = nombreCompleto.trim().split(' ');
+    return `${partes[0]?.[0] || ''}${partes[1]?.[0] || ''}`.toUpperCase();
+  };
 
   // ─── RENDER ───────────────────────────────────────────────────────────────
   return (
@@ -794,15 +850,15 @@ export default function ConfigAgendaPage() {
           <h1 className="text-lg font-black text-white tracking-tight">
             Config <span className="bg-gradient-to-r from-yellow-400 to-amber-500 bg-clip-text text-transparent">Agenda</span>
           </h1>
-          {medicoSel && (
+          {profesionalSel && (
             <span className="hidden sm:flex items-center gap-1.5 text-[10px] text-gray-500 border border-white/10 rounded-full px-2 py-0.5">
-              <User size={9}/> {medicoSel.nombre} {medicoSel.apellido}
+              <User size={9}/> {profesionalSel.nombreCompleto}
             </span>
           )}
         </div>
 
         {/* Tabs vista */}
-        {medicoSel && (
+        {profesionalSel && (
           <div className="flex items-center gap-1 bg-white/[0.04] border border-white/[0.08] rounded-lg p-0.5">
             {([['mes', LayoutGrid, 'Mes'], ['semana', CalendarRange, 'Semana'], ['dia', CalendarDays, 'Día']] as const).map(([v, Icon, lbl]) => (
               <button key={v} onClick={() => setVista(v)}
@@ -823,7 +879,7 @@ export default function ConfigAgendaPage() {
               </motion.div>
             )}
           </AnimatePresence>
-          {medicoSel && (
+          {profesionalSel && (
             <>
               <button onClick={() => setPanelActivo(panelActivo === 'bloqueo' ? null : 'bloqueo')}
                 className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border transition-all
@@ -861,13 +917,13 @@ export default function ConfigAgendaPage() {
 
         {/* ━━ Columna izquierda: profesionales (oculta en móvil) ━━ */}
         <div className="hidden md:flex w-64 flex-shrink-0 flex-col border-r border-white/[0.06] bg-[#0a0c13]">
-          {/* Buscador dinámico: nombre + especialidad + cédula */}
+          {/* Buscador dinámico: nombre + especialidad + registro médico */}
           <div className="px-3 py-3 border-b border-white/[0.06]">
             <div className="flex items-center gap-2 bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-2">
               <Search size={12} className="text-gray-500 flex-shrink-0"/>
               <input
                 value={busqueda} onChange={e => setBusqueda(e.target.value)}
-                placeholder="Nombre, especialidad o cédula…"
+                placeholder="Nombre, especialidad o registro…"
                 className="bg-transparent text-white text-xs placeholder-gray-600 flex-1 focus:outline-none"
               />
               {busqueda && (
@@ -875,7 +931,7 @@ export default function ConfigAgendaPage() {
               )}
             </div>
             <p className="text-[9px] text-gray-700 mt-1 pl-1">
-              {medicosFiltrados.length} de {medicos.length} profesional{medicos.length !== 1 ? 'es' : ''}
+              {medicosFiltrados.length} de {profesionales.length} profesional{profesionales.length !== 1 ? 'es' : ''}
             </p>
           </div>
 
@@ -888,22 +944,22 @@ export default function ConfigAgendaPage() {
               </div>
             ) : (
               medicosFiltrados.map(m => {
-                const activo = medicoSel?.id === m.id;
+                const activo = profesionalSel?.id === m.id;
                 return (
-                  <button key={m.id} onClick={() => cargarDatosMedico(m)}
+                  <button key={m.id} onClick={() => cargarDatosProfesional(m)}
                     className={`w-full text-left px-3 py-3 flex items-center gap-2.5 transition-all group border-l-2
                       ${activo ? 'bg-yellow-500/10 border-yellow-400' : 'border-transparent hover:bg-white/[0.03] hover:border-white/10'}`}>
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-black flex-shrink-0
                       ${activo ? 'bg-yellow-500 text-slate-900' : 'bg-white/[0.06] text-gray-400 group-hover:bg-white/10'}`}>
-                      {m.nombre[0]}{m.apellido[0]}
+                      {nombreCorto(m.nombreCompleto)}
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className={`text-xs font-semibold truncate ${activo ? 'text-white' : 'text-gray-300'}`}>
-                        {m.nombre} {m.apellido}
+                        {m.nombreCompleto}
                       </p>
-                      <p className="text-[10px] text-gray-600 truncate">{m.especialidad || 'Sin especialidad'}</p>
-                      {m.numeroDocumento && (
-                        <p className="text-[9px] text-gray-700 truncate font-mono">{m.numeroDocumento}</p>
+                      <p className="text-[10px] text-gray-600 truncate">{m.especialidadPrincipal || 'Sin especialidad'}</p>
+                      {m.registroMedico && (
+                        <p className="text-[9px] text-gray-700 truncate font-mono">RM {m.registroMedico}</p>
                       )}
                     </div>
                   </button>
@@ -915,7 +971,7 @@ export default function ConfigAgendaPage() {
 
         {/* ━━ Columna central: calendario ━━ */}
         <div className="flex-1 flex flex-col overflow-hidden">
-          {!medicoSel ? (
+          {!profesionalSel ? (
             <div className="flex-1 flex flex-col items-center justify-center gap-3 text-gray-600">
               <Settings size={48} className="opacity-10"/>
               <p className="text-sm font-medium">Selecciona un profesional</p>
@@ -930,11 +986,11 @@ export default function ConfigAgendaPage() {
               {/* Sub-header profesional */}
               <div className="flex-shrink-0 px-5 py-2.5 border-b border-white/[0.06] flex items-center justify-between">
                 <div>
-                  <p className="text-white font-bold text-sm">{medicoSel.nombre} {medicoSel.apellido}</p>
+                  <p className="text-white font-bold text-sm">{profesionalSel.nombreCompleto}</p>
                   <p className="text-gray-600 text-[10px]">
-                    {medicoSel.especialidad || 'Sin especialidad'}
-                    {medicoSel.numeroDocumento && <> · CC {medicoSel.numeroDocumento}</>}
-                    {' · '}{disponibilidades.length} franjas · {bloqueos.length} bloqueos
+                    {profesionalSel.especialidadPrincipal || 'Sin especialidad'}
+                    {profesionalSel.registroMedico && <> · RM {profesionalSel.registroMedico}</>}
+                    {' · '}{turnos.filter(t => t.estado === 'HABILITADO').length} turnos abiertos
                   </p>
                 </div>
                 <button onClick={recargar} title="Actualizar"
@@ -948,7 +1004,7 @@ export default function ConfigAgendaPage() {
                 {vista === 'mes' && (
                   <CalMes
                     fecha={calFecha} setFecha={setCalFecha} setVista={setVista}
-                    dispPorDia={dispPorDia} bloqueos={bloqueos}
+                    turnosPorFecha={turnosPorFecha}
                     onClickDia={onClickDiaCalendario} diaActivo={diaActivo}
                     onClickMes={(mes, año) => {
                       setFranja({ ...emptyFranja, mesesSeleccionados: [mes], añoVigencia: año });
@@ -959,58 +1015,376 @@ export default function ConfigAgendaPage() {
                 {vista === 'semana' && (
                   <CalSemana
                     fecha={calFecha} setFecha={setCalFecha}
-                    dispPorDia={dispPorDia} bloqueos={bloqueos}
+                    turnosPorFecha={turnosPorFecha}
                     onClickDia={onClickDiaCalendario} diaActivo={diaActivo}
                     eliminarDisp={eliminarDisp}
                     setPanelActivo={setPanelActivo}
                     setFranja={setFranja}
-                    emptyFranja={emptyFranja}
                   />
                 )}
                 {vista === 'dia' && (
                   <CalDia
                     fecha={calFecha} setFecha={d => { setCalFecha(d); setDiaActivo(d); }}
-                    dispPorDia={dispPorDia} bloqueos={bloqueos}
+                    turnosPorFecha={turnosPorFecha}
                     eliminarDisp={eliminarDisp}
                     setPanelActivo={setPanelActivo}
                     setFranja={setFranja}
                   />
-                )}
-
-                {/* Bloqueos resumen (solo en vista semana/mes) */}
-                {vista !== 'dia' && bloqueos.length > 0 && (
-                  <div className="mt-5">
-                    <p className="text-[9px] font-bold text-gray-600 uppercase tracking-widest mb-2 flex items-center gap-1.5">
-                      <CalendarX2 size={11} className="text-orange-500"/> Bloqueos activos
-                    </p>
-                    <div className="grid grid-cols-2 gap-2">
-                      {bloqueos.map(b => (
-                        <div key={b.id}
-                          className="flex items-center justify-between gap-2 bg-orange-500/[0.05] border border-orange-500/20 rounded-xl px-3 py-2 group/blq">
-                          <div>
-                            <p className="text-white text-xs font-semibold">{b.motivo || 'Bloqueo'}</p>
-                            <p className="text-orange-400/80 text-[10px]">
-                              {fmtFecha(b.fechaInicio.slice(0,10))} → {fmtFecha(b.fechaFin.slice(0,10))}
-                              {b.todoElDia && <span className="ml-1.5 text-[9px] text-orange-600">todo el día</span>}
-                            </p>
-                          </div>
-                          <button onClick={() => eliminarBloqueo(b.id)}
-                            className="opacity-0 group-hover/blq:opacity-100 text-gray-600 hover:text-red-400 p-1 rounded transition-all">
-                            <Trash2 size={13}/>
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
                 )}
               </div>
             </>
           )}
         </div>
 
-        {/* ━━ Panel lateral deslizante ━━ */}
+        {/* ━━ Modal: Nueva Franja ━━ */}
         <AnimatePresence>
-          {panelActivo && medicoSel && (
+          {panelActivo === 'franja' && profesionalSel && (
+            <motion.div
+              className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setPanelActivo(null)}
+            >
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 16 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 16 }}
+                transition={{ type: 'spring', stiffness: 340, damping: 32 }}
+                onClick={e => e.stopPropagation()}
+                className="w-full max-w-3xl lg:max-w-6xl max-h-[96vh] flex flex-col bg-gradient-to-b from-[#13110a] to-[#0b0a06] border border-yellow-500/25 rounded-2xl shadow-2xl shadow-black/60 overflow-hidden"
+              >
+                {/* Header */}
+                <div className="flex items-center justify-between px-6 py-2.5 border-b border-yellow-500/15 bg-yellow-500/[0.04] flex-shrink-0">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-yellow-500/15 border border-yellow-500/30 flex items-center justify-center text-yellow-400 flex-shrink-0">
+                      <CalendarCheck2 size={18}/>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-white font-bold text-base">Nueva Franja de Agenda</p>
+                      <p className="text-gray-500 text-xs truncate">{profesionalSel.nombreCompleto} · {profesionalSel.especialidadPrincipal}</p>
+                    </div>
+                  </div>
+                  <button onClick={() => setPanelActivo(null)} className="text-gray-500 hover:text-white hover:bg-white/5 p-2 rounded-xl transition-all flex-shrink-0"><X size={18}/></button>
+                </div>
+
+                {/* Body */}
+                <div className="flex-1 overflow-y-auto px-6 py-2.5">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-2.5">
+                  {/* Ubicación */}
+                  <div className="lg:col-span-3">
+                  <FranjaSeccion icon={<MapPin size={12}/>} titulo="Ubicación">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div>
+                        <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest block mb-1.5">Sede</label>
+                        <select value={franja.sedeId}
+                          onChange={e => setFranja(p => ({ ...p, sedeId: e.target.value, departamentoId: '', consultorioId: '' }))}
+                          className="w-full bg-white/[0.04] border border-white/[0.09] rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-yellow-500/50 transition-all">
+                          <option value="">Selecciona una sede</option>
+                          {sedes.map(s => <option key={s.id} value={s.id}>{s.nombre}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest block mb-1.5">Departamento</label>
+                        <select value={franja.departamentoId}
+                          onChange={e => setFranja(p => ({ ...p, departamentoId: e.target.value, consultorioId: '' }))}
+                          disabled={!franja.sedeId}
+                          className="w-full bg-white/[0.04] border border-white/[0.09] rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-yellow-500/50 transition-all disabled:opacity-40">
+                          <option value="">{franja.sedeId ? 'Selecciona' : 'Primero sede'}</option>
+                          {franjaDeptos.map(d => <option key={d.id} value={d.id}>{d.nombre}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest block mb-1.5">Consultorio</label>
+                        <select value={franja.consultorioId}
+                          onChange={e => setFranja(p => ({ ...p, consultorioId: e.target.value }))}
+                          disabled={!franja.departamentoId}
+                          className="w-full bg-white/[0.04] border border-white/[0.09] rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-yellow-500/50 transition-all disabled:opacity-40">
+                          <option value="">{franja.departamentoId ? 'Selecciona' : 'Primero depto.'}</option>
+                          {franjaConsultorios.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                  </FranjaSeccion>
+                  </div>
+
+                  {/* Especialidad / Tipo de consulta */}
+                  <FranjaSeccion icon={<Stethoscope size={12}/>} titulo="Tipo de atención">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest block mb-1.5">Especialidad</label>
+                        <select value={franja.especialidadId}
+                          onChange={e => setFranja(p => ({ ...p, especialidadId: e.target.value, tipoConsultaId: '' }))}
+                          className="w-full bg-white/[0.04] border border-white/[0.09] rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-yellow-500/50 transition-all">
+                          <option value="">Selecciona</option>
+                          {especialidades.map(e => <option key={e.id} value={e.id}>{e.nombre}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest block mb-1.5">Tipo consulta</label>
+                        <select value={franja.tipoConsultaId}
+                          onChange={e => setFranja(p => ({ ...p, tipoConsultaId: e.target.value }))}
+                          disabled={!franja.especialidadId}
+                          className="w-full bg-white/[0.04] border border-white/[0.09] rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-yellow-500/50 transition-all disabled:opacity-40">
+                          <option value="">{franja.especialidadId ? 'Opcional' : 'Primero especialidad'}</option>
+                          {franjaTiposConsulta.map(t => <option key={t.id} value={t.id}>{t.nombre}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                  </FranjaSeccion>
+
+                  {/* Vigencia */}
+                  <FranjaSeccion icon={<CalendarRange size={12}/>} titulo="Vigencia">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-[10px] text-gray-600">Meses en los que se generarán turnos</span>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          disabled={franja.añoVigencia <= new Date().getFullYear()}
+                          onClick={() => setFranja(p => ({ ...p, añoVigencia: Math.max(new Date().getFullYear(), p.añoVigencia - 1), mesesSeleccionados: [] }))}
+                          className="w-6 h-6 flex items-center justify-center rounded bg-white/[0.04] hover:bg-yellow-500/20 text-gray-500 hover:text-yellow-400 disabled:opacity-25 disabled:cursor-not-allowed transition-all">
+                          <ChevronLeft size={12}/>
+                        </button>
+                        <span className="text-xs font-bold text-gray-300 w-14 text-center">
+                          {franja.añoVigencia === new Date().getFullYear() ? 'actual' : franja.añoVigencia}
+                        </span>
+                        <button
+                          onClick={() => setFranja(p => ({ ...p, añoVigencia: p.añoVigencia + 1, mesesSeleccionados: [] }))}
+                          className="w-6 h-6 flex items-center justify-center rounded bg-white/[0.04] hover:bg-yellow-500/20 text-gray-500 hover:text-yellow-400 transition-all">
+                          <ChevronRight size={12}/>
+                        </button>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-4 sm:grid-cols-6 gap-1 mb-1.5">
+                      {MESES_CORTO.map((m, i) => {
+                        const mesNum = i + 1;
+                        const hoyA   = new Date().getFullYear();
+                        const hoyM   = new Date().getMonth() + 1;
+                        const isPast = franja.añoVigencia === hoyA && mesNum < hoyM;
+                        const isCurr = franja.añoVigencia === hoyA && mesNum === hoyM;
+                        const isSel  = franja.mesesSeleccionados.includes(mesNum);
+                        return (
+                          <button key={i}
+                            disabled={isPast}
+                            onClick={() => setFranja(p => ({
+                              ...p,
+                              mesesSeleccionados: isSel
+                                ? p.mesesSeleccionados.filter(x => x !== mesNum)
+                                : [...p.mesesSeleccionados, mesNum].sort((a,b) => a - b),
+                            }))}
+                            className={`py-1.5 rounded-lg text-xs font-bold transition-all
+                              ${isPast  ? 'opacity-20 cursor-not-allowed bg-transparent text-gray-700'
+                              : isSel   ? 'bg-yellow-500 text-slate-900 shadow-sm shadow-yellow-500/25'
+                              : isCurr  ? 'bg-white/[0.04] text-yellow-300/80 border border-yellow-500/25 hover:bg-yellow-500/15'
+                              : 'bg-white/[0.03] text-gray-600 hover:bg-yellow-500/10 hover:text-yellow-400 border border-white/[0.05]'}`}>
+                            {m}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div className="flex items-center gap-3 mb-0.5">
+                      <button onClick={() => {
+                        const hA = new Date().getFullYear(); const hM = new Date().getMonth() + 1;
+                        setFranja(p => ({ ...p, mesesSeleccionados: Array.from({length:12},(_,i)=>i+1).filter(m => !(p.añoVigencia===hA && m<hM)) }));
+                      }} className="text-[10px] text-yellow-500/70 hover:text-yellow-300 transition-colors">todos</button>
+                      <button onClick={() => {
+                        const hA = new Date().getFullYear(); const hM = new Date().getMonth() + 1;
+                        setFranja(p => ({ ...p, mesesSeleccionados: [1,2,3,4,5,6].filter(m => !(p.añoVigencia===hA && m<hM)) }));
+                      }} className="text-[10px] text-gray-600 hover:text-gray-400 transition-colors">1er sem</button>
+                      <button onClick={() => {
+                        const hA = new Date().getFullYear(); const hM = new Date().getMonth() + 1;
+                        setFranja(p => ({ ...p, mesesSeleccionados: [7,8,9,10,11,12].filter(m => !(p.añoVigencia===hA && m<hM)) }));
+                      }} className="text-[10px] text-gray-600 hover:text-gray-400 transition-colors">2do sem</button>
+                      {franja.mesesSeleccionados.length > 0 && (
+                        <button onClick={() => setFranja(p => ({ ...p, mesesSeleccionados: [] }))}
+                          className="text-[10px] text-gray-700 hover:text-gray-400 transition-colors ml-auto">limpiar</button>
+                      )}
+                    </div>
+                    {franja.mesesSeleccionados.length === 0
+                      ? <p className="text-[10px] text-amber-500/70 mt-1">Selecciona al menos un mes (his-core requiere un rango de fechas concreto)</p>
+                      : <p className="text-[10px] text-yellow-500/60 mt-1">{franja.mesesSeleccionados.map(m => MESES_CORTO[m-1]).join(' · ')} {franja.añoVigencia}</p>
+                    }
+                  </FranjaSeccion>
+
+                  {/* Días de la semana */}
+                  <FranjaSeccion icon={<CalendarDays size={12}/>} titulo="Días de la semana">
+                    <div className="flex items-center justify-end gap-2 mb-1.5 -mt-1">
+                      <button onClick={() => setFranja(p => ({ ...p, diasSeleccionados: [1,2,3,4,5] }))}
+                        className="text-[10px] text-yellow-500 hover:text-yellow-300 transition-colors">L–V</button>
+                      <button onClick={() => setFranja(p => ({ ...p, diasSeleccionados: DIAS_LABORALES }))}
+                        className="text-[10px] text-gray-500 hover:text-gray-300 transition-colors">L–S</button>
+                      <button onClick={() => setFranja(p => ({ ...p, diasSeleccionados: [] }))}
+                        className="text-[10px] text-gray-600 hover:text-gray-400 transition-colors">ninguno</button>
+                    </div>
+                    <div className="grid grid-cols-7 gap-1">
+                      {[0,1,2,3,4,5,6].map(dia => {
+                        const sel = franja.diasSeleccionados.includes(dia);
+                        return (
+                          <button key={dia} onClick={() => toggleDia(dia)}
+                            className={`flex flex-col items-center py-1.5 rounded-lg text-[10px] font-bold transition-all
+                              ${sel ? 'bg-yellow-500 text-slate-900 shadow-md shadow-yellow-500/20' :
+                                'bg-white/[0.04] text-gray-500 hover:bg-white/[0.08] hover:text-gray-300'}`}>
+                            {DIAS_CORTO[dia]}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {franja.diasSeleccionados.length > 0 && (
+                      <p className="text-[10px] text-yellow-500/70 mt-1.5">
+                        {franja.diasSeleccionados.map(d => DIAS_CORTO[d]).join(' · ')}
+                      </p>
+                    )}
+                  </FranjaSeccion>
+
+                  {/* Horario y duración */}
+                  <div className="lg:col-span-2">
+                  <FranjaSeccion icon={<Clock size={12}/>} titulo="Horario y duración">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Plantillas — multi-selección */}
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Plantillas rápidas</label>
+                          {franja.plantillasActivas.length > 0 && (
+                            <button onClick={() => setFranja(p => ({ ...p, plantillasActivas: [] }))}
+                              className="text-[10px] text-gray-600 hover:text-gray-400 transition-colors">limpiar</button>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-2 gap-1.5">
+                          {PLANTILLAS.map(pl => {
+                            const Icon = pl.icon;
+                            const activa = franja.plantillasActivas.includes(pl.label);
+                            return (
+                              <button key={pl.label}
+                                onClick={() => setFranja(p => ({
+                                  ...p,
+                                  plantillasActivas: activa
+                                    ? p.plantillasActivas.filter(x => x !== pl.label)
+                                    : [...p.plantillasActivas, pl.label],
+                                }))}
+                                className={`relative flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs font-semibold border transition-all
+                                  ${activa ? 'bg-yellow-500/20 border-yellow-500/40 text-yellow-300 ring-1 ring-yellow-500/20' : 'bg-white/[0.03] border-white/[0.07] text-gray-500 hover:border-white/15 hover:text-gray-300'}`}>
+                                <Icon size={11}/> {pl.label}
+                                <span className="ml-auto text-[9px] opacity-50">{pl.horaInicio}–{pl.horaFin}</span>
+                                {activa && <Check size={9} className="text-yellow-400 flex-shrink-0"/>}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        {franja.plantillasActivas.length > 0 && (
+                          <div className="mt-1.5 flex flex-wrap gap-1">
+                            {franja.plantillasActivas.map(lbl => {
+                              const pl = PLANTILLAS.find(p => p.label === lbl)!;
+                              const t = calcTurnos(pl.horaInicio, pl.horaFin, franja.duracionSlot);
+                              return (
+                                <span key={lbl} className="text-[9px] bg-yellow-500/10 border border-yellow-500/20 text-yellow-400/80 rounded-full px-2 py-0.5">
+                                  {lbl}: {t} turnos
+                                </span>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="space-y-3">
+                        {/* Horario manual — solo si no hay plantillas activas */}
+                        {franja.plantillasActivas.length === 0 ? (
+                          <div>
+                            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest block mb-2">Horario manual</label>
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <label className="text-[10px] text-gray-600 block mb-1">Inicio</label>
+                                <input type="time" value={franja.horaInicio} onChange={e => setFranja(p => ({ ...p, horaInicio: e.target.value }))}
+                                  className="w-full bg-white/[0.04] border border-white/[0.09] rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-yellow-500/50 transition-all"/>
+                              </div>
+                              <div>
+                                <label className="text-[10px] text-gray-600 block mb-1">Fin</label>
+                                <input type="time" value={franja.horaFin} onChange={e => setFranja(p => ({ ...p, horaFin: e.target.value }))}
+                                  className="w-full bg-white/[0.04] border border-white/[0.09] rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-yellow-500/50 transition-all"/>
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="text-[10px] text-gray-600 bg-white/[0.02] border border-white/[0.05] rounded-lg px-3 py-2.5">
+                            El horario lo define la plantilla seleccionada. Deselecciónala para editar un horario manual.
+                          </div>
+                        )}
+
+                        {/* Intervalo */}
+                        <div>
+                          <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest block mb-2">Duración del turno</label>
+                          <div className="flex flex-wrap gap-1.5">
+                            {INTERVALOS.map(v => (
+                              <button key={v} onClick={() => setFranja(p => ({ ...p, duracionSlot: v }))}
+                                className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-all
+                                  ${franja.duracionSlot === v ? 'bg-yellow-500/20 border-yellow-500/40 text-yellow-300' : 'bg-white/[0.03] border-white/[0.07] text-gray-500 hover:text-gray-300 hover:border-white/15'}`}>
+                                {v}min
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </FranjaSeccion>
+                  </div>
+
+                  {/* Configuración adicional */}
+                  <FranjaSeccion icon={<Settings size={12}/>} titulo="Configuración adicional">
+                    <div className="grid grid-cols-1 gap-3">
+                      <div>
+                        <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest block mb-1.5">Modalidad</label>
+                        <select value={franja.modalidad}
+                          onChange={e => setFranja(p => ({ ...p, modalidad: e.target.value as any }))}
+                          className="w-full bg-white/[0.04] border border-white/[0.09] rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-yellow-500/50 transition-all">
+                          {MODALIDADES.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-gray-500 block mb-1.5 uppercase tracking-widest font-bold">Sobrecupos máx.</label>
+                        <input type="number" min={0} value={franja.sobrecuposMax}
+                          onChange={e => setFranja(p => ({ ...p, sobrecuposMax: Number(e.target.value) || 0 }))}
+                          className="w-full bg-white/[0.04] border border-white/[0.09] rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-yellow-500/50 transition-all"/>
+                      </div>
+                    </div>
+                  </FranjaSeccion>
+
+                  {/* Preview turnos */}
+                  <div className="lg:col-span-3">
+                  <div className={`flex items-center gap-2.5 rounded-xl px-4 py-3 border text-sm
+                    ${turnosPreview > 0 ? 'bg-emerald-500/[0.07] border-emerald-500/20 text-emerald-300' : 'bg-red-500/[0.07] border-red-500/20 text-red-400'}`}>
+                    <Clock size={16} className="flex-shrink-0"/>
+                    {turnosPreview > 0 ? (
+                      franja.plantillasActivas.length > 1 ? (
+                        <><strong className="text-white">{turnosPreview} cupos/día</strong> · {franja.plantillasActivas.length} jornadas · {franja.duracionSlot}min c/u</>
+                      ) : (
+                        <><strong className="text-white">{turnosPreview} cupos/día</strong> · {franja.plantillasActivas.length === 1 ? (() => { const pl = PLANTILLAS.find(p => p.label === franja.plantillasActivas[0])!; return `${pl.horaInicio}–${pl.horaFin}`; })() : `${franja.horaInicio}–${franja.horaFin}`} · {franja.duracionSlot}min c/u</>
+                      )
+                    ) : 'Revisa el horario'}
+                  </div>
+                  </div>
+                </div>
+                </div>
+
+                {/* Footer */}
+                <div className="flex items-center justify-end gap-3 px-6 py-2.5 border-t border-yellow-500/15 bg-black/20 flex-shrink-0">
+                  <button onClick={() => setPanelActivo(null)}
+                    className="px-4 py-2.5 rounded-xl text-gray-400 hover:text-white border border-white/10 hover:bg-white/5 text-sm font-semibold transition-all">
+                    Cancelar
+                  </button>
+                  <button onClick={guardarFranja}
+                    disabled={guardando || turnosPreview <= 0 || franja.diasSeleccionados.length === 0 || franja.mesesSeleccionados.length === 0}
+                    className="flex items-center justify-center gap-2 bg-yellow-500 hover:bg-yellow-400 text-slate-900 font-black text-sm px-6 py-2.5 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-yellow-500/20">
+                    {guardando ? (
+                      <><RefreshCw size={14} className="animate-spin"/> Creando turnos...</>
+                    ) : (
+                      <><Check size={14}/> Crear turnos</>
+                    )}
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* ━━ Panel lateral deslizante (Bloqueo / Eliminar) ━━ */}
+        <AnimatePresence>
+          {panelActivo && panelActivo !== 'franja' && profesionalSel && (
             <motion.div
               key={panelActivo}
               initial={{ x: 340, opacity: 0 }}
@@ -1018,287 +1392,22 @@ export default function ConfigAgendaPage() {
               exit={{ x: 340, opacity: 0 }}
               transition={{ type: 'spring', stiffness: 380, damping: 35 }}
               className={`w-full md:w-80 flex-shrink-0 flex flex-col border-l overflow-hidden
-                ${panelActivo === 'bloqueo' ? 'border-orange-500/20 bg-[#0d0a08]' : panelActivo === 'eliminar' ? 'border-rose-500/20 bg-[#0d0809]' : 'border-yellow-500/20 bg-[#0d0c08]'}`}
+                ${panelActivo === 'bloqueo' ? 'border-orange-500/20 bg-[#0d0a08]' : 'border-rose-500/20 bg-[#0d0809]'}`}
             >
-              {/* ── Panel Franja ── */}
-              {panelActivo === 'franja' && (
-                <>
-                  <div className="flex items-center justify-between px-4 py-3 border-b border-yellow-500/15">
-                    <div>
-                      <p className="text-yellow-400 font-bold text-sm flex items-center gap-1.5"><CalendarCheck2 size={14}/> Nueva Franja</p>
-                      <p className="text-gray-600 text-[10px]">{medicoSel.nombre} {medicoSel.apellido}</p>
-                    </div>
-                    <button onClick={() => setPanelActivo(null)} className="text-gray-600 hover:text-white p-1"><X size={16}/></button>
-                  </div>
-
-                  <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
-                    {/* Año + Meses */}
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <label className="text-[9px] font-bold text-gray-500 uppercase tracking-widest">Meses</label>
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            disabled={franja.añoVigencia <= new Date().getFullYear()}
-                            onClick={() => setFranja(p => ({ ...p, añoVigencia: Math.max(new Date().getFullYear(), p.añoVigencia - 1), mesesSeleccionados: [] }))}
-                            className="w-5 h-5 flex items-center justify-center rounded bg-white/[0.04] hover:bg-yellow-500/20 text-gray-500 hover:text-yellow-400 disabled:opacity-25 disabled:cursor-not-allowed transition-all">
-                            <ChevronLeft size={11}/>
-                          </button>
-                          <span className="text-[10px] font-bold text-gray-400 w-14 text-center">
-                            {franja.añoVigencia === new Date().getFullYear() ? 'actual' : franja.añoVigencia}
-                          </span>
-                          <button
-                            onClick={() => setFranja(p => ({ ...p, añoVigencia: p.añoVigencia + 1, mesesSeleccionados: [] }))}
-                            className="w-5 h-5 flex items-center justify-center rounded bg-white/[0.04] hover:bg-yellow-500/20 text-gray-500 hover:text-yellow-400 transition-all">
-                            <ChevronRight size={11}/>
-                          </button>
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-4 gap-1 mb-2">
-                        {MESES_CORTO.map((m, i) => {
-                          const mesNum = i + 1;
-                          const hoyA   = new Date().getFullYear();
-                          const hoyM   = new Date().getMonth() + 1;
-                          const isPast = franja.añoVigencia === hoyA && mesNum < hoyM;
-                          const isCurr = franja.añoVigencia === hoyA && mesNum === hoyM;
-                          const isSel  = franja.mesesSeleccionados.includes(mesNum);
-                          return (
-                            <button key={i}
-                              disabled={isPast}
-                              onClick={() => setFranja(p => ({
-                                ...p,
-                                mesesSeleccionados: isSel
-                                  ? p.mesesSeleccionados.filter(x => x !== mesNum)
-                                  : [...p.mesesSeleccionados, mesNum].sort((a,b) => a - b),
-                              }))}
-                              className={`py-2 rounded-lg text-[10px] font-bold transition-all
-                                ${isPast  ? 'opacity-20 cursor-not-allowed bg-transparent text-gray-700'
-                                : isSel   ? 'bg-yellow-500 text-slate-900 shadow-sm shadow-yellow-500/25'
-                                : isCurr  ? 'bg-white/[0.04] text-yellow-300/80 border border-yellow-500/25 hover:bg-yellow-500/15'
-                                : 'bg-white/[0.03] text-gray-600 hover:bg-yellow-500/10 hover:text-yellow-400 border border-white/[0.05]'}`}>
-                              {m}
-                            </button>
-                          );
-                        })}
-                      </div>
-                      <div className="flex items-center gap-3 mb-0.5">
-                        <button onClick={() => {
-                          const hA = new Date().getFullYear(); const hM = new Date().getMonth() + 1;
-                          setFranja(p => ({ ...p, mesesSeleccionados: Array.from({length:12},(_,i)=>i+1).filter(m => !(p.añoVigencia===hA && m<hM)) }));
-                        }} className="text-[9px] text-yellow-500/70 hover:text-yellow-300 transition-colors">todos</button>
-                        <button onClick={() => {
-                          const hA = new Date().getFullYear(); const hM = new Date().getMonth() + 1;
-                          setFranja(p => ({ ...p, mesesSeleccionados: [1,2,3,4,5,6].filter(m => !(p.añoVigencia===hA && m<hM)) }));
-                        }} className="text-[9px] text-gray-600 hover:text-gray-400 transition-colors">1er sem</button>
-                        <button onClick={() => {
-                          const hA = new Date().getFullYear(); const hM = new Date().getMonth() + 1;
-                          setFranja(p => ({ ...p, mesesSeleccionados: [7,8,9,10,11,12].filter(m => !(p.añoVigencia===hA && m<hM)) }));
-                        }} className="text-[9px] text-gray-600 hover:text-gray-400 transition-colors">2do sem</button>
-                        {franja.mesesSeleccionados.length > 0 && (
-                          <button onClick={() => setFranja(p => ({ ...p, mesesSeleccionados: [] }))}
-                            className="text-[9px] text-gray-700 hover:text-gray-400 transition-colors ml-auto">limpiar</button>
-                        )}
-                      </div>
-                      {franja.mesesSeleccionados.length === 0
-                        ? <p className="text-[9px] text-gray-700">Sin meses = vigencia indefinida</p>
-                        : <p className="text-[9px] text-yellow-500/60">{franja.mesesSeleccionados.map(m => MESES_CORTO[m-1]).join(' · ')} {franja.añoVigencia}</p>
-                      }
-                    </div>
-
-                    {/* Días de la semana */}
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <label className="text-[9px] font-bold text-gray-500 uppercase tracking-widest">Días de la semana</label>
-                        <div className="flex gap-2">
-                          <button onClick={() => setFranja(p => ({ ...p, diasSeleccionados: [1,2,3,4,5] }))}
-                            className="text-[9px] text-yellow-500 hover:text-yellow-300 transition-colors">L–V</button>
-                          <button onClick={() => setFranja(p => ({ ...p, diasSeleccionados: DIAS_LABORALES }))}
-                            className="text-[9px] text-gray-500 hover:text-gray-300 transition-colors">L–S</button>
-                          <button onClick={() => setFranja(p => ({ ...p, diasSeleccionados: [] }))}
-                            className="text-[9px] text-gray-600 hover:text-gray-400 transition-colors">ninguno</button>
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-7 gap-1">
-                        {[0,1,2,3,4,5,6].map(dia => {
-                          const sel = franja.diasSeleccionados.includes(dia);
-                          const esDom = dia === 0;
-                          return (
-                            <button key={dia} onClick={() => !esDom && toggleDia(dia)} disabled={esDom}
-                              className={`flex flex-col items-center py-2 rounded-lg text-[10px] font-bold transition-all
-                                ${esDom ? 'opacity-25 cursor-not-allowed bg-transparent text-gray-600' :
-                                  sel ? 'bg-yellow-500 text-slate-900 shadow-md shadow-yellow-500/20' :
-                                  'bg-white/[0.04] text-gray-500 hover:bg-white/[0.08] hover:text-gray-300'}`}>
-                              {DIAS_CORTO[dia]}
-                            </button>
-                          );
-                        })}
-                      </div>
-                      {franja.diasSeleccionados.length > 0 && (
-                        <p className="text-[9px] text-yellow-500/70 mt-1.5">
-                          {franja.diasSeleccionados.map(d => DIAS_CORTO[d]).join(' · ')}
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Plantillas — multi-selección */}
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <label className="text-[9px] font-bold text-gray-500 uppercase tracking-widest">Plantillas rápidas</label>
-                        {franja.plantillasActivas.length > 0 && (
-                          <button onClick={() => setFranja(p => ({ ...p, plantillasActivas: [] }))}
-                            className="text-[9px] text-gray-600 hover:text-gray-400 transition-colors">limpiar</button>
-                        )}
-                      </div>
-                      <div className="grid grid-cols-2 gap-1.5">
-                        {PLANTILLAS.map(pl => {
-                          const Icon = pl.icon;
-                          const activa = franja.plantillasActivas.includes(pl.label);
-                          return (
-                            <button key={pl.label}
-                              onClick={() => setFranja(p => ({
-                                ...p,
-                                plantillasActivas: activa
-                                  ? p.plantillasActivas.filter(x => x !== pl.label)
-                                  : [...p.plantillasActivas, pl.label],
-                              }))}
-                              className={`relative flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs font-semibold border transition-all
-                                ${activa ? 'bg-yellow-500/20 border-yellow-500/40 text-yellow-300 ring-1 ring-yellow-500/20' : 'bg-white/[0.03] border-white/[0.07] text-gray-500 hover:border-white/15 hover:text-gray-300'}`}>
-                              <Icon size={11}/> {pl.label}
-                              <span className="ml-auto text-[9px] opacity-50">{pl.horaInicio}–{pl.horaFin}</span>
-                              {activa && <Check size={9} className="text-yellow-400 flex-shrink-0"/>}
-                            </button>
-                          );
-                        })}
-                      </div>
-                      {franja.plantillasActivas.length > 0 && (
-                        <div className="mt-1.5 flex flex-wrap gap-1">
-                          {franja.plantillasActivas.map(lbl => {
-                            const pl = PLANTILLAS.find(p => p.label === lbl)!;
-                            const t = calcTurnos(pl.horaInicio, pl.horaFin, franja.duracionSlot);
-                            return (
-                              <span key={lbl} className="text-[9px] bg-yellow-500/10 border border-yellow-500/20 text-yellow-400/80 rounded-full px-2 py-0.5">
-                                {lbl}: {t} turnos
-                              </span>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Horario manual — solo si no hay plantillas activas */}
-                    {franja.plantillasActivas.length === 0 && (
-                      <div>
-                        <label className="text-[9px] font-bold text-gray-500 uppercase tracking-widest block mb-2">Horario manual</label>
-                        <div className="grid grid-cols-2 gap-2">
-                          <div>
-                            <label className="text-[9px] text-gray-600 block mb-1">Inicio</label>
-                            <input type="time" value={franja.horaInicio} onChange={e => setFranja(p => ({ ...p, horaInicio: e.target.value }))}
-                              className="w-full bg-white/[0.04] border border-white/[0.09] rounded-lg px-2.5 py-2 text-white text-xs focus:outline-none focus:border-yellow-500/50 transition-all"/>
-                          </div>
-                          <div>
-                            <label className="text-[9px] text-gray-600 block mb-1">Fin</label>
-                            <input type="time" value={franja.horaFin} onChange={e => setFranja(p => ({ ...p, horaFin: e.target.value }))}
-                              className="w-full bg-white/[0.04] border border-white/[0.09] rounded-lg px-2.5 py-2 text-white text-xs focus:outline-none focus:border-yellow-500/50 transition-all"/>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Intervalo */}
-                    <div>
-                      <label className="text-[9px] font-bold text-gray-500 uppercase tracking-widest block mb-2">Duración del turno</label>
-                      <div className="flex flex-wrap gap-1.5">
-                        {INTERVALOS.map(v => (
-                          <button key={v} onClick={() => setFranja(p => ({ ...p, duracionSlot: v }))}
-                            className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-all
-                              ${franja.duracionSlot === v ? 'bg-yellow-500/20 border-yellow-500/40 text-yellow-300' : 'bg-white/[0.03] border-white/[0.07] text-gray-500 hover:text-gray-300 hover:border-white/15'}`}>
-                            {v}min
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Preview turnos */}
-                    <div className={`flex items-center gap-2.5 rounded-xl px-3 py-2.5 border text-xs
-                      ${turnosPreview > 0 ? 'bg-emerald-500/[0.07] border-emerald-500/20 text-emerald-300' : 'bg-red-500/[0.07] border-red-500/20 text-red-400'}`}>
-                      <Clock size={14} className="flex-shrink-0"/>
-                      {turnosPreview > 0 ? (
-                        franja.plantillasActivas.length > 1 ? (
-                          <><strong className="text-white">{turnosPreview} turnos</strong> · {franja.plantillasActivas.length} franjas · {franja.duracionSlot}min c/u</>
-                        ) : (
-                          <><strong className="text-white">{turnosPreview} turnos</strong> · {franja.plantillasActivas.length === 1 ? (() => { const pl = PLANTILLAS.find(p => p.label === franja.plantillasActivas[0])!; return `${pl.horaInicio}–${pl.horaFin}`; })() : `${franja.horaInicio}–${franja.horaFin}`} · {franja.duracionSlot}min c/u</>
-                        )
-                      ) : 'Revisa el horario'}
-                    </div>
-
-                    {/* Tipo consulta */}
-                    {tiposConsulta.length > 0 && (
-                      <div>
-                        <label className="text-[9px] font-bold text-gray-500 uppercase tracking-widest block mb-2">Tipo de consulta</label>
-                        <div className="space-y-1">
-                          {tiposConsulta.map(t => (
-                            <button key={t.id}
-                              onClick={() => setFranja(p => ({ ...p, tipoConsultaId: t.id, tipoConsultaNombre: t.nombre, duracionSlot: t.duracionMinutos || p.duracionSlot }))}
-                              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg border text-xs transition-all
-                                ${franja.tipoConsultaId === t.id ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-300' : 'bg-white/[0.02] border-white/[0.06] text-gray-400 hover:border-white/10 hover:text-gray-300'}`}>
-                              <span>{t.nombre}</span>
-                              <span className="text-[9px] opacity-60">{t.duracionMinutos}min</span>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Sede / Consultorio */}
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="text-[9px] text-gray-600 block mb-1.5 uppercase tracking-widest font-bold">Sede</label>
-                        <input value={franja.sede} onChange={e => setFranja(p => ({ ...p, sede: e.target.value }))}
-                          placeholder="Principal"
-                          className="w-full bg-white/[0.04] border border-white/[0.09] rounded-lg px-2.5 py-2 text-white text-xs placeholder-gray-600 focus:outline-none focus:border-yellow-500/50 transition-all"/>
-                      </div>
-                      <div>
-                        <label className="text-[9px] text-gray-600 block mb-1.5 uppercase tracking-widest font-bold">Consultorio</label>
-                        <input value={franja.consultorio} onChange={e => setFranja(p => ({ ...p, consultorio: e.target.value }))}
-                          placeholder="Ej: Cons. 2"
-                          className="w-full bg-white/[0.04] border border-white/[0.09] rounded-lg px-2.5 py-2 text-white text-xs placeholder-gray-600 focus:outline-none focus:border-yellow-500/50 transition-all"/>
-                      </div>
-                    </div>
-
-                  </div>
-
-                  <div className="flex-shrink-0 px-4 py-3 border-t border-yellow-500/15">
-                    <button onClick={guardarFranja}
-                      disabled={guardando || turnosPreview <= 0 || franja.diasSeleccionados.length === 0}
-                      className="w-full flex items-center justify-center gap-2 bg-yellow-500 hover:bg-yellow-400 text-slate-900 font-black text-sm py-2.5 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-yellow-500/20">
-                      {guardando ? (
-                        <><RefreshCw size={14} className="animate-spin"/> Guardando...</>
-                      ) : (() => {
-                        const nMeses = franja.mesesSeleccionados.length || 1;
-                        const nPares = franja.plantillasActivas.length || 1;
-                        const nDias  = franja.diasSeleccionados.length;
-                        const total  = nMeses * nPares * nDias;
-                        const detalles = [nMeses>1?`${nMeses} meses`:'', nPares>1?`${nPares} horarios`:'', nDias>1?`${nDias} días`:''].filter(Boolean).join(' × ');
-                        return <><Check size={14}/> Crear {total > 1 ? `${total} franjas` : 'franja'}{detalles ? ` (${detalles})` : ''}</>;
-                      })()}
-                    </button>
-                  </div>
-                </>
-              )}
-
               {/* ── Panel Bloqueo ── */}
               {panelActivo === 'bloqueo' && (
                 <>
                   <div className="flex items-center justify-between px-4 py-3 border-b border-orange-500/15">
                     <div>
                       <p className="text-orange-400 font-bold text-sm flex items-center gap-1.5"><CalendarX2 size={14}/> Nuevo Bloqueo</p>
-                      <p className="text-gray-600 text-[10px]">{medicoSel.nombre} {medicoSel.apellido}</p>
+                      <p className="text-gray-600 text-[10px]">{profesionalSel.nombreCompleto}</p>
                     </div>
                     <button onClick={() => setPanelActivo(null)} className="text-gray-600 hover:text-white p-1"><X size={16}/></button>
                   </div>
 
                   <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
                     <div className="bg-orange-500/[0.05] border border-orange-500/15 rounded-xl px-3 py-2.5 text-[10px] text-orange-300/70">
-                      Los bloqueos impiden agendar citas en el período indicado (vacaciones, congresos, cirugías programadas, etc.)
+                      Cancela los turnos ya abiertos en el período indicado (vacaciones, congresos, cirugías programadas, etc.). Los turnos con citas activas no se cancelan.
                     </div>
                     <div>
                       <label className="text-[9px] font-bold text-gray-500 uppercase tracking-widest block mb-2">Motivo</label>
@@ -1323,40 +1432,34 @@ export default function ConfigAgendaPage() {
                     {bloqueoForm.fechaInicio && bloqueoForm.fechaFin && (
                       <p className="text-[10px] text-orange-400/70">{fmtFecha(bloqueoForm.fechaInicio)} → {fmtFecha(bloqueoForm.fechaFin)}</p>
                     )}
-                    <div className="flex items-center gap-3">
-                      <button onClick={() => setBloqueoForm(p => ({ ...p, todoElDia: !p.todoElDia }))} className="transition-colors">
-                        {bloqueoForm.todoElDia ? <ToggleRight size={22} className="text-orange-400"/> : <ToggleLeft size={22} className="text-gray-600"/>}
-                      </button>
-                      <div>
-                        <p className="text-white text-xs font-medium">Todo el día</p>
-                        <p className="text-gray-600 text-[10px]">Bloquea todo el horario disponible</p>
-                      </div>
-                    </div>
+                    <p className="text-[10px] text-gray-600">
+                      {turnos.filter(t => t.estado === 'HABILITADO' && t.fecha >= bloqueoForm.fechaInicio && t.fecha <= bloqueoForm.fechaFin).length} turno(s) habilitado(s) serán cancelados en ese rango.
+                    </p>
                   </div>
 
                   <div className="flex-shrink-0 px-4 py-3 border-t border-orange-500/15">
                     <button onClick={guardarBloqueo} disabled={guardando || !bloqueoForm.fechaInicio || !bloqueoForm.fechaFin}
                       className="w-full flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-400 text-white font-black text-sm py-2.5 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed">
-                      {guardando ? <><RefreshCw size={14} className="animate-spin"/> Guardando...</> : <><CalendarX2 size={14}/> Crear bloqueo</>}
+                      {guardando ? <><RefreshCw size={14} className="animate-spin"/> Cancelando...</> : <><CalendarX2 size={14}/> Bloquear (cancelar turnos)</>}
                     </button>
                   </div>
                 </>
               )}
 
-              {/* ── Panel Eliminar Franjas ── */}
+              {/* ── Panel Eliminar / Cancelar en lote ── */}
               {panelActivo === 'eliminar' && (
                 <>
                   <div className="flex items-center justify-between px-4 py-3 border-b border-rose-500/15">
                     <div>
-                      <p className="text-rose-400 font-bold text-sm flex items-center gap-1.5"><Trash2 size={14}/> Eliminar Franjas</p>
-                      <p className="text-gray-600 text-[10px]">{medicoSel.nombre} {medicoSel.apellido}</p>
+                      <p className="text-rose-400 font-bold text-sm flex items-center gap-1.5"><Trash2 size={14}/> Cancelar Turnos</p>
+                      <p className="text-gray-600 text-[10px]">{profesionalSel.nombreCompleto}</p>
                     </div>
                     <button onClick={() => setPanelActivo(null)} className="text-gray-600 hover:text-white p-1"><X size={16}/></button>
                   </div>
 
                   <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
                     <div className="bg-rose-500/[0.05] border border-rose-500/15 rounded-xl px-3 py-2.5 text-[10px] text-rose-300/70">
-                      Solo se eliminan franjas <strong>sin pacientes asignados</strong>. Las que tienen citas activas quedan protegidas.
+                      Solo se cancelan turnos <strong>sin citas asignadas</strong>. Los que tienen citas activas quedan protegidos.
                     </div>
 
                     {/* Filtro días */}
@@ -1364,14 +1467,12 @@ export default function ConfigAgendaPage() {
                       <label className="text-[9px] font-bold text-gray-500 uppercase tracking-widest block mb-2">Filtrar por día</label>
                       <div className="flex flex-wrap gap-1">
                         {DIAS_LARGO.map((d, i) => {
-                          const esDom = i === 0;
-                          const sel   = elimFiltroDias.includes(i);
+                          const sel = elimFiltroDias.includes(i);
                           return (
-                            <button key={i} disabled={esDom}
+                            <button key={i}
                               onClick={() => setElimFiltroDias(p => p.includes(i) ? p.filter(x => x !== i) : [...p, i])}
                               className={`px-2 py-1 rounded-md text-[10px] font-semibold transition-all
-                                ${esDom ? 'opacity-20 cursor-not-allowed text-gray-700 bg-white/[0.02]' :
-                                  sel  ? 'bg-rose-500/20 border border-rose-500/40 text-rose-300' :
+                                ${sel  ? 'bg-rose-500/20 border border-rose-500/40 text-rose-300' :
                                   'bg-white/[0.04] border border-white/[0.08] text-gray-500 hover:text-rose-300 hover:border-rose-500/30'}`}>
                               {DIAS_CORTO[i]}
                             </button>
@@ -1409,16 +1510,12 @@ export default function ConfigAgendaPage() {
                       <div className="grid grid-cols-4 gap-1">
                         {MESES_CORTO.map((m, i) => {
                           const mesNum  = i + 1;
-                          const hoyAño  = new Date().getFullYear();
-                          const hoyMes  = new Date().getMonth() + 1;
-                          const isPast  = elimFiltroAño === hoyAño && mesNum < hoyMes;
                           const isSel   = elimFiltroMeses.includes(mesNum);
                           return (
-                            <button key={i} disabled={isPast}
+                            <button key={i}
                               onClick={() => setElimFiltroMeses(p => p.includes(mesNum) ? p.filter(x => x !== mesNum) : [...p, mesNum])}
                               className={`py-1.5 rounded-lg text-[10px] font-bold transition-all
-                                ${isPast ? 'opacity-20 cursor-not-allowed text-gray-700 bg-white/[0.02]' :
-                                  isSel  ? 'bg-rose-500/20 border border-rose-500/40 text-rose-300' :
+                                ${isSel  ? 'bg-rose-500/20 border border-rose-500/40 text-rose-300' :
                                   'bg-white/[0.04] text-gray-500 hover:bg-rose-500/10 hover:text-rose-300 border border-white/[0.06]'}`}>
                               {m}
                             </button>
@@ -1433,32 +1530,32 @@ export default function ConfigAgendaPage() {
                     {/* Botón cargar */}
                     <button onClick={cargarEliminar} disabled={elimCargando}
                       className="w-full flex items-center justify-center gap-2 bg-white/[0.05] hover:bg-rose-500/10 border border-white/[0.08] hover:border-rose-500/30 text-gray-300 hover:text-rose-300 text-xs font-semibold py-2 rounded-lg transition-all disabled:opacity-50">
-                      {elimCargando ? <><RefreshCw size={12} className="animate-spin"/> Cargando...</> : <><Search size={12}/> Buscar franjas</>}
+                      {elimCargando ? <><RefreshCw size={12} className="animate-spin"/> Cargando...</> : <><Search size={12}/> Buscar turnos</>}
                     </button>
 
-                    {/* Lista de franjas */}
+                    {/* Lista de turnos */}
                     {elimCargado && (
                       <div>
                         {elimFranjas.length === 0 ? (
-                          <p className="text-center text-gray-600 text-xs py-4">No hay franjas con esos filtros</p>
+                          <p className="text-center text-gray-600 text-xs py-4">No hay turnos con esos filtros</p>
                         ) : (
                           <>
                             <div className="flex items-center justify-between mb-2">
-                              <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest">{elimFranjas.length} franja{elimFranjas.length !== 1 ? 's' : ''}</span>
+                              <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest">{elimFranjas.length} turno{elimFranjas.length !== 1 ? 's' : ''}</span>
                               <div className="flex gap-2">
-                                <button onClick={() => setElimSel(elimFranjas.filter(f => f.numCitas === 0).map(f => f.id))}
-                                  className="text-[9px] text-gray-600 hover:text-rose-400 transition-colors">todas libres</button>
+                                <button onClick={() => setElimSel(elimFranjas.filter(f => f.citasActivas === 0).map(f => f.id))}
+                                  className="text-[9px] text-gray-600 hover:text-rose-400 transition-colors">todos libres</button>
                                 <button onClick={() => setElimSel([])}
-                                  className="text-[9px] text-gray-600 hover:text-rose-400 transition-colors">ninguna</button>
+                                  className="text-[9px] text-gray-600 hover:text-rose-400 transition-colors">ninguno</button>
                               </div>
                             </div>
                             <div className="space-y-1.5 max-h-64 overflow-y-auto pr-0.5">
-                              {elimFranjas.map(f => {
-                                const tieneCitas = f.numCitas > 0;
-                                const checked    = elimSel.includes(f.id);
+                              {elimFranjas.map(t => {
+                                const tieneCitas = t.citasActivas > 0;
+                                const checked    = elimSel.includes(t.id);
                                 return (
-                                  <button key={f.id} disabled={tieneCitas}
-                                    onClick={() => setElimSel(p => p.includes(f.id) ? p.filter(x => x !== f.id) : [...p, f.id])}
+                                  <button key={t.id} disabled={tieneCitas}
+                                    onClick={() => setElimSel(p => p.includes(t.id) ? p.filter(x => x !== t.id) : [...p, t.id])}
                                     className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg border text-left transition-all
                                       ${tieneCitas ? 'opacity-50 cursor-not-allowed border-white/[0.04] bg-white/[0.02]' :
                                         checked    ? 'border-rose-500/30 bg-rose-500/10' :
@@ -1469,14 +1566,11 @@ export default function ConfigAgendaPage() {
                                       {checked && !tieneCitas && <Check size={10} className="text-white m-auto mt-px"/>}
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                      <p className="text-[11px] font-semibold text-gray-300 truncate">{DIAS_LARGO[f.diaSemana]}</p>
-                                      <p className="text-[10px] text-gray-600">{f.horaInicio} – {f.horaFin}</p>
-                                      {(f.fechaDesde || f.fechaHasta) && (
-                                        <p className="text-[9px] text-gray-700 truncate">{fmtFecha(f.fechaDesde || '')} → {fmtFecha(f.fechaHasta || '')}</p>
-                                      )}
+                                      <p className="text-[11px] font-semibold text-gray-300 truncate">{fmtFecha(t.fecha)}</p>
+                                      <p className="text-[10px] text-gray-600">{t.horaInicio} – {t.horaFin} · {t.consultorio.nombre}</p>
                                     </div>
                                     {tieneCitas ? (
-                                      <span className="text-[9px] bg-red-500/20 text-red-400 border border-red-500/30 px-1.5 py-0.5 rounded-full flex-shrink-0">{f.numCitas} cita{f.numCitas !== 1 ? 's' : ''}</span>
+                                      <span className="text-[9px] bg-red-500/20 text-red-400 border border-red-500/30 px-1.5 py-0.5 rounded-full flex-shrink-0">{t.citasActivas} cita{t.citasActivas !== 1 ? 's' : ''}</span>
                                     ) : (
                                       <span className="text-[9px] text-gray-700 flex-shrink-0">libre</span>
                                     )}
@@ -1495,8 +1589,8 @@ export default function ConfigAgendaPage() {
                       disabled={elimEliminando || !elimSel.length}
                       className="w-full flex items-center justify-center gap-2 bg-rose-600 hover:bg-rose-500 text-white font-black text-sm py-2.5 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed">
                       {elimEliminando
-                        ? <><RefreshCw size={14} className="animate-spin"/> Eliminando...</>
-                        : <><Trash2 size={14}/> Eliminar {elimSel.length > 0 ? `(${elimSel.length})` : ''}</>}
+                        ? <><RefreshCw size={14} className="animate-spin"/> Cancelando...</>
+                        : <><Trash2 size={14}/> Cancelar {elimSel.length > 0 ? `(${elimSel.length})` : ''}</>}
                     </button>
                   </div>
                 </>
@@ -1508,6 +1602,3 @@ export default function ConfigAgendaPage() {
     </div>
   );
 }
-
-
-

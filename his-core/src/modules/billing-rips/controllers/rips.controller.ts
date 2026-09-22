@@ -9,6 +9,7 @@ import {
   UsePipes,
   ValidationPipe,
   ParseUUIDPipe,
+  UseGuards,
 } from '@nestjs/common';
 import {
   RipsService,
@@ -17,8 +18,10 @@ import {
 } from '../services/rips.service';
 import { GenerateRipsDto } from '../dto/generate-rips.dto';
 import { TenantContextService } from '../../../core/tenancy/services/tenant-context.service';
+import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 
 @Controller('rips')
+@UseGuards(JwtAuthGuard)
 export class RipsController {
   constructor(
     private readonly ripsService: RipsService,

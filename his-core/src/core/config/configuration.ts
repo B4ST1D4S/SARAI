@@ -5,6 +5,12 @@ export const appConfig = registerAs('app', () => ({
   port: parseInt(process.env.PORT ?? '3000', 10),
   name: process.env.APP_NAME ?? 'SARAI-HIS-Core',
   baseDomain: process.env.BASE_DOMAIN ?? 'hisapp.local',
+  corsOrigins: (
+    process.env.CORS_ORIGINS ?? 'http://localhost:5173,http://127.0.0.1:5173'
+  )
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean),
 }));
 
 export const masterDbConfig = registerAs('masterDb', () => ({

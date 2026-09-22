@@ -38,19 +38,25 @@ async function bootstrap() {
   );
 
   // CORS para frontend de salud y clínicas
+  const corsOrigins = configService.get<string[]>('app.corsOrigins', [
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+  ]);
   app.enableCors({
-  origin: ['http://localhost:5173', 'http://127.0.0.1:5173'],
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: [
-    'Content-Type',
-    'Authorization',
-    'x-tenant-id',
-    'Accept',
-    'Origin',
-    'X-Requested-With',
-  ],
-});
+    origin: corsOrigins,
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'x-tenant-id',
+      'x-tenant-subdomain',
+      'x-tenant-slug',
+      'Accept',
+      'Origin',
+      'X-Requested-With',
+    ],
+  });
 
   app.setGlobalPrefix('api/v1');
 

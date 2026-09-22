@@ -23,11 +23,14 @@ export default function PacientesPage() {
   // Cargar pacientes
   const loadPacientes = async () => {
     setLoading(true);
-    const response = await getAllPacientes(1, 10, token);
-    if (response.data) {
-      setPacientes(((response.data as any).pacientes || []) as any[]);
+    try {
+      const data: any = await getAllPacientes(1, 10, token);
+      setPacientes(data?.pacientes || []);
+    } catch (error) {
+      console.error('Error al cargar pacientes:', error);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   useEffect(() => {
@@ -42,11 +45,14 @@ export default function PacientesPage() {
     }
 
     setLoading(true);
-    const response = await searchPacientes(searchQuery, token);
-    if (response.data) {
-      setPacientes(response.data as any);
+    try {
+      const data: any = await searchPacientes(searchQuery, token);
+      setPacientes(data || []);
+    } catch (error) {
+      console.error('Error al buscar pacientes:', error);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   // Manejar envío del formulario
@@ -76,14 +82,9 @@ export default function PacientesPage() {
         observaciones: formData.notasPaciente,
       };
 
-      const response = await createPaciente(pacienteMapeado, token);
-      
-      if (!response.error) {
-        await loadPacientes();
-        setMostrarFormulario(false);
-      } else {
-        console.error('Error al crear paciente:', response.error);
-      }
+      await createPaciente(pacienteMapeado, token);
+      await loadPacientes();
+      setMostrarFormulario(false);
     } catch (error) {
       console.error('Error al crear paciente:', error);
     } finally {
@@ -96,11 +97,14 @@ export default function PacientesPage() {
     if (!confirm('¿Estás seguro de que deseas eliminar este paciente?')) return;
 
     setLoading(true);
-    const response = await deletePaciente(id, token);
-    if (!response.error) {
+    try {
+      await deletePaciente(id, token);
       await loadPacientes();
+    } catch (error) {
+      console.error('Error al eliminar paciente:', error);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const { canDo } = useIam();

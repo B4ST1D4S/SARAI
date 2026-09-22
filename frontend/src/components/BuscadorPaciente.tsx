@@ -1,7 +1,7 @@
 ﻿import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Search, User, AlertCircle, CheckCircle } from 'lucide-react';
-import { API_BASE_URL } from '../config';
+import { searchPacientes } from '../services/api';
 
 interface BuscadorPacienteProps {
   onPacienteEncontrado: (paciente: any) => void;
@@ -17,8 +17,6 @@ export function BuscadorPaciente({ onPacienteEncontrado, onNuevoPaciente, onConf
   const [pacienteEncontrado, setPacienteEncontrado] = useState<any>(null);
   const [error, setError] = useState('');
 
-  const getToken = () => localStorage.getItem('accessToken') || '';
-
   const handleBuscar = async () => {
     if (!numeroDocumento.trim()) {
       setError('Por favor ingresa el número de documento');
@@ -30,18 +28,12 @@ export function BuscadorPaciente({ onPacienteEncontrado, onNuevoPaciente, onConf
     setPacienteEncontrado(null);
 
     try {
-      // Buscar por documento
-      const response = await fetch(
-        `${API_BASE_URL}/pacientes/search?documento=${numeroDocumento}&tipo=${tipoDocumento}`,
-        {
-          headers: { Authorization: `Bearer ${getToken()}` },
-        }
-      );
+      const resultados: any[] = (await searchPacientes(numeroDocumento.trim())) || [];
+      const encontrado = resultados.find((p) => p.numeroDocumento === numeroDocumento.trim() && p.tipoDocumento === tipoDocumento)
+        || resultados[0];
 
-      const data = await response.json();
-
-      if (response.ok && data) {
-        setPacienteEncontrado(data);
+      if (encontrado) {
+        setPacienteEncontrado(encontrado);
       } else {
         // Paciente no encontrado → abrir formulario de creación automáticamente
         setError('Paciente no encontrado. Abriendo formulario de registro...');

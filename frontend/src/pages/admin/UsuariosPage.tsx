@@ -124,23 +124,28 @@ export default function UsuariosPage() {
   // ── Carga ─────────────────────────────────────────────────────────────────
   const loadUsuarios = async () => {
     setLoading(true);
-    const res = await getAllUsuarios(token);
-    if (res.data) setUsuarios(res.data as UsuarioData[]);
-    setLoading(false);
+    try {
+      const data = await getAllUsuarios(token);
+      setUsuarios(data as UsuarioData[]);
+    } catch (e) {
+      console.error('Error cargando usuarios:', e);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
     loadUsuarios();
     // Cargar especialidades al montar
-    getEspecialidades(token).then((res) => {
-      if (res.data) setEspecialidades(res.data);
-    });
-    // Cargar perfiles IAM
+    getEspecialidades(token)
+      .then((data) => setEspecialidades(data))
+      .catch((e) => console.error('Error cargando especialidades:', e));
+    // Cargar perfiles IAM (módulo IAM aún no migrado a his-core; falla en silencio)
     fetch(`${import.meta.env.DEV ? 'http://localhost:3001/api' : 'https://sarai-app-backend.vercel.app/api'}/seguridad/perfiles`, {
       headers: { Authorization: `Bearer ${token}` },
     }).then(r => r.json()).then(data => {
       if (Array.isArray(data)) setPerfilesIam(data);
-    });
+    }).catch(() => {});
   }, []);
 
   // ── Filtrado ──────────────────────────────────────────────────────────────
@@ -246,8 +251,7 @@ export default function UsuariosPage() {
           if (!payload.firmaBase64)         delete payload.firmaBase64;
         }
 
-        const res = await createUsuario(payload, token);
-        if (res.error) { setError(res.error); setSaving(false); return; }
+        await createUsuario(payload, token);
         setSuccess('Usuario creado correctamente');
       } else if (editId) {
         const payload: UpdateUserRequest = { ...form };
@@ -263,13 +267,14 @@ export default function UsuariosPage() {
           delete payload.firmaBase64;
         }
 
-        const res = await updateUsuario(editId, payload, token);
-        if (res.error) { setError(res.error); setSaving(false); return; }
+        await updateUsuario(editId, payload, token);
         setSuccess('Usuario actualizado correctamente');
       }
 
       await loadUsuarios();
       setTimeout(() => { setSuccess(null); cerrarModal(); }, 1200);
+    } catch (err: any) {
+      setError(err?.message || 'Error al guardar el usuario');
     } finally {
       setSaving(false);
     }
@@ -277,11 +282,13 @@ export default function UsuariosPage() {
 
   // ── Toggle estado ──────────────────────────────────────────────────────────
   const handleToggle = async (id: string) => {
-    const res = await toggleUsuarioStatus(id, token);
-    if (!res.error) {
+    try {
+      const data = await toggleUsuarioStatus(id, token);
       setUsuarios((prev) =>
-        prev.map((u) => (u.id === id ? { ...u, activo: (res.data as any).activo } : u))
+        prev.map((u) => (u.id === id ? { ...u, activo: (data as any).activo } : u))
       );
+    } catch (e) {
+      console.error('Error al cambiar estado del usuario:', e);
     }
   };
 

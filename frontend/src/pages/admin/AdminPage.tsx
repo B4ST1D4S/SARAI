@@ -20,7 +20,7 @@ import * as svc from '../../services/adminService';
 import { useTheme, ThemeId } from '../../hooks/useTheme';
 import TabOdontologia from './TabOdontologia';
 import { BulkModal, EBadge, ErrBanner, ErrBox, Field, FormFooter, Modal, SecHeader, Sel, Sw, Table, TableSkeleton } from './components';
-import { TabSedes, TabDepartamentos, TabConsultorios } from './estructura-organizacional';
+import { TabSedes, TabDepartamentos, TabConsultorios, TabTurnos } from './estructura-organizacional';
 import { TabEspecialidades, TabTiposConsulta, TabPreparaciones, TabMotivosCita } from './consulta-externa';
 
 // ════════════════════════════════════════════════
@@ -2096,6 +2096,7 @@ const MODULOS = [
       { id:'sedes',                   label:'Sedes (REPS)',              icon:Building2,  component:TabSedes },
       { id:'departamentos-servicios', label:'Departamentos / Servicios', icon:Layers,     component:TabDepartamentos },
       { id:'consultorios-recursos',   label:'Consultorios / Recursos',   icon:LayoutGrid, component:TabConsultorios },
+      { id:'turnos',                  label:'Turnos (Agenda)',           icon:Calendar,   component:TabTurnos },
     ],
   },
   {
@@ -2166,10 +2167,13 @@ const MODULOS = [
 // ════════════════════════════════════════════════
 // PÁGINA PRINCIPAL
 // ════════════════════════════════════════════════
-export default function AdminPage() {
-  const [activeMod, setActiveMod] = useState('estructura');
-  const [activeSub, setActiveSub] = useState('sedes');
-  const [expanded,  setExpanded]  = useState('');
+export default function AdminPage({
+  initialModuloId = 'estructura',
+  initialSubmoduloId = 'sedes',
+}: { initialModuloId?: string; initialSubmoduloId?: string } = {}) {
+  const [activeMod, setActiveMod] = useState(initialModuloId);
+  const [activeSub, setActiveSub] = useState(initialSubmoduloId);
+  const [expanded,  setExpanded]  = useState(initialModuloId);
 
   const modulo    = MODULOS.find(m => m.id === activeMod);
   const submodulo = modulo?.submodulos.find(s => s.id === activeSub);

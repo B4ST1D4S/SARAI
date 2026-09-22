@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { AnimatePresence } from 'framer-motion';
-import * as svc from '../../../services/adminService';
-import { BulkModal, EBadge, ErrBanner, ErrBox, Field, FormFooter, Modal, SecHeader, Sw, Table } from '../components';
+import { getEspecialidades, createEspecialidad, updateEspecialidad, deleteEspecialidad } from '../../../services/api';
+import { EBadge, ErrBanner, ErrBox, Field, FormFooter, Modal, SecHeader, Sw, Table } from '../components';
 
 // ════════════════════════════════════════════════
 // TAB: ESPECIALIDADES
@@ -18,7 +18,7 @@ export default function TabEspecialidades() {
 
   const load = useCallback(async () => {
     setLoading(true); setLoadErr('');
-    try { setItems(await svc.getEspecialidades() as any[]); }
+    try { setItems(await getEspecialidades() as any[]); }
     catch(e: any) { setLoadErr(e?.message || 'Error al cargar'); }
     finally { setLoading(false); }
   }, []);
@@ -39,8 +39,8 @@ export default function TabEspecialidades() {
     setSaving(true);
     setErr('');
     try {
-      if (modal === 'create') await svc.createEspecialidad(form);
-      else await svc.updateEspecialidad(form.id, form);
+      if (modal === 'create') await createEspecialidad(form);
+      else await updateEspecialidad(form.id, form);
       setModal(null); load();
     } catch(e: any) { setErr(e.message); }
     finally { savingRef.current = false; setSaving(false); }
@@ -48,14 +48,14 @@ export default function TabEspecialidades() {
 
   const del = async (r: any) => {
     if (!confirm(`¿Desactivar "${r.nombre}"?`)) return;
-    try { await svc.deleteEspecialidad(r.id); load(); } catch(e: any) { alert(e.message); }
+    try { await deleteEspecialidad(r.id); load(); } catch(e: any) { alert(e.message); }
   };
 
   const f = (k: string) => (v: any) => setForm((p: any) => ({...p, [k]: v}));
 
   return (
     <>
-      <SecHeader title="Especialidades Médicas" onNew={openCreate} onBulk={() => setModal('bulk')} />
+      <SecHeader title="Especialidades Médicas" onNew={openCreate} />
       {loadErr && <ErrBanner msg={loadErr} onRetry={load} />}
       <Table items={items} loading={loading}
         cols={[
@@ -97,15 +97,6 @@ export default function TabEspecialidades() {
               <FormFooter onCancel={() => setModal(null)} onSave={save} saving={saving} />
             </div>
           </Modal>
-        )}
-        {modal === 'bulk' && (
-          <BulkModal
-            title="Cargue Masivo – Especialidades"
-            headers={['codigo','nombre','descripcion','aplicaAnestesia','aplicaPediatria','aplicaCirugia','aplicaInstrumentacion','aplicaMedicoFamiliar']}
-            filename="plantilla_especialidades.csv"
-            onUpload={items => svc.bulkEspecialidades(items)}
-            onClose={() => { setModal(null); load(); }}
-          />
         )}
       </AnimatePresence>
     </>

@@ -71,6 +71,31 @@ export interface TurnoOperativoResponse {
   updatedAt: Date;
 }
 
+export interface ProfesionalResponse {
+  id: string;
+  nombreCompleto: string;
+  especialidadPrincipal?: string | null;
+  registroMedico?: string | null;
+}
+
+export interface TurnoListItem {
+  id: string;
+  sede: { id: string; nombre: string };
+  departamento: { id: string; nombre: string };
+  consultorio: { id: string; nombre: string };
+  profesional: { id: string; nombreCompleto: string };
+  especialidadId: string;
+  fecha: string;
+  horaInicio: string;
+  horaFin: string;
+  intervaloMinutos: number;
+  sobrecuposMax: number;
+  modalidad: string;
+  estado: string;
+  motivoBloqueo?: string | null;
+  citasActivas: number;
+}
+
 export interface SlotDisponibilidad {
   slotId: string;
   fecha: string;
@@ -702,6 +727,105 @@ export class AgendaOrganizacionalService {
       fechasProcesadas: resultado.fechasProcesadas,
       conflictos: resultado.totalOmitidos,
     };
+  }
+
+  // ===========================================================================
+  // 4.1 PROFESIONALES Y ADMINISTRACIÓN DE TURNOS (LISTADO/CANCELACIÓN)
+  // ===========================================================================
+
+  async listarProfesionales(): Promise<ProfesionalResponse[]> {
+    const tenantPool = this.tenancyConnectionService.getTenantPool();
+    const result = await tenantPool.query(
+      `SELECT u.id, u.primer_nombre, u.segundo_nombre, u.primer_apellido, u.segundo_apellido,
+              ps.especialidad_principal, ps.registro_medico
+       FROM usuarios u
+       JOIN profesionales_salud ps ON ps.usuario_id = u.id
+       WHERE u.activo = true
+       ORDER BY u.primer_nombre ASC;`,
+    );
+    return result.rows.map((row) => ({
+      id: row.id,
+      nombreCompleto: [row.primer_nombre, row.segundo_nombre, row.primer_apellido, row.segundo_apellido]
+        .filter(Boolean)
+        .join(' '),
+      especialidadPrincipal: row.especialidad_principal ?? null,
+      registroMedico: row.registro_medico ?? null,
+    }));
+  }
+
+  async listarTurnos(filtros: {
+    sedeId?: string;
+    consultorioId?: string;
+    profesionalId?: string;
+    fechaInicio?: string;
+    fechaFin?: string;
+  }): Promise<TurnoListItem[]> {
+    const tenantPool = this.tenancyConnectionService.getTenantPool();
+
+    let sql = `
+      SELECT t.*, s.nombre AS sede_nombre, d.nombre AS departamento_nombre,
+             c.nombre AS consultorio_nombre, u.primer_nombre, u.primer_apellido,
+             (SELECT count(*)::int FROM citas ci WHERE ci.turno_id = t.id AND ci.estado != 'CANCELADA') AS citas_activas
+      FROM agenda_turnos_profesional t
+      JOIN sedes s ON s.id = t.sede_id
+      JOIN centros_costo_departamentos d ON d.id = t.departamento_id
+      JOIN consultorios_recursos c ON c.id = t.consultorio_id
+      JOIN usuarios u ON u.id = t.profesional_id
+      WHERE t.estado != 'CANCELADO'
+    `;
+    const params: any[] = [];
+    let idx = 1;
+    if (filtros.sedeId) { sql += ` AND t.sede_id = $${idx++}`; params.push(filtros.sedeId); }
+    if (filtros.consultorioId) { sql += ` AND t.consultorio_id = $${idx++}`; params.push(filtros.consultorioId); }
+    if (filtros.profesionalId) { sql += ` AND t.profesional_id = $${idx++}`; params.push(filtros.profesionalId); }
+    if (filtros.fechaInicio) { sql += ` AND t.fecha >= $${idx++}`; params.push(filtros.fechaInicio); }
+    if (filtros.fechaFin) { sql += ` AND t.fecha <= $${idx++}`; params.push(filtros.fechaFin); }
+    sql += ' ORDER BY t.fecha DESC, t.hora_inicio ASC;';
+
+    const result = await tenantPool.query(sql, params);
+    return result.rows.map((row) => ({
+      id: row.id,
+      sede: { id: row.sede_id, nombre: row.sede_nombre },
+      departamento: { id: row.departamento_id, nombre: row.departamento_nombre },
+      consultorio: { id: row.consultorio_id, nombre: row.consultorio_nombre },
+      profesional: {
+        id: row.profesional_id,
+        nombreCompleto: `${row.primer_nombre} ${row.primer_apellido}`.trim(),
+      },
+      especialidadId: row.especialidad_id,
+      fecha: this.extractDateOnly(row.fecha),
+      horaInicio: this.normalizeTimeString(row.hora_inicio),
+      horaFin: this.normalizeTimeString(row.hora_fin),
+      intervaloMinutos: Number(row.intervalo_minutos),
+      sobrecuposMax: Number(row.sobrecupos_max ?? 0),
+      modalidad: row.modalidad,
+      estado: row.estado,
+      motivoBloqueo: row.motivo_bloqueo ?? null,
+      citasActivas: Number(row.citas_activas ?? 0),
+    }));
+  }
+
+  async cancelarTurno(id: string, motivo?: string): Promise<{ mensaje: string }> {
+    const tenantPool = this.tenancyConnectionService.getTenantPool();
+
+    const citasActivas = await tenantPool.query(
+      `SELECT id FROM citas WHERE turno_id = $1 AND estado NOT IN ('CANCELADA')`,
+      [id],
+    );
+    if (citasActivas.rows.length > 0) {
+      throw new ConflictException(
+        'No se puede cancelar el turno porque tiene citas activas agendadas',
+      );
+    }
+
+    const result = await tenantPool.query(
+      `UPDATE agenda_turnos_profesional SET estado = 'CANCELADO', motivo_bloqueo = $2, updated_at = now() WHERE id = $1 RETURNING id;`,
+      [id, motivo ?? null],
+    );
+    if (result.rows.length === 0) {
+      throw new NotFoundException(`Turno con ID '${id}' no encontrado`);
+    }
+    return { mensaje: 'Turno cancelado exitosamente' };
   }
 
   // ===========================================================================

@@ -1,5 +1,5 @@
 // URL base hacia el API de NestJS
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
+export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
 
 // Función para extraer el subdominio del host actual o usar 'demo' por defecto
 export const getSubdomain = (): string => {
@@ -132,6 +132,78 @@ export async function apiCall<T = any>(
   }
 
   return response.json();
+}
+
+// ============================================
+// CLIENTE HTTP PARA MÓDULOS QUE ARMAN SU PROPIA URL BASE
+// (ej. `${API_URL}/agenda-organizacional`) EN VEZ DE USAR apiCall()
+// ============================================
+let isRefreshingDirect = false;
+let refreshWaitersDirect: Array<{ resolve: () => void; reject: (err: unknown) => void }> = [];
+
+async function refrescarTokenDirect(): Promise<boolean> {
+  if (isRefreshingDirect) {
+    return new Promise((resolve) => {
+      refreshWaitersDirect.push({ resolve: () => resolve(true), reject: () => resolve(false) });
+    });
+  }
+  isRefreshingDirect = true;
+  try {
+    const res = await fetch(`${API_URL}/auth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-tenant-id': getSubdomain() },
+      credentials: 'include',
+      body: JSON.stringify({ subdomain: getSubdomain() }),
+    });
+    if (!res.ok) throw new Error('No se pudo refrescar la sesión');
+    const data = await res.json();
+    localStorage.setItem('accessToken', data.accessToken);
+    refreshWaitersDirect.forEach((w) => w.resolve());
+    return true;
+  } catch (err) {
+    refreshWaitersDirect.forEach((w) => w.reject(err));
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('user');
+    return false;
+  } finally {
+    isRefreshingDirect = false;
+    refreshWaitersDirect = [];
+  }
+}
+
+/**
+ * fetch con header de tenant, Authorization y rotación automática (RTR) ante 401.
+ * Sin esto, un módulo que construye su propia URL base (en vez de usar apiCall)
+ * deja de funcionar en cuanto expira el access token de corta duración (~15min):
+ * cualquier 401 se propagaba como error en vez de refrescar la sesión, lo que se
+ * percibía como "se cae la conexión" al volver a una página tras un rato.
+ */
+export async function authFetch<T = any>(
+  url: string,
+  options: RequestInit = {},
+  _reintentado = false,
+): Promise<T> {
+  const response = await fetch(url, {
+    ...options,
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-tenant-id': getSubdomain(),
+      Authorization: `Bearer ${localStorage.getItem('accessToken') || ''}`,
+      ...options.headers,
+    },
+  });
+
+  if (response.status === 401 && !_reintentado) {
+    const refrescado = await refrescarTokenDirect();
+    if (refrescado) return authFetch<T>(url, options, true);
+  }
+
+  const data = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error((data as any)?.message || (data as any)?.error || `Error HTTP ${response.status}`);
+  }
+  return data as T;
 }
 
 // ============================================
@@ -306,8 +378,8 @@ export async function updateHistoriaClinica(
 // CITAS ENDPOINTS
 // ============================================
 
-export async function getCitasMedico(token?: string) {
-  return apiCall('/citas/medico/agenda', { method: 'GET', token });
+export async function getCitasMedico(fechaInicio: string, fechaFin: string, token?: string) {
+  return apiCall(`/citas/medico/agenda?fechaInicio=${encodeURIComponent(fechaInicio)}&fechaFin=${encodeURIComponent(fechaFin)}`, { method: 'GET', token });
 }
 
 export async function completarCita(citaId: string, token?: string) {
@@ -320,6 +392,83 @@ export async function cancelarCitaApi(citaId: string, token?: string) {
 
 export async function updateCitaEstado(citaId: string, estado: string, token?: string) {
   return apiCall(`/citas/${citaId}`, { method: 'PUT', body: { estado }, token });
+}
+
+export async function registrarAdmisionCita(citaId: string, token?: string) {
+  return apiCall(`/citas/${citaId}/admision`, { method: 'POST', token });
+}
+
+export interface CreateCitaPayload {
+  turnoId: string;
+  horaInicio: string;
+  pacienteId: string;
+  tipoConsultaId: string;
+  motivoConsulta?: string;
+}
+
+export async function crearCita(data: CreateCitaPayload, token?: string) {
+  return apiCall('/citas', { method: 'POST', body: data, token });
+}
+
+// ============================================
+// TIPOS DE CONSULTA ENDPOINTS
+// ============================================
+
+export interface TipoConsultaItem {
+  id: string;
+  especialidadId: string;
+  codigo: string;
+  nombre: string;
+  descripcion?: string | null;
+  estado: boolean;
+}
+
+export async function getTiposConsulta(especialidadId?: string, token?: string) {
+  const query = especialidadId ? `?especialidadId=${especialidadId}` : '';
+  return apiCall<TipoConsultaItem[]>(`/tipos-consulta${query}`, { method: 'GET', token });
+}
+
+// ============================================
+// AGENDA ORGANIZACIONAL — SEDES Y SLOTS
+// ============================================
+
+export interface SedeItem {
+  id: string;
+  codigo: string;
+  nombre: string;
+  ciudad?: string | null;
+  activo: boolean;
+}
+
+export async function getSedesActivas(token?: string) {
+  return apiCall<SedeItem[]>('/agenda-organizacional/sedes?soloActivos=true', { method: 'GET', token });
+}
+
+export interface SlotDisponible {
+  slotId: string;
+  fecha: string;
+  horaInicio: string;
+  horaFin: string;
+  duracionMinutos: number;
+  disponible: boolean;
+}
+
+export interface TurnoConSlots {
+  turnoId: string;
+  fecha: string;
+  sede: { id: string; nombre: string };
+  consultorio: { id: string; nombre: string };
+  profesional: { id: string; nombreCompleto: string };
+  especialidadId: string;
+  slots: SlotDisponible[];
+}
+
+export async function getSlotsDisponibles(
+  params: { sedeId: string; especialidadId: string; fechaInicio: string; fechaFin: string },
+  token?: string,
+) {
+  const qs = new URLSearchParams(params).toString();
+  return apiCall<TurnoConSlots[]>(`/agenda-organizacional/turnos/slots?${qs}`, { method: 'GET', token });
 }
 
 // ============================================
@@ -399,6 +548,18 @@ export async function getEspecialidades(token?: string) {
     method: 'GET',
     token,
   });
+}
+
+export async function createEspecialidad(data: Record<string, any>, token?: string) {
+  return apiCall('/especialidades', { method: 'POST', body: data, token });
+}
+
+export async function updateEspecialidad(id: string, data: Record<string, any>, token?: string) {
+  return apiCall(`/especialidades/${id}`, { method: 'PUT', body: data, token });
+}
+
+export async function deleteEspecialidad(id: string, token?: string) {
+  return apiCall(`/especialidades/${id}`, { method: 'DELETE', token });
 }
 
 // ============================================

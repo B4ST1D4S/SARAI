@@ -7,6 +7,7 @@ import {
   Param,
   ParseBoolPipe,
   Post,
+  Put,
   Query,
   UseGuards,
 } from '@nestjs/common';
@@ -15,8 +16,10 @@ import {
   AgendaOrganizacionalService,
   ConsultorioResponse,
   DepartamentoResponse,
+  ProfesionalResponse,
   SedeResponse,
   TurnoDisponibilidadResponse,
+  TurnoListItem,
   TurnoOperativoResponse,
 } from './agenda-organizacional.service';
 import {
@@ -139,6 +142,36 @@ export class AgendaOrganizacionalController {
   @Post('turnos/masivos')
   async generarAgendaMasiva(@Body() dto: CreateAgendaMasivaDto) {
     return this.agendaOrganizacionalService.generarAgendaMasiva(dto);
+  }
+
+  @Get('turnos')
+  async listarTurnos(
+    @Query('sedeId') sedeId?: string,
+    @Query('consultorioId') consultorioId?: string,
+    @Query('profesionalId') profesionalId?: string,
+    @Query('fechaInicio') fechaInicio?: string,
+    @Query('fechaFin') fechaFin?: string,
+  ): Promise<TurnoListItem[]> {
+    return this.agendaOrganizacionalService.listarTurnos({
+      sedeId, consultorioId, profesionalId, fechaInicio, fechaFin,
+    });
+  }
+
+  @Put('turnos/:turnoId/cancelar')
+  async cancelarTurno(
+    @Param('turnoId') turnoId: string,
+    @Body('motivo') motivo?: string,
+  ): Promise<{ mensaje: string }> {
+    return this.agendaOrganizacionalService.cancelarTurno(turnoId, motivo);
+  }
+
+  // ===========================================================================
+  // PROFESIONALES (para asignación de turnos)
+  // ===========================================================================
+
+  @Get('profesionales')
+  async listarProfesionales(): Promise<ProfesionalResponse[]> {
+    return this.agendaOrganizacionalService.listarProfesionales();
   }
 
   // ===========================================================================

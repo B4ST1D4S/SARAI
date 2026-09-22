@@ -7,6 +7,7 @@ export const envSchema = z.object({
   PORT: z.coerce.number().default(3000),
   APP_NAME: z.string().default('SARAI-HIS-Core'),
   BASE_DOMAIN: z.string().default('hisapp.local'),
+  CORS_ORIGINS: z.string().default('http://localhost:5173,http://127.0.0.1:5173'),
 
   // Conexión a la base de datos maestra (his_master)
   MASTER_DB_HOST: z

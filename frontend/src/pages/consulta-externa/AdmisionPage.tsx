@@ -6,7 +6,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Users, UserCheck, Clock, RefreshCw, Bell, CheckCircle, AlertCircle, Search, X } from 'lucide-react';
-import { API_BASE_URL } from '../../config';
+import { getCitasMedico, registrarAdmisionCita } from '../../services/api';
 
 
 interface Cita {
@@ -35,17 +35,12 @@ export default function AdmisionPage() {
 
   const cargar = async () => {
     setLoading(true);
-    const token = getToken();
     // Rango LOCAL del día (igual que AgendaPage) para no perder citas por zona horaria
     const ahora = new Date();
     const inicioLocal = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 0, 0, 0, 0);
     const finLocal    = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 23, 59, 59, 999);
-    const res = await fetch(
-      `${API_BASE_URL}/citas/medico/agenda?fechaInicio=${inicioLocal.toISOString()}&fechaFin=${finLocal.toISOString()}`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-    if (res.ok) {
-      const data = await res.json();
+    try {
+      const data = await getCitasMedico(inicioLocal.toISOString(), finLocal.toISOString());
       const todas = ((data as any).citas || []).map((c: any, i: number) => {
         const fecha = new Date(c.fechaHora);
         return {
@@ -67,6 +62,8 @@ export default function AdmisionPage() {
         .filter((c: Cita) => ['CONFIRMADA', 'EN_SALA', 'PENDIENTE'].includes(c.estado))
         .sort((a: Cita, b: Cita) => a.hora.localeCompare(b.hora));
       setCitas(filtradas);
+    } catch {
+      setCitas([]);
     }
     setLoading(false);
   };
@@ -74,21 +71,12 @@ export default function AdmisionPage() {
   useEffect(() => { cargar(); }, []);
 
   const registrarLlegada = async (citaId: string, nombre: string) => {
-    const token = getToken();
     try {
-      const res = await fetch(`${API_BASE_URL}/citas/${citaId}/admision`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      });
-      if (res.ok) {
-        setMsg({ tipo: 'ok', texto: `✓ ${nombre} — en sala de espera` });
-        cargar();
-      } else {
-        const d = await res.json();
-        setMsg({ tipo: 'error', texto: d.error || 'Error al registrar llegada' });
-      }
-    } catch {
-      setMsg({ tipo: 'error', texto: 'Error de conexión' });
+      await registrarAdmisionCita(citaId, getToken());
+      setMsg({ tipo: 'ok', texto: `✓ ${nombre} — en sala de espera` });
+      cargar();
+    } catch (e: any) {
+      setMsg({ tipo: 'error', texto: e.message || 'Error al registrar llegada' });
     }
     setTimeout(() => setMsg(null), 4000);
   };

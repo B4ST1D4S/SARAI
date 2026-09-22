@@ -40,9 +40,15 @@ export class AppModule implements NestModule {
         { path: 'health', method: RequestMethod.ALL },
         { path: 'api/v1/health', method: RequestMethod.ALL },
 
-        // Rutas públicas de autenticación y gestión a nivel maestro (Superadmin)
-        { path: 'auth/master/(.*)', method: RequestMethod.ALL },
-        { path: 'api/v1/auth/(.*)', method: RequestMethod.ALL },
+        // Rutas públicas de autenticación (resuelven el tenant desde el body, no desde el middleware)
+        { path: 'auth/login', method: RequestMethod.POST },
+        { path: 'api/v1/auth/login', method: RequestMethod.POST },
+        { path: 'auth/refresh', method: RequestMethod.POST },
+        { path: 'api/v1/auth/refresh', method: RequestMethod.POST },
+        { path: 'auth/logout', method: RequestMethod.POST },
+        { path: 'api/v1/auth/logout', method: RequestMethod.POST },
+        { path: 'auth/me', method: RequestMethod.GET },
+        { path: 'api/v1/auth/me', method: RequestMethod.GET },
         { path: 'admin/tenants/onboarding', method: RequestMethod.POST },
         { path: 'api/v1/admin/tenants/onboarding', method: RequestMethod.POST },
       )

@@ -1,8 +1,7 @@
 ﻿import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { Calendar, Clock, User, CheckCircle, Plus, Trash2, Stethoscope, Bell, RefreshCw, Zap } from 'lucide-react';
-import { completarCita } from '../../services/api';
-import { API_BASE_URL } from '../../config';
+import { completarCita, getCitasMedico, updateCitaEstado, cancelarCitaApi, registrarAdmisionCita } from '../../services/api';
 
 interface Cita {
   id: string;
@@ -18,7 +17,7 @@ interface Cita {
 
 interface AgendaProfesionalProps {
   onNavegar?: (pagina: string) => void;
-  onAbrirHistoriaPaciente?: (pacienteId: string, nombre: string) => void;
+  onAbrirHistoriaPaciente?: (pacienteId: string, nombre: string, citaId?: string) => void;
 }
 
 export default function AgendaProfesionalPage({ onNavegar, onAbrirHistoriaPaciente }: AgendaProfesionalProps = {}) {
@@ -35,16 +34,10 @@ export default function AgendaProfesionalPage({ onNavegar, onAbrirHistoriaPacien
   const cargarCitas = useCallback(async () => {
     setLoadingCitas(true);
     try {
-      const token = getToken();
       const [year, month, day] = selectedDate.split('-').map(Number);
       const inicioLocal = new Date(year, month - 1, day, 0, 0, 0, 0);
       const finLocal    = new Date(year, month - 1, day, 23, 59, 59, 999);
-      const res = await fetch(
-        `${API_BASE_URL}/citas/medico/agenda?fechaInicio=${inicioLocal.toISOString()}&fechaFin=${finLocal.toISOString()}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      if (!res.ok) throw new Error('Error al obtener citas');
-      const data = await res.json();
+      const data: any = await getCitasMedico(inicioLocal.toISOString(), finLocal.toISOString());
       const lista = (data.citas || []).map((c: any) => {
         const fecha = new Date(c.fechaHora);
         return {
@@ -88,19 +81,14 @@ export default function AgendaProfesionalPage({ onNavegar, onAbrirHistoriaPacien
       if (token && cita) await completarCita(id, token);
       setCitas((prev) => prev.map((c) => c.id === id ? { ...c, estado: 'ATENDIDA' } : c));
       if (cita?.pacienteId && onAbrirHistoriaPaciente) {
-        onAbrirHistoriaPaciente(cita.pacienteId, cita.pacienteNombre);
+        onAbrirHistoriaPaciente(cita.pacienteId, cita.pacienteNombre, cita.id);
       } else if (onNavegar) {
         onNavegar('historia');
       }
       return;
     }
     if (nuevoEstado === 'CONFIRMADA') {
-      const token = getToken();
-      await fetch(`${API_BASE_URL}/citas/${id}`, {
-        method: 'PUT',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ estado: 'CONFIRMADA' }),
-      });
+      await updateCitaEstado(id, 'CONFIRMADA', getToken());
       setCitas((prev) => prev.map((c) => c.id === id ? { ...c, estado: 'CONFIRMADA' } : c));
       return;
     }
@@ -109,11 +97,7 @@ export default function AgendaProfesionalPage({ onNavegar, onAbrirHistoriaPacien
 
   // Eliminar / cancelar cita
   const handleEliminarCita = async (id: string) => {
-    const token = getToken();
-    await fetch(`${API_BASE_URL}/citas/${id}`, {
-      method: 'DELETE',
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    await cancelarCitaApi(id, getToken());
     setCitas((prev) => prev.filter((c) => c.id !== id));
   };
 
@@ -384,12 +368,10 @@ export default function AgendaProfesionalPage({ onNavegar, onAbrirHistoriaPacien
                           {cita.estado === 'CONFIRMADA' && (
                             <button
                               onClick={async () => {
-                                const token = getToken();
-                                const res = await fetch(`${API_BASE_URL}/citas/${cita.id}/admision`, {
-                                  method: 'POST',
-                                  headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-                                });
-                                if (res.ok) setCitas(prev => prev.map(c => c.id === cita.id ? { ...c, estado: 'EN_SALA' } : c));
+                                try {
+                                  await registrarAdmisionCita(cita.id, getToken());
+                                  setCitas(prev => prev.map(c => c.id === cita.id ? { ...c, estado: 'EN_SALA' } : c));
+                                } catch (e) { console.error('Error en admisión:', e); }
                               }}
                               className="flex-1 py-2 bg-gradient-to-r from-cyan-600 to-sky-600 hover:from-cyan-500 hover:to-sky-500 text-white text-sm font-semibold rounded-xl transition shadow-lg shadow-cyan-500/20 flex items-center justify-center gap-2"
                             >
@@ -411,7 +393,7 @@ export default function AgendaProfesionalPage({ onNavegar, onAbrirHistoriaPacien
                               <button
                                 onClick={() => {
                                   if (cita.pacienteId && onAbrirHistoriaPaciente) {
-                                    onAbrirHistoriaPaciente(cita.pacienteId, cita.pacienteNombre);
+                                    onAbrirHistoriaPaciente(cita.pacienteId, cita.pacienteNombre, cita.id);
                                   } else {
                                     onNavegar?.('historia');
                                   }

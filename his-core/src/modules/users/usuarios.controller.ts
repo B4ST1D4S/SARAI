@@ -1,7 +1,11 @@
 import {
   Controller,
+  Get,
+  Post,
+  Put,
   Patch,
   Body,
+  Param,
   Req,
   UseGuards,
   HttpCode,
@@ -9,8 +13,10 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { Request } from 'express';
-import { UsuariosService, UsuarioPreferenciasResponse } from './usuarios.service';
+import { UsuariosService, UsuarioPreferenciasResponse, UsuarioResponse } from './usuarios.service';
 import { UpdatePreferenciasDto } from './dto/update-preferencias.dto';
+import { CreateUsuarioDto } from './dto/create-usuario.dto';
+import { UpdateUsuarioDto } from './dto/update-usuario.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @Controller('usuarios')
@@ -39,5 +45,33 @@ export class UsuariosController {
       usuarioId,
       updatePreferenciasDto,
     );
+  }
+
+  @Get()
+  async listar(): Promise<UsuarioResponse[]> {
+    return this.usuariosService.listar();
+  }
+
+  @Post()
+  async crear(@Body() dto: CreateUsuarioDto): Promise<UsuarioResponse> {
+    return this.usuariosService.crear(dto);
+  }
+
+  @Get(':id')
+  async obtenerPorId(@Param('id') id: string): Promise<UsuarioResponse> {
+    return this.usuariosService.obtenerPorId(id);
+  }
+
+  @Put(':id')
+  async actualizar(
+    @Param('id') id: string,
+    @Body() dto: UpdateUsuarioDto,
+  ): Promise<UsuarioResponse> {
+    return this.usuariosService.actualizar(id, dto);
+  }
+
+  @Patch(':id/toggle-status')
+  async toggleEstado(@Param('id') id: string): Promise<{ activo: boolean }> {
+    return this.usuariosService.toggleEstado(id);
   }
 }
