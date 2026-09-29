@@ -214,8 +214,9 @@ export async function entregarHistoriaClinica(id: string, medicoId: string) {
     const historia = await prisma.historiaClinica.update({
       where: { id },
       data: {
-        entregadoEn: new Date(),
-        entregadoPor: medicoId,
+        fechaFirma: new Date(),
+        firmadoPorMedico: true,
+        editadoPor: medicoId,
       },
       include: {
         paciente: {

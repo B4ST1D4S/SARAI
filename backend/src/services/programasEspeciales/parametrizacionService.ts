@@ -109,15 +109,15 @@ export async function saveParametrizacionHD(
       data: {
         parametros: {
           ...currentParams,
-          parametrizacionHD: data,
-        },
+          parametrizacionHD: data as any,
+        } as any,
       },
     });
   } else {
     await prisma.configuracionPE.create({
       data: {
         programaId: programa.id,
-        parametros: { parametrizacionHD: data },
+        parametros: { parametrizacionHD: data } as any,
       },
     });
   }

@@ -7,12 +7,22 @@ export interface LoginRequest {
   password: string;
 }
 
+export interface RegisterRequest {
+  email?: string | null;
+  username?: string | null;
+  password: string;
+  nombre: string;
+  apellido: string;
+  rol?: string;
+}
+
 export interface AuthResponse {
   accessToken: string;
   refreshToken: string;
   user: {
     id: string;
     username: string;
+    email?: string | null;
     nombre: string;
     apellido: string;
     rol: string;
@@ -42,9 +52,10 @@ export async function loginUser(request: LoginRequest): Promise<AuthResponse | n
       throw new Error('Usuario inactivo');
     }
 
+    const emailValue = user.email ?? user.username ?? user.id;
     const tokenPayload: TokenPayload = {
       userId: user.id,
-      email: user.email ?? user.username,
+      email: emailValue,
       rol: user.rol,
     };
 
@@ -56,7 +67,8 @@ export async function loginUser(request: LoginRequest): Promise<AuthResponse | n
       refreshToken,
       user: {
         id: user.id,
-        username: user.username,
+        username: user.username ?? '',
+        email: user.email ?? user.username ?? user.id,
         nombre: user.nombre,
         apellido: user.apellido,
         rol: user.rol,
@@ -70,9 +82,9 @@ export async function loginUser(request: LoginRequest): Promise<AuthResponse | n
 
 export async function registerUser(request: RegisterRequest): Promise<AuthResponse | null> {
   try {
-    const existingUser = await prisma.user.findUnique({
-      where: { email: request.email },
-    });
+    const existingUser = request.email
+      ? await prisma.user.findUnique({ where: { email: request.email } })
+      : null;
 
     if (existingUser) {
       throw new Error('Email ya registrado');
@@ -82,18 +94,20 @@ export async function registerUser(request: RegisterRequest): Promise<AuthRespon
 
     const newUser = await prisma.user.create({
       data: {
-        email: request.email,
+        email: request.email ?? null,
+        username: request.username ?? null,
         password: hashedPassword,
         nombre: request.nombre,
         apellido: request.apellido,
-        rol: request.rol || 'PACIENTE',
+        rol: (request.rol || 'PACIENTE') as any,
         activo: true,
       },
     });
 
+    const emailValue = newUser.email ?? newUser.username ?? newUser.id;
     const tokenPayload: TokenPayload = {
       userId: newUser.id,
-      email: newUser.email,
+      email: emailValue,
       rol: newUser.rol,
     };
 
@@ -105,7 +119,8 @@ export async function registerUser(request: RegisterRequest): Promise<AuthRespon
       refreshToken,
       user: {
         id: newUser.id,
-        email: newUser.email,
+        username: newUser.username ?? '',
+        email: newUser.email ?? newUser.username ?? newUser.id,
         nombre: newUser.nombre,
         apellido: newUser.apellido,
         rol: newUser.rol,

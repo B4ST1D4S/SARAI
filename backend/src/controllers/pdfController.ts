@@ -62,7 +62,6 @@ async function htmlToPdf(html: string): Promise<Buffer> {
 
   const browser = await puppeteer.launch({
     args: process.env.VERCEL ? chromium.args : ['--no-sandbox', '--disable-setuid-sandbox'],
-    defaultViewport: chromium.defaultViewport,
     executablePath,
     headless: true,
   });

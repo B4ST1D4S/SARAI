@@ -1,8 +1,8 @@
 import jwt from 'jsonwebtoken';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'tu_secreto_muy_seguro_aqui_2024';
+const JWT_SECRET = (process.env.JWT_SECRET || 'tu_secreto_muy_seguro_aqui_2024') as jwt.Secret;
 const JWT_EXPIRATION = process.env.JWT_EXPIRATION || '24h';
-const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'tu_secreto_refresh_aqui_2024';
+const JWT_REFRESH_SECRET = (process.env.JWT_REFRESH_SECRET || 'tu_secreto_refresh_aqui_2024') as jwt.Secret;
 const JWT_REFRESH_EXPIRATION = process.env.JWT_REFRESH_EXPIRATION || '7d';
 
 export interface TokenPayload {
@@ -12,15 +12,11 @@ export interface TokenPayload {
 }
 
 export function generateToken(payload: TokenPayload): string {
-  return jwt.sign(payload, JWT_SECRET, {
-    expiresIn: JWT_EXPIRATION,
-  });
+  return jwt.sign(payload as object, JWT_SECRET, { expiresIn: JWT_EXPIRATION as any } as any);
 }
 
 export function generateRefreshToken(payload: TokenPayload): string {
-  return jwt.sign(payload, JWT_REFRESH_SECRET, {
-    expiresIn: JWT_REFRESH_EXPIRATION,
-  });
+  return jwt.sign(payload as object, JWT_REFRESH_SECRET, { expiresIn: JWT_REFRESH_EXPIRATION as any } as any);
 }
 
 export function verifyToken(token: string): TokenPayload | null {
