@@ -293,10 +293,38 @@ export default function SaraiAssistant({ onCamposDetectados, token, contexto, on
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      if (data.campos && Object.keys(data.campos).length > 0) {
-        onCamposDetectados(data.campos);
-        const n = Object.keys(data.campos).length;
-        setResultado(`✓ ${n} campos completados`);
+      const camposPermitidos = new Set([
+        'quejaPrincipal', 'historiaEnfermedad', 'antecedentesFamiliares',
+        'antecedentesPersonales', 'antecedentesQuirurgicos', 'antecedentesEsteticos',
+        'medicamentosActuales', 'alergias', 'habitosToxicos', 'examenFisico',
+        'presionArterial', 'frecuenciaCardiaca', 'frecuenciaRespiratoria',
+        'temperatura', 'peso', 'talla', 'imc', 'saturacionO2', 'glicemia',
+        'diagnostico', 'planTratamiento', 'procedimientoPropuesto',
+        'recomendaciones', 'observaciones', 'signosVitales',
+      ]);
+      const campos = data.campos && typeof data.campos === 'object'
+        ? Object.fromEntries(Object.entries(data.campos).filter(([key, value]) =>
+            camposPermitidos.has(key) && value !== null && value !== undefined && value !== ''
+          ))
+        : {};
+      if (Object.keys(campos).length > 0) {
+        onCamposDetectados(campos);
+        const nombres: Record<string, string> = {
+          quejaPrincipal: 'motivo', historiaEnfermedad: 'historia actual',
+          presionArterial: 'presión arterial', frecuenciaCardiaca: 'frecuencia cardíaca',
+          frecuenciaRespiratoria: 'frecuencia respiratoria', temperatura: 'temperatura',
+          peso: 'peso', talla: 'talla', imc: 'IMC', saturacionO2: 'saturación O2',
+          glicemia: 'glicemia', medicamentosActuales: 'farmacológicos',
+          antecedentesPersonales: 'patológicos', antecedentesQuirurgicos: 'quirúrgicos',
+          alergias: 'alergias', diagnostico: 'diagnóstico', planTratamiento: 'plan terapéutico',
+          procedimientoPropuesto: 'procedimiento', recomendaciones: 'recomendaciones',
+          observaciones: 'observaciones', examenFisico: 'examen físico',
+        };
+        const aplicados = Object.keys(campos)
+          .flatMap(key => key === 'signosVitales'
+            ? Object.keys(campos.signosVitales || {}).map(signo => nombres[signo] || signo)
+            : [nombres[key] || key]);
+        setResultado(`✓ Aplicado: ${aplicados.join(', ')}`);
         setEst('listo');
         setTimeout(() => { setEst('esperando'); setResultado(''); }, 7000);
       } else {
@@ -380,54 +408,6 @@ export default function SaraiAssistant({ onCamposDetectados, token, contexto, on
       const track = stream.getAudioTracks()[0];
       console.log('[SARAI] Dispositivo de audio:', track?.label, track?.getSettings());
       
-      // ── Validación de micrófono activo (pre-grabación) ────────────────────────
-      // Verificar que el micrófono está capturando audio antes de comenzar
-      const validarMicrofonoActivo = await new Promise<boolean>((resolve) => {
-        try {
-          const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-          const analyser = audioContext.createAnalyser();
-          const source = audioContext.createMediaStreamSource(stream);
-          source.connect(analyser);
-          analyser.fftSize = 256;
-          
-          let checkCount = 0;
-          const maxChecks = 10; // 1 segundo (100ms × 10)
-          let tieneAudio = false;
-          
-          const validateInterval = setInterval(() => {
-            const dataArray = new Uint8Array(analyser.frequencyBinCount);
-            analyser.getByteFrequencyData(dataArray);
-            const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
-            
-            if (average > 5) tieneAudio = true;
-            checkCount++;
-            
-            if (checkCount >= maxChecks) {
-              clearInterval(validateInterval);
-              audioContext.close().catch(() => {});
-              resolve(tieneAudio);
-            }
-          }, 100);
-        } catch (err) {
-          console.warn('[SARAI] Error validando micrófono:', err);
-          resolve(true); // permitir de todas formas si hay error
-        }
-      });
-      
-      if (!validarMicrofonoActivo) {
-        // Micrófono silenciado o desconectado
-        stream.getTracks().forEach(track => track.stop());
-        setError(
-          '⚠️ El micrófono no está capturando audio.\n\n' +
-          'Verifica en Windows:\n' +
-          '• Configuración → Sonido → Entrada\n' +
-          '• Asegúrate que el micrófono correcto está seleccionado\n' +
-          '• Sube el volumen del micrófono al 80-100%\n' +
-          '• Desactiva "mejoras de audio" en propiedades'
-        );
-        return;
-      }
-
       const mimeType =
         ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/ogg']
           .find(m => MediaRecorder.isTypeSupported(m)) || '';
@@ -445,14 +425,9 @@ export default function SaraiAssistant({ onCamposDetectados, token, contexto, on
       rec.start(500); // chunk cada 500ms
       setEst('grabando');
       iniciarVisualizador(stream);
-      // Contador + autodetener a los 60 segundos
-      const MAX_SEG = 60;
+      // El profesional decide cuándo terminar la narración clínica.
       timerRef.current = setInterval(() => {
         setSegundos(s => {
-          if (s + 1 >= MAX_SEG) {
-            // Autodetener cuando llega al límite
-            setTimeout(() => detenerYAnalizar(), 50);
-          }
           return s + 1;
         });
       }, 1000);
