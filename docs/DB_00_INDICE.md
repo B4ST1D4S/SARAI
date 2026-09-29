@@ -18,6 +18,9 @@
 | [DB_08_ARQUITECTURA_TECNICA.md](./DB_08_ARQUITECTURA_TECNICA.md) | Tablas centrales, índices, identificadores, gaps técnicos | DBA |
 | [DB_09_RECOMENDACIONES.md](./DB_09_RECOMENDACIONES.md) | Recomendaciones clasificadas: Crítica / Alta / Media / Baja | CTO, Arquitectos |
 | [DB_10_RESUMEN_EJECUTIVO.md](./DB_10_RESUMEN_EJECUTIVO.md) | Métricas globales, fortalezas, debilidades y riesgos | Dirección, CTO |
+| [DB_11_ARQUITECTURA_BASE_DATOS_SARAI.md](./DB_11_ARQUITECTURA_BASE_DATOS_SARAI.md) | Explicación arquitectónica general de la base de datos, tablas clave y convenciones de naming | Desarrolladores, Arquitectos, CTO |
+| [DB_12_DIAGNOSTICO_ARQUITECTURA_PRODUCCION.md](./DB_12_DIAGNOSTICO_ARQUITECTURA_PRODUCCION.md) | Diagnóstico de arquitectura para producción, riesgos y recomendaciones concretas | CTO, Arquitectos, DevOps |
+| [DB_13_PLAN_REFACTORIZACION_PRODUCCION.md](./DB_13_PLAN_REFACTORIZACION_PRODUCCION.md) | Plan de refactorización para producción con prioridad por módulos | CTO, Arquitectos, Equipo técnico |
 
 ---
 

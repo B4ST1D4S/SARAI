@@ -118,6 +118,7 @@ model Paciente {
   seguimientos          SeguimientoPostOp[]
   transacciones         Transaccion[]
   contratosBeneficiario ContratoBeneficiario[]
+  inscripcionesPE       InscripcionPrograma[]
 
   @@unique([numeroDocumento, tipoDocumento])
   @@index([nombreCompleto])
@@ -1942,4 +1943,449 @@ model RipsPrueba {
 
   @@index([numFactura])
   @@index([modulo])
+}
+
+// ==========================================
+// PROGRAMAS ESPECIALIZADOS / ALTO COSTO
+// Módulo independiente – NO modifica tablas existentes
+// Normativa: Res. 3241/2008, Circular 030/2006 MINSALUD
+// ==========================================
+
+model ProgramaEspecial {
+  id            String                @id @default(cuid())
+  codigo        String                @unique // RENAL, VIH, DIABETES, HIPERTENSION, etc.
+  nombre        String
+  descripcion   String?
+  categoria     String                @default("ALTO_COSTO") // ALTO_COSTO, GESTION_RIESGO, INSTITUCIONAL
+  activo        Boolean               @default(true)
+  icono         String?
+  color         String                @default("#00B4D8")
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+  inscripciones InscripcionPrograma[]
+  configuracion ConfiguracionPE?
+
+  @@index([codigo])
+  @@index([categoria])
+  @@index([activo])
+}
+
+model InscripcionPrograma {
+  id               String                      @id @default(cuid())
+  pacienteId       String
+  programaId       String
+  codigoPrograma   String
+  fechaIngreso     DateTime                    @default(now())
+  fechaEgreso      DateTime?
+  motivoEgreso     String?
+  estado           String                      @default("ACTIVO") // ACTIVO, RETIRADO, TRASLADADO, FALLECIDO, ALTA
+  entidadRemitente String?
+  medicoIngresoId  String?
+  observaciones    String?
+  sedeId           String?
+  createdAt        DateTime                    @default(now())
+  updatedAt        DateTime                    @updatedAt
+  paciente         Paciente                    @relation(fields: [pacienteId], references: [id])
+  programa         ProgramaEspecial            @relation(fields: [programaId], references: [id])
+  historiaRenal    HistoriaClinicaRenal?
+  sesionesHD       SesionHemodialisis[]
+  accesosVasculares AccesoVascular[]
+  eventosAdversos  EventoAdversoPE[]
+  evoluciones      EvolucionMultidisciplinaria[]
+  laboratorios     LaboratorioRenal[]
+  tamizajesPE      TamizajePE[]
+  turnoHD          TurnoHD?
+  serologia        ResultadoSerologico[]
+
+  @@unique([pacienteId, programaId])
+  @@index([pacienteId])
+  @@index([programaId])
+  @@index([estado])
+  @@index([codigoPrograma])
+}
+
+model HistoriaClinicaRenal {
+  id                     String              @id @default(cuid())
+  inscripcionId          String              @unique
+  pacienteId             String
+  // Diagnóstico principal
+  codigoCIE10            String?             // N18.x ERC
+  diagnosticoPrincipal   String
+  etiologia              String?             // DIABETICA, HIPERTENSIVA, GLOMERULAR, OBSTRUCTIVA, POLICISTICA, DESCONOCIDA, OTRA
+  otrosDiagnosticos      String?
+  // Clasificación KDIGO (GFR + Albuminuria)
+  estadioERC             String?             // G1,G2,G3a,G3b,G4,G5,G5D
+  categoriaAlbuminuria   String?             // A1,A2,A3
+  riesgoKDIGO            String?             // BAJO, MODERADO, ALTO, MUY_ALTO
+  // Función renal basal
+  tfgBasal               Float?              // mL/min/1.73m²
+  metodoTFG              String?             // CKD-EPI, MDRD, COCKCROFT-GAULT
+  creatininaBasal        Float?              // mg/dL
+  fechaTFGBasal          DateTime?
+  // Parámetros clínicos
+  peso                   Float?
+  talla                  Float?
+  imc                    Float?
+  // Comorbilidades / factores de riesgo
+  hipertension           Boolean             @default(false)
+  diabetes               Boolean             @default(false)
+  obesidad               Boolean             @default(false)
+  tabaquismo             Boolean             @default(false)
+  dislipidemia           Boolean             @default(false)
+  cardiopatia            Boolean             @default(false)
+  antecedentesFamiliares Boolean             @default(false)
+  otrasComorbilidades    String?
+  // Modalidad terapéutica actual
+  modalidadActual        String?             // NEFROPROTECCION, PREDIALISIS, HEMODIALISIS, DIALISIS_PERITONEAL, TRASPLANTE
+  fechaInicioDialisis    DateTime?
+  causaERC               String?
+  // Medicación nefroprotectora
+  ieca                   Boolean             @default(false)
+  ara2                   Boolean             @default(false)
+  // Control
+  nefrologoTratante      String?
+  periodicidadControl    String?             // MENSUAL, BIMESTRAL, TRIMESTRAL, SEMESTRAL
+  observaciones          String?
+  createdAt              DateTime            @default(now())
+  updatedAt              DateTime            @updatedAt
+  inscripcion            InscripcionPrograma @relation(fields: [inscripcionId], references: [id])
+
+  @@index([pacienteId])
+  @@index([estadioERC])
+  @@index([modalidadActual])
+}
+
+model AccesoVascular {
+  id              String              @id @default(cuid())
+  inscripcionId   String
+  pacienteId      String
+  tipo            String              // FAV_RADIOCEFÁLICA, FAV_BRAQUIOCEFÁLICA, INJERTO_PTFE, CATETER_TEMPORAL, CATETER_TUNELIZADO_DERECHO, CATETER_TUNELIZADO_IZQUIERDO, CATETER_PERMCATH
+  lateralidad     String?             // IZQUIERDO, DERECHO
+  sitio           String?             // ANTEBRAZO, BRAZO, YUGULAR_INTERNA, SUBCLAVIA, FEMORAL
+  fechaCreacion   DateTime?
+  fechaUso        DateTime?
+  fechaRetiro     DateTime?
+  estado          String              @default("ACTIVO") // ACTIVO, DISFUNCIONAL, TROMBOSADO, INFECTADO, RETIRADO, MADURACIÓN
+  flujoActual     Float?              // mL/min
+  recirculacion   Float?              // %
+  presionVenosa   Float?
+  presionArterial Float?
+  observaciones   String?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  inscripcion     InscripcionPrograma @relation(fields: [inscripcionId], references: [id])
+  sesiones        SesionHemodialisis[]
+
+  @@index([inscripcionId])
+  @@index([pacienteId])
+  @@index([estado])
+}
+
+model MaquinaDialisis {
+  id        String               @id @default(cuid())
+  codigo    String               @unique
+  marca     String
+  modelo    String?
+  serie     String?
+  sillon    String?              // Número o letra del sillón asignado
+  estado    String               @default("ACTIVO") // ACTIVO, MANTENIMIENTO, INACTIVO, BAJA
+  sedeId    String?
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
+  sesiones  SesionHemodialisis[]
+  turnosHD  TurnoHD[]
+
+  @@index([codigo])
+}
+
+model SesionHemodialisis {
+  id                    String              @id @default(cuid())
+  inscripcionId         String
+  pacienteId            String
+  // Identificación
+  numeroSesion          Int?
+  fechaSesion           DateTime
+  turno                 String?             // MANANA, TARDE, NOCHE
+  // Personal asistencial
+  nefrologoId           String?
+  nefrologo             String?             // Nombre libre si no está en sistema
+  enfermeroId           String?
+  enfermero             String?
+  // Equipos
+  maquinaId             String?
+  codigoMaquina         String?
+  accesoVascularId      String?
+  sillon                String?
+  // Parámetros pre-diálisis
+  pesoPre               Float               // kg – peso al ingreso
+  pesoSeco              Float?              // kg – peso seco objetivo
+  gananciaPesoInter     Float?              // kg – ganancia entre sesiones
+  taSistolicaPre        Int?                // mmHg
+  taDiastolicaPre       Int?                // mmHg
+  frecCardiacaPre       Int?                // lpm
+  temperaturaPre        Float?              // °C
+  saturacionO2Pre       Int?                // %
+  // Prescripción
+  tiempoPrescrito       Int?                // minutos
+  qbPrescrito           Int?                // mL/min sangre
+  qdPrescrito           Int?                // mL/min dializado
+  ufPrescrita           Float?              // litros ultrafiltración prescrita
+  concentracionDializado String?
+  temperaturaDializado  Float?              // °C
+  filtroTipo            String?
+  filtroLote            String?
+  filtroReutilizado     Boolean             @default(false)
+  filtroUsos            Int?
+  // Anticoagulación
+  tipoAnticoagulacion   String?             // HEPARINA_NO_FRACCIONADA, ENOXAPARINA, CITRATO, SIN_ANTICOAGULACION
+  heparinaInicial       Float?              // UI bolo inicial
+  heparinaMantenimiento Float?              // UI/h
+  heparinaTotal         Float?              // UI total sesión
+  // Parámetros logrados (post-sesión)
+  tiempoReal            Int?                // min reales
+  qbReal                Int?                // mL/min real
+  ufReal                Float?              // litros reales
+  ktVSesion             Float?              // Kt/V Daugirdas
+  urrSesion             Float?              // URR %
+  volumeTratado         Float?              // mL
+  // Valores post-diálisis
+  pesoPost              Float?              // kg
+  taSistolicaPost       Int?
+  taDiastolicaPost      Int?
+  frecCardiacaPost      Int?
+  temperaturaPost       Float?
+  saturacionO2Post      Int?
+  // Evaluación clínica
+  toleranciaDialisis    String?             // BUENA, REGULAR, MALA
+  estadoConciencia      String?
+  // Medicamentos administrados en sesión
+  medicamentosSesion    Json?               // [{nombre, dosis, via, hora, lote}]
+  // Signos vitales intrasesión
+  signosVitalesIntra    Json?               // [{hora, pas, pad, fc, fc, sintomas}]
+  // Incidencias intrasesión
+  incidencias           String[]
+  // Estado
+  estadoSesion          String              @default("PROGRAMADA") // PROGRAMADA, EN_CURSO, COMPLETADA, SUSPENDIDA, CANCELADA
+  motivoCancelacion     String?
+  observaciones         String?
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  inscripcion           InscripcionPrograma @relation(fields: [inscripcionId], references: [id])
+  maquina               MaquinaDialisis?    @relation(fields: [maquinaId], references: [id])
+  accesoVascular        AccesoVascular?     @relation(fields: [accesoVascularId], references: [id])
+
+  @@index([inscripcionId])
+  @@index([pacienteId])
+  @@index([fechaSesion])
+  @@index([estadoSesion])
+  @@index([turno])
+}
+
+model LaboratorioRenal {
+  id                     String              @id @default(cuid())
+  inscripcionId          String
+  pacienteId             String
+  fechaToma              DateTime
+  fechaResultado         DateTime?
+  tipo                   String              // PRE_DIALISIS, POST_DIALISIS, MENSUAL, TRIMESTRAL, SEMESTRAL, ANUAL, ESPECIAL
+  // Función renal
+  creatinina             Float?              // mg/dL  VR: 0.6-1.2
+  urea                   Float?              // mg/dL
+  bun                    Float?              // mg/dL  VR: 7-25
+  tfgCalculada           Float?              // mL/min/1.73m²
+  acidoUrico             Float?              // mg/dL  VR: 3.5-7.2
+  // Electrolitos
+  sodio                  Float?              // mEq/L  VR: 135-145
+  potasio                Float?              // mEq/L  VR: 3.5-5.0  CRITICO >6.5
+  calcio                 Float?              // mg/dL  VR: 8.5-10.2
+  calcioIonico           Float?              // mmol/L VR: 1.1-1.35
+  fosforo                Float?              // mg/dL  VR: 2.5-4.5  HD: 3.5-5.5
+  magnesio               Float?              // mEq/L  VR: 1.5-2.5
+  cloro                  Float?              // mEq/L  VR: 98-107
+  bicarbonato            Float?              // mEq/L  VR: 22-26
+  productoCaP            Float?              // Calcio x Fósforo (calculado)
+  // Hemograma
+  hemoglobina            Float?              // g/dL   Target HD: 10-12
+  hematocrito            Float?              // %      Target HD: 30-36
+  leucocitos             Float?              // x10³/μL VR: 4.5-11
+  plaquetas              Float?              // x10³/μL VR: 150-400
+  // Metabolismo óseo-mineral
+  pth                    Float?              // pg/mL  Target HD: 150-600
+  vitaminaD              Float?              // ng/mL  VR: >30
+  fosfatasaAlcalina      Float?              // U/L    VR: 44-147
+  // Anemia
+  ferritina              Float?              // ng/mL  Target HD: 200-500
+  hierroSerico           Float?              // μg/dL  VR: 60-170
+  capacidadFijacion      Float?              // μg/dL TIBC
+  saturacionTransferrina Float?              // %      Target HD: >20
+  // Inflamación/Nutrición
+  proteC                 Float?              // mg/dL  VR: <0.5
+  albumina               Float?              // g/dL   Target HD: >3.5
+  prealbumina            Float?              // mg/dL  VR: 15-35
+  proteinas              Float?              // g/dL   VR: 6.4-8.3
+  // Perfil lipídico
+  colesterol             Float?              // mg/dL  VR: <200
+  trigliceridos          Float?              // mg/dL  VR: <150
+  hdl                    Float?              // mg/dL  VR: >40H >50M
+  ldl                    Float?              // mg/dL  VR: <100
+  // Glucosa
+  glucosa                Float?              // mg/dL  VR: 70-99
+  hba1c                  Float?              // %      Target DM: <7
+  // Kt/V y adecuación
+  ktVMensual             Float?              // >1.2 ideal >1.4
+  urrMensual             Float?              // >65%
+  // Serología
+  hbsAg                  String?             // NEG, POS
+  antiHbs                String?             // NEG, POS
+  antiHcvTotal           String?             // NEG, POS
+  antiHiv                String?             // NEG, POS
+  vdrl                   String?             // NEG, POS, REACTIVO, NO_REACTIVO
+  // Orina (cuando aplica pre-diálisis)
+  proteinuriaOrina       Float?              // g/24h o mg/g creatinina
+  albuminuriaOrina       Float?              // mg/24h o mg/g creatinina
+  observaciones          String?
+  resultadoCompleto      Json?
+  createdAt              DateTime            @default(now())
+  updatedAt              DateTime            @updatedAt
+  inscripcion            InscripcionPrograma @relation(fields: [inscripcionId], references: [id])
+
+  @@index([inscripcionId])
+  @@index([pacienteId])
+  @@index([fechaToma])
+  @@index([tipo])
+}
+
+model EventoAdversoPE {
+  id                String              @id @default(cuid())
+  inscripcionId     String
+  pacienteId        String
+  sesionId          String?
+  tipo              String              // HIPOTENSION, CALAMBRES, NAUSEAS, VOMITOS, CEFALEA, FIEBRE_ESCALOSFRIOS, SANGRADO_ACCESO, TROMBOSIS, INFECCION_ACCESO, REACCION_FILTRO, ARRITMIA, CONVULSION, COAGULACION_LINEAS, OTRO
+  descripcion       String
+  fechaEvento       DateTime
+  horaEvento        String?
+  severidad         String              // LEVE, MODERADO, GRAVE, CRITICO
+  tratamiento       String?
+  resolucion        String?
+  reportadoA        String?
+  notificadoFamilia Boolean             @default(false)
+  requirioHospitalizacion Boolean       @default(false)
+  seguimiento       String?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  inscripcion       InscripcionPrograma @relation(fields: [inscripcionId], references: [id])
+
+  @@index([inscripcionId])
+  @@index([pacienteId])
+  @@index([fechaEvento])
+  @@index([severidad])
+}
+
+model EvolucionMultidisciplinaria {
+  id             String              @id @default(cuid())
+  inscripcionId  String
+  pacienteId     String
+  profesionalId  String?
+  profesional    String?             // Nombre libre
+  disciplina     String              // MEDICO, ENFERMERIA, NUTRICION, PSICOLOGIA, TRABAJO_SOCIAL, FARMACIA, QUIMICO_FARMACEUTICO, EDUCACION
+  fechaEvolucion DateTime
+  // Formato SOAP
+  subjetivo      String?
+  objetivo       String?
+  analisis       String?
+  plan           String?
+  notaLibre      String?
+  // Objetivos y seguimiento
+  objetivos      Json?               // [{descripcion, estado, fechaMeta}]
+  alertas        Json?               // [{tipo, descripcion, urgente}]
+  // Firma
+  firmado        Boolean             @default(false)
+  fechaFirma     DateTime?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  inscripcion    InscripcionPrograma @relation(fields: [inscripcionId], references: [id])
+
+  @@index([inscripcionId])
+  @@index([disciplina])
+  @@index([fechaEvolucion])
+}
+
+model TamizajePE {
+  id              String              @id @default(cuid())
+  inscripcionId   String
+  pacienteId      String
+  codigoPrograma  String
+  tipo            String              // Ej: HEPATITIS_B, VHC, VIH, VARICELA, TETANOS, OFTALMOLOGIA...
+  descripcion     String
+  fechaProgramada DateTime?
+  fechaRealizada  DateTime?
+  resultado       String?             // NEGATIVO, POSITIVO, NO_CONCLUYENTE, PENDIENTE
+  observaciones   String?
+  estado          String              @default("PENDIENTE") // PENDIENTE, REALIZADO, NO_APLICA, RECHAZADO
+  periodicidad    String?             // UNICO, ANUAL, SEMESTRAL, TRIMESTRAL, MENSUAL
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  inscripcion     InscripcionPrograma @relation(fields: [inscripcionId], references: [id])
+
+  @@index([inscripcionId])
+  @@index([pacienteId])
+  @@index([codigoPrograma])
+  @@index([estado])
+}
+
+model ConfiguracionPE {
+  id           String           @id @default(cuid())
+  programaId   String           @unique
+  parametros   Json             // Config específica por programa
+  kpis         Json?            // {ktv:{min:1.2}, hemoglobina:{min:10,max:12}, albumina:{min:3.5}, etc.}
+  alertasReglas Json?           // Reglas de alertas automáticas
+  tamizajesDef Json?            // Definición de tamizajes con periodicidad
+  laboratoriosFrecuencia Json?  // Frecuencia de laboratorios recomendados
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  programa     ProgramaEspecial @relation(fields: [programaId], references: [id])
+}
+
+// ── HD-02: Turno de Hemodiálisis ─────────────────────────────
+model TurnoHD {
+  id            String               @id @default(cuid())
+  inscripcionId String               @unique  // Un turno vigente por paciente
+  esquema       String               // LMV, MJS
+  jornada       String               // MADRUGADA, MANANA, TARDE, NOCHE
+  sillaNumero   String?
+  maquinaId     String?
+  activo        Boolean              @default(true)
+  fechaInicio   DateTime             @default(now())
+  fechaFin      DateTime?
+  observaciones String?
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+  inscripcion   InscripcionPrograma  @relation(fields: [inscripcionId], references: [id])
+  maquina       MaquinaDialisis?     @relation(fields: [maquinaId], references: [id])
+
+  @@index([esquema])
+  @@index([jornada])
+  @@index([activo])
+}
+
+// ── P3: Serología del paciente HD ────────────────────────────
+model ResultadoSerologico {
+  id             String              @id @default(cuid())
+  inscripcionId  String
+  pacienteId     String
+  marcador       String              // HBsAg, AntiHBc, AntiHBs, AntiHVC, HIV, VDRL, HBeAg, AntiHBe
+  resultado      String              @default("PENDIENTE") // REACTIVO, NO_REACTIVO, PENDIENTE, INDETERMINADO
+  valorNumerico  Float?              // UI/mL o título para AntiHBs (>10 UI/mL = protegido)
+  fechaToma      DateTime?
+  fechaResultado DateTime?
+  laboratorio    String?
+  observaciones  String?
+  validadoPor    String?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  inscripcion    InscripcionPrograma @relation(fields: [inscripcionId], references: [id])
+
+  @@index([inscripcionId])
+  @@index([marcador])
+  @@index([resultado])
 }

@@ -442,6 +442,19 @@ export default function HistoriaClinicaPage({
   const handleCamposSarai = useCallback((campos: Record<string, string>) => {
     setForm(prev => {
       const n = { ...prev };
+      const camposSeguros = { ...campos };
+      const posibleSignos = camposSeguros.medicamentosActuales || '';
+      if (/presi[oó]n arterial|frecuencia card[ií]aca|frecuencia respiratoria|temperatura/i.test(posibleSignos)) {
+        const pa = posibleSignos.match(/(?:presi[oó]n arterial|tensi[oó]n)[^0-9]*(\d{2,3}\s*[\/-]\s*\d{2,3})/i);
+        const fc = posibleSignos.match(/(?:frecuencia card[ií]aca|pulso)[^0-9]*(\d{2,3})/i);
+        const fr = posibleSignos.match(/(?:frecuencia respiratoria)[^0-9]*(\d{1,2})/i);
+        const temp = posibleSignos.match(/(?:temperatura)[^0-9]*(\d{2}(?:[.,]\d)?)/i);
+        if (pa) camposSeguros.presionArterial = pa[1].replace(/\s/g, '');
+        if (fc) camposSeguros.frecuenciaCardiaca = fc[1];
+        if (fr) camposSeguros.frecuenciaRespiratoria = fr[1];
+        if (temp) camposSeguros.temperatura = temp[1].replace(',', '.');
+        delete camposSeguros.medicamentosActuales;
+      }
       const mapa: Partial<Record<string, keyof FormHC>> = {
         quejaPrincipal:          'motivoConsulta',
         historiaEnfermedad:      'historiaEnfermedad',
@@ -454,11 +467,15 @@ export default function HistoriaClinicaPage({
         habitosToxicos:          'antToxicos',
         examenFisico:            'historiaEnfermedad',
         presionArterial:         'taSistolica',
+        taDiastolica:             'taDiastolica',
         frecuenciaCardiaca:      'frecuenciaCardiaca',
         frecuenciaRespiratoria:  'frecuenciaRespiratoria',
         temperatura:             'temperatura',
         peso:                    'peso',
         talla:                   'talla',
+        imc:                     'imc',
+        saturacionO2:            'saturacionO2',
+        glicemia:                'glicemia',
         diagnostico:             'diagnosticoPrincipal',
         planTratamiento:         'conducta',
         procedimientoPropuesto:  'procedimientoRealizado',
@@ -466,8 +483,16 @@ export default function HistoriaClinicaPage({
         observaciones:           'recomendacionesMed',
         consentimientoExplicacion: 'recomendacionesMed',
       };
-      Object.entries(campos).forEach(([k, v]) => {
-        if (mapa[k] && v) (n as any)[mapa[k]!] = v;
+      Object.entries(camposSeguros).forEach(([k, v]) => {
+        if (mapa[k] && v) {
+          if (k === 'presionArterial' && typeof v === 'string') {
+            const [sistolica, diastolica] = v.split(/[\/-]/).map(part => part.trim());
+            n.taSistolica = sistolica || v;
+            if (diastolica) n.taDiastolica = diastolica;
+          } else {
+            (n as any)[mapa[k]!] = v;
+          }
+        }
       });
       const sv = (campos as any).signosVitales;
       if (sv) {

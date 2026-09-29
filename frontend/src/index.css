@@ -2,6 +2,34 @@
 @tailwind components;
 @tailwind utilities;
 
+select {
+  color-scheme: dark;
+}
+
+select option {
+  background-color: #111827;
+  color: #f8fafc;
+}
+
+select option:checked,
+select option:hover {
+  background-color: #2563eb;
+  color: #ffffff;
+}
+
+[data-theme="premium-light"] select,
+[data-theme="soft-medical"] select,
+[data-theme="rose-care"] select {
+  color-scheme: light;
+}
+
+[data-theme="premium-light"] select option,
+[data-theme="soft-medical"] select option,
+[data-theme="rose-care"] select option {
+  background-color: #ffffff;
+  color: #1e293b;
+}
+
 * {
   margin: 0;
   padding: 0;

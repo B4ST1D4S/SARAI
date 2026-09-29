@@ -15,7 +15,7 @@ import numpy as np
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("sarai-whisper")
 
-MODEL_SIZE = os.getenv("WHISPER_MODEL", "medium")
+MODEL_SIZE = os.getenv("WHISPER_MODEL", "small")
 model: WhisperModel = None
 RMS_VOZ_MINIMO = 0.015  # < 1.5% RMS = audio demasiado débil para Whisper
 

@@ -1,11 +1,39 @@
 import { Request, Response } from 'express';
 type MulterFile = { buffer: Buffer; mimetype: string };
 
+function extraerBloquesPorModulo(texto: string): Record<string, string> {
+  const campos: Record<string, string> = {};
+  const encabezados: Array<[string, string]> = [
+    ['quejaPrincipal', 'motivo\\s+de\\s+consulta|motivo'],
+    ['historiaEnfermedad', 'historia\\s+de\\s+la\\s+enfermedad\\s+actual|enfermedad\\s+actual'],
+    ['antecedentesPersonales', 'antecedentes?\\s+personales|patologicos'],
+    ['antecedentesFamiliares', 'antecedentes?\\s+familiares'],
+    ['antecedentesQuirurgicos', 'antecedentes?\\s+quirurgicos|quirurgicos'],
+    ['medicamentosActuales', 'antecedentes?\\s+farmacologicos|farmacologicos|medicamentos?\\s+actuales'],
+    ['alergias', 'antecedentes?\\s+alergicos|alergias?'],
+    ['habitosToxicos', 'antecedentes?\\s+toxicos|habitos?\\s+toxicos'],
+    ['diagnostico', 'impresion\\s+diagnostica|diagnostico'],
+    ['planTratamiento', 'plan\\s+terapeutico|plan\\s+de\\s+manejo|tratamiento'],
+    ['recomendaciones', 'recomendaciones?\\s+medicas?|indicaciones'],
+  ];
+  const nombres = encabezados.map(([, patron]) => patron).join('|');
+  for (const [campo, patron] of encabezados) {
+    const expresion = new RegExp(
+      `(?:^|[.;|])\\s*(?:${patron})\\s*:?\\s*(.*?)(?=\\s*(?:${nombres})\\s*:|$)`,
+      'i'
+    );
+    const coincidencia = texto.replace(/\\s+/g, ' ').match(expresion);
+    const valor = coincidencia?.[1]?.trim();
+    if (valor && valor.length >= 3) campos[campo] = valor;
+  }
+  return campos;
+}
+
 // -----------------------------------------------------------------------------
 // Extractor local con patrones (sin API, siempre disponible como fallback)
 // -----------------------------------------------------------------------------
 function extraerCamposLocalmente(texto: string): Record<string, string> {
-  const campos: Record<string, string> = {};
+  const campos: Record<string, string> = extraerBloquesPorModulo(texto);
 
   const paMatch = texto.match(/\b(\d{2,3}[\s\/\-]\d{2,3})\s*(?:mmhg|mm hg)?/i);
   if (paMatch) campos['presionArterial'] = paMatch[1].replace(/\s/g, '/');
@@ -45,13 +73,42 @@ function extraerCamposLocalmente(texto: string): Record<string, string> {
   const procMatch = texto.match(/(?:procedimiento|se\s+(?:har[aá]|propone|recomienda))\s*([^.;\n]{5,80})/i);
   if (procMatch) campos['procedimientoPropuesto'] = procMatch[1].trim();
 
-  if (Object.keys(campos).length <= 1) {
+  if (Object.keys(campos).length <= 1 && !campos.quejaPrincipal) {
     campos['quejaPrincipal'] = texto;
-  } else {
+  } else if (!campos.quejaPrincipal) {
     const inicio = texto.split(/[.;]/)[0].trim();
     if (inicio.length > 10) campos['quejaPrincipal'] = inicio;
   }
   return campos;
+}
+
+function normalizarCamposClasificados(campos: Record<string, string>): Record<string, string> {
+  const normalizados = { ...campos };
+  const fuentes = ['antecedentesPersonales', 'medicamentosActuales', 'observaciones'];
+  const textoFuentes = fuentes
+    .map((campo) => normalizados[campo] || '')
+    .join(' ');
+  const signos = extraerCamposLocalmente(textoFuentes);
+  const camposSignos = [
+    'presionArterial', 'frecuenciaCardiaca', 'frecuenciaRespiratoria',
+    'temperatura', 'peso', 'talla',
+  ];
+
+  for (const campo of camposSignos) {
+    if (signos[campo]) normalizados[campo] = signos[campo];
+  }
+
+  // Una frase con signos no es un antecedente ni un medicamento.
+  if (camposSignos.some((campo) => signos[campo])) {
+    for (const fuente of fuentes) {
+      const valor = normalizados[fuente];
+      if (valor && /presi[oó]n|tensi[oó]n|frecuencia|temperatura|peso|talla|mmhg|lpm|rpm/i.test(valor)) {
+        delete normalizados[fuente];
+      }
+    }
+  }
+
+  return normalizados;
 }
 
 // -----------------------------------------------------------------------------
@@ -105,7 +162,17 @@ async function geminiTextoACampos(texto: string, contexto: string): Promise<Reco
 
   const prompt = `Eres SARAI, asistente clínica de EstetIA (medicina estética colombiana, Res. 1995/1999 - Ley 2015/2020).
 El profesional dictó: "${texto}"
-Contexto: ${contexto || 'historia clínica de medicina estética'}
+Contexto actual: ${contexto || 'historia clínica de medicina estética'}
+
+CLASIFICACIÓN OBLIGATORIA POR ORACIÓN:
+- Clasifica cada oración por su significado, aunque el profesional no diga el nombre del módulo.
+- Si el contexto indica una sección activa, úsala como prioridad para una oración ambigua,
+  pero nunca contradigas una categoría clínica inequívoca.
+- "Paciente refiere dolor tipo cólico" va a historiaEnfermedad o quejaPrincipal,
+  nunca a antecedentesPersonales ni medicamentosActuales.
+- "Toma losartán 50 mg" va a medicamentosActuales.
+- "Antecedente de cirugía de rodilla" va a antecedentesQuirurgicos.
+- "Presión 120/80, pulso 88, respiraciones 18" va únicamente a los campos de signos vitales.
 
 Extrae SOLO los campos mencionados explícitamente. Omite los no mencionados.
 Usa lenguaje médico formal. No inventes datos.
@@ -141,6 +208,15 @@ CAMPOS DISPONIBLES:
 - consentimientoExplicacion: explicación dada al paciente sobre riesgos
 - observaciones: observaciones adicionales del médico
 
+REGLA CRÍTICA DE UBICACIÓN:
+- Los valores de presión arterial, frecuencia cardíaca, frecuencia respiratoria,
+  temperatura, peso, talla e IMC son SIGNOS VITALES y deben ir únicamente en
+  sus campos numéricos correspondientes.
+- Nunca guardes signos vitales en antecedentesPersonales, medicamentosActuales,
+  antecedentesFarmacologicos ni observaciones.
+- medicamentosActuales solo debe contener nombres de medicamentos y dosis
+  mencionados explícitamente.
+
 Responde ÚNICAMENTE con JSON válido, sin markdown, sin explicaciones.
 Ejemplo: {"quejaPrincipal":"Flacidez abdominal post embarazo","peso":"68","presionArterial":"120/80","tipoPiel":"mixta","diagnostico":"Lipedema grado II"}`;
 
@@ -154,7 +230,7 @@ Ejemplo: {"quejaPrincipal":"Flacidez abdominal post embarazo","peso":"68","presi
     Object.entries(parsed).forEach(([k, v]) => {
       if (v !== null && v !== '' && v !== undefined) clean[k] = String(v);
     });
-    return Object.keys(clean).length > 0 ? clean : null;
+    return Object.keys(clean).length > 0 ? normalizarCamposClasificados(clean) : null;
   } catch (err: any) {
     console.error('[SARAI] geminiTextoACampos error:', err?.message || err);
     return null;
@@ -324,12 +400,30 @@ export async function procesarVoz(req: Request, res: Response): Promise<void> {
       res.status(400).json({ error: 'Texto vacío' });
       return;
     }
-    const gemini = await geminiTextoACampos(String(texto), String(contexto || ''));
-    if (gemini && Object.keys(gemini).length > 1) {
-      res.json({ campos: gemini, motor: 'gemini' });
+    const textoNormalizado = String(texto);
+    const camposLocales = extraerCamposLocalmente(textoNormalizado);
+    const bloquesExplicitos = extraerBloquesPorModulo(textoNormalizado);
+    const tieneSignosVitales = [
+      'presionArterial', 'frecuenciaCardiaca', 'frecuenciaRespiratoria',
+      'temperatura', 'peso', 'talla',
+    ].some((campo) => Boolean(camposLocales[campo]));
+
+    // Los signos vitales son deterministas: devolverlos de inmediato evita la
+    // latencia de Gemini y evita que el modelo los clasifique como antecedentes.
+    if (tieneSignosVitales || Object.keys(bloquesExplicitos).length > 0) {
+      res.json({ campos: camposLocales, motor: 'local-signos-vitales' });
       return;
     }
-    res.json({ campos: extraerCamposLocalmente(String(texto)), motor: 'local' });
+
+    const gemini = await geminiTextoACampos(textoNormalizado, String(contexto || ''));
+    if (gemini && Object.keys(gemini).length > 1) {
+      res.json({ campos: normalizarCamposClasificados(gemini), motor: 'gemini' });
+      return;
+    }
+    res.json({
+      campos: normalizarCamposClasificados(extraerCamposLocalmente(String(texto))),
+      motor: 'local',
+    });
   } catch (err) {
     console.error('procesarVoz error:', err);
     res.status(500).json({ error: 'Error interno' });
