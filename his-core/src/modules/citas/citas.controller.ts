@@ -12,17 +12,24 @@ import {
   Req,
   UseGuards,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { Request } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CitasService, CitaResponse } from './citas.service';
 import { CreateCitaDto } from './dto/create-cita.dto';
 import { UpdateEstadoCitaDto } from './dto/update-estado-cita.dto';
+import { FacturacionService } from '../facturacion/facturacion.service';
 
 @Controller('citas')
 @UseGuards(JwtAuthGuard)
 export class CitasController {
-  constructor(private readonly citasService: CitasService) {}
+  private readonly logger = new Logger(CitasController.name);
+
+  constructor(
+    private readonly citasService: CitasService,
+    private readonly facturacionService: FacturacionService,
+  ) {}
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
@@ -71,11 +78,30 @@ export class CitasController {
 
   @Post(':id/completar')
   async completar(@Param('id') id: string): Promise<CitaResponse> {
-    return this.citasService.completar(id);
+    const cita = await this.citasService.completar(id);
+    await this.crearIngresoFacturacionSinBloquear(id);
+    return cita;
   }
 
   @Post(':id/admision')
   async admision(@Param('id') id: string): Promise<CitaResponse> {
-    return this.citasService.registrarAdmision(id);
+    const cita = await this.citasService.registrarAdmision(id);
+    await this.crearIngresoFacturacionSinBloquear(id);
+    return cita;
+  }
+
+  /**
+   * Desde que el paciente llega (admisión) ya se puede empezar a cargar
+   * cuenta (consulta, insumos, etc.), así que el ingreso+cuenta de
+   * facturación debe existir desde ahí, no solo al cerrar la atención.
+   * Idempotente (FacturacionService.crearIngresoYCuentaDesdeCita) y no debe
+   * bloquear la admisión/atención si falla.
+   */
+  private async crearIngresoFacturacionSinBloquear(citaId: string): Promise<void> {
+    try {
+      await this.facturacionService.crearIngresoYCuentaDesdeCita(citaId);
+    } catch (err: any) {
+      this.logger.warn(`No se pudo crear el ingreso de facturación para la cita [${citaId}]: ${err?.message}`);
+    }
   }
 }

@@ -7,6 +7,7 @@ import { PacientesModule } from './pacientes/pacientes.module';
 import { EspecialidadesModule } from './especialidades/especialidades.module';
 import { TiposConsultaModule } from './tipos-consulta/tipos-consulta.module';
 import { CitasModule } from './citas/citas.module';
+import { FacturacionModule } from './facturacion/facturacion.module';
 
 /**
  * Punto de entrada para los módulos de dominio y funcionalidades clínicas del HIS:
@@ -30,6 +31,7 @@ export const CLINICAL_MODULES = [
   EspecialidadesModule,
   TiposConsultaModule,
   CitasModule,
+  FacturacionModule,
 ];
 
 export * from './clinical-record';
@@ -41,5 +43,5 @@ export * from './pacientes';
 export * from './especialidades';
 export * from './tipos-consulta';
 export * from './citas';
-
+export * from './facturacion';
 
