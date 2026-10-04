@@ -1,30 +1,12 @@
-// src/services/facturacionService.ts — Módulo de Facturación
+// src/services/facturacionService.ts — Módulo de Facturación (his-core)
 
-import { API_BASE_URL as API } from '../config';
+import { API_URL, authFetch } from './api';
 
-function getToken() {
-  return localStorage.getItem('accessToken') || '';
-}
-
-function headers() {
-  return { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` };
-}
-
+// authFetch ya agrega el header de tenant, Authorization y refresca el
+// access token automáticamente ante un 401 (RTR) — sin esto, igual que pasó
+// antes en Config Agenda, la sesión "se caía" al expirar el token.
 async function req<T>(url: string, options: RequestInit = {}): Promise<T> {
-  const r = await fetch(`${API}/facturacion${url}`, { headers: headers(), ...options });
-  const data = await r.json().catch(() => ({}));
-  if (!r.ok) {
-    if (r.status === 401 || r.status === 403) {
-      const msg = ((data as any).error || '').toLowerCase();
-      if (msg.includes('token') || msg.includes('expirad') || msg.includes('inválid') || msg.includes('autenticad')) {
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('user');
-        window.location.reload();
-      }
-    }
-    throw new Error((data as any).error || 'Error en la solicitud');
-  }
-  return data as T;
+  return authFetch<T>(`${API_URL}/facturacion${url}`, options);
 }
 
 // ─── Tipos ──────────────────────────────────────────────────
