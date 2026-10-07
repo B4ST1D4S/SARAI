@@ -42,6 +42,7 @@ import {
 } from '@/types/historiaClinica.types';
 import { useActiveSection } from '@/hooks/useActiveSection';
 import { RenderSubmodulo } from '@/modules/historia-clinica/registry';
+import { ClinicalAdmissionGuard } from '@/components/guards/ClinicalAdmissionGuard';
 
 // ============================================================================
 // MAPA DINÁMICO DE ICONOS LUCIDE PARA SECCIONES & SUBMÓDULOS
@@ -181,6 +182,7 @@ export interface HistoriaClinicaWorkbenchProps {
   plantillaResuelta?: PlantillaResueltaResponse;
   paciente?: PacienteInfo;
   citaId?: string;
+  citaEstado?: string;
   initialDraft?: DiligenciamientoDraft;
   onSaveDraft?: (draft: DiligenciamientoDraft) => Promise<void> | void;
   onFinalizarAtencion?: (draft: DiligenciamientoDraft) => Promise<void> | void;
@@ -195,6 +197,7 @@ export const HistoriaClinicaWorkbench: React.FC<HistoriaClinicaWorkbenchProps> =
   plantillaResuelta: plantillaProp,
   paciente: pacienteProp,
   citaId: citaIdProp,
+  citaEstado = 'ADMITIDO',
   initialDraft,
   onSaveDraft,
   onFinalizarAtencion,
@@ -425,7 +428,8 @@ export const HistoriaClinicaWorkbench: React.FC<HistoriaClinicaWorkbenchProps> =
   }, [plantilla.origenResolucion]);
 
   return (
-    <div className="h-[calc(100vh-4.5rem)] flex flex-col overflow-hidden bg-app text-primary antialiased selection:bg-primary/30 selection:text-primary">
+    <ClinicalAdmissionGuard citaEstado={citaEstado}>
+      <div className="h-[calc(100vh-4.5rem)] flex flex-col overflow-hidden bg-app text-primary antialiased selection:bg-primary/30 selection:text-primary">
       {/* ─────────────────────────────────────────────────────────────────── */}
       {/* BARRA SUPERIOR ASISTENCIAL (FIJA ARRIBA)                            */}
       {/* ─────────────────────────────────────────────────────────────────── */}
@@ -813,6 +817,7 @@ export const HistoriaClinicaWorkbench: React.FC<HistoriaClinicaWorkbenchProps> =
         </div>
       )}
     </div>
+    </ClinicalAdmissionGuard>
   );
 };
 
