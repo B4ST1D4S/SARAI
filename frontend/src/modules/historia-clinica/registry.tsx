@@ -12,7 +12,13 @@ export interface SubmoduloProps<T = any> {
 // const MotivoConsultaModule = lazy(() => import('./submodulos/MotivoConsultaModule'));
 const SignosVitalesModule = lazy(() => import('./submodulos/SignosVitalesModule'));
 const MotivoConsultaModule = lazy(() => import('./submodulos/MotivoConsultaModule'));
+const AntecedentesModule = lazy(() => import('./submodulos/AntecedentesModule'));
+const RevisionSistemasModule = lazy(() => import('./submodulos/RevisionSistemasModule'));
+const ExamenFisicoModule = lazy(() => import('./submodulos/ExamenFisicoModule'));
 const DiagnosticosModule = lazy(() => import('./submodulos/DiagnosticosModule'));
+const PlanManejoModule = lazy(() => import('./submodulos/PlanManejoModule'));
+const SolicitudAyudasDiagModule = lazy(() => import('./submodulos/SolicitudAyudasDiagModule'));
+const SolicitudProcedimientosModule = lazy(() => import('./submodulos/SolicitudProcedimientosModule'));
 
 // Fallback elegante mientras carga el chunk del submódulo
 const SubmoduloFallback: React.FC = () => (
@@ -26,7 +32,13 @@ const SubmoduloFallback: React.FC = () => (
 const REGISTRY_RAW: Partial<Record<SubmoduloId, React.LazyExoticComponent<React.ComponentType<SubmoduloProps<any>>>>> = {
   signos_vitales: SignosVitalesModule,
   motivo_consulta: MotivoConsultaModule,
+  antecedentes: AntecedentesModule,
+  revision_sistemas: RevisionSistemasModule,
+  examen_fisico: ExamenFisicoModule,
   diagnosticos: DiagnosticosModule,
+  plan_manejo: PlanManejoModule,
+  solicitud_ayudas_diag: SolicitudAyudasDiagModule,
+  solicitud_procedimientos: SolicitudProcedimientosModule,
 };
 
 // 2. Componente Envoltorio para consumir de forma segura desde el Workbench

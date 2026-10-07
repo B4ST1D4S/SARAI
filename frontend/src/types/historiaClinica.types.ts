@@ -103,6 +103,88 @@ export interface SeccionNavStatus {
 // ----------------------------------------------------------------------------
 // 5. Borrador de Diligenciamiento (State del Formulario Continuo)
 // ----------------------------------------------------------------------------
+export interface GinecoObstetricosData {
+  fum?: string;
+  gravidez?: number;
+  partos?: number;
+  cesareas?: number;
+  abortos?: number;
+  planificacion?: string;
+}
+
+export interface AntecedentesData {
+  patologicos?: string;
+  quirurgicos?: string;
+  alergicos?: string;
+  farmacologicos?: string;
+  toxicos?: string;
+  familiares?: string;
+  ginecoObstetricos?: GinecoObstetricosData;
+}
+
+export interface ExamenFisicoData {
+  estadoGeneral?: string;
+  cabezaCuello?: string;
+  toraxCardiopulmonar?: string;
+  abdomen?: string;
+  extremidades?: string;
+  neurologico?: string;
+  osteomuscular?: string;
+}
+
+export interface RevisionSistemasData {
+  general?: string;
+  cardiovascular?: string;
+  respiratorio?: string;
+  gastrointestinal?: string;
+  genitourinario?: string;
+  neurologico?: string;
+  osteomuscular?: string;
+  dermatologico?: string;
+}
+
+export interface IncapacidadMedicaData {
+  requiere?: boolean;
+  dias?: number;
+  fechaInicio?: string;
+  fechaFin?: string;
+  observaciones?: string;
+}
+
+export interface PlanManejoData {
+  conducta?: string;
+  recomendaciones?: string;
+  signosAlarma?: string;
+  incapacidad?: IncapacidadMedicaData;
+}
+
+export interface AyudaDiagnosticaItem {
+  id: string;
+  codigoCups?: string;
+  descripcion: string;
+  cantidad: number;
+  justificacion?: string;
+}
+
+export interface SolicitudAyudasDiagData {
+  items?: AyudaDiagnosticaItem[];
+  observacionesGenerales?: string;
+}
+
+export interface ProcedimientoItem {
+  id: string;
+  codigoCups?: string;
+  descripcion: string;
+  cantidad: number;
+  justificacion?: string;
+  tipoAmbito?: 'AMBULATORIO' | 'HOSPITALARIO' | 'URGENCIAS' | 'QUIRURGICO';
+}
+
+export interface SolicitudProcedimientosData {
+  items?: ProcedimientoItem[];
+  observacionesGenerales?: string;
+}
+
 export interface DiligenciamientoDraft {
   citaId: string;
   pacienteId: string;
@@ -110,10 +192,20 @@ export interface DiligenciamientoDraft {
   // Cada submódulo guarda su payload particular en formato llave-valor
   datos: {
     motivo_consulta?: { motivo: string; enfermedadActual: string };
+    antecedentes?: AntecedentesData;
     signos_vitales?: { fc: number; fr: number; paSistolica: number; paDiastolica: number; temp: number; pesoKg: number; tallaCm: number; imc: number };
+    revisionSistemas?: RevisionSistemasData;
+    revision_sistemas?: RevisionSistemasData;
+    examenFisico?: ExamenFisicoData;
+    examen_fisico?: ExamenFisicoData;
     diagnosticos?: { principal: string; tipoPrincipal: string; relacionados: string[] };
     evolucion_nota?: { nota: string };
-    plan_manejo?: { conducta: string; recomendaciones: string };
+    planManejo?: PlanManejoData;
+    plan_manejo?: PlanManejoData;
+    solicitudAyudasDiag?: SolicitudAyudasDiagData;
+    solicitud_ayudas_diag?: SolicitudAyudasDiagData;
+    solicitudProcedimientos?: SolicitudProcedimientosData;
+    solicitud_procedimientos?: SolicitudProcedimientosData;
     [key: string]: unknown;
   };
   ultimaActualizacion: string; // ISO Date para autosave
