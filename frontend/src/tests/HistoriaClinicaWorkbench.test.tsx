@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { HistoriaClinicaWorkbench, DEFAULT_PLANTILLA_RESUELTA } from '../pages/HistoriaClinicaWorkbench';
 
@@ -57,7 +57,7 @@ describe('HistoriaClinicaWorkbench Component', () => {
     expect(screen.getByText(/Plan de Manejo & Conducta/i)).toBeInTheDocument();
   });
 
-  it('debe actualizar el estado del borrador al escribir en el motivo de consulta', () => {
+  it('debe actualizar el estado del borrador al escribir en el motivo de consulta', async () => {
     render(
       <HistoriaClinicaWorkbench
         plantillaResuelta={DEFAULT_PLANTILLA_RESUELTA}
@@ -65,14 +65,16 @@ describe('HistoriaClinicaWorkbench Component', () => {
       />
     );
 
-    const motivoInput = screen.getByPlaceholderText(/Describa textualmente el motivo expresado/i);
+    const motivoInput = await screen.findByPlaceholderText(/Describa textualmente el motivo expresado/i);
     fireEvent.change(motivoInput, { target: { value: 'Paciente refiere dolor abdominal agudo' } });
 
-    expect(motivoInput).toHaveValue('Paciente refiere dolor abdominal agudo');
-    expect(screen.getByText(/Cambios pendientes/i)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(motivoInput).toHaveValue('Paciente refiere dolor abdominal agudo');
+      expect(screen.getByText(/Cambios pendientes/i)).toBeInTheDocument();
+    });
   });
 
-  it('debe calcular el IMC automáticamente en el submódulo de signos vitales', () => {
+  it('debe calcular el IMC automáticamente en el submódulo de signos vitales', async () => {
     render(
       <HistoriaClinicaWorkbench
         plantillaResuelta={DEFAULT_PLANTILLA_RESUELTA}
@@ -80,14 +82,17 @@ describe('HistoriaClinicaWorkbench Component', () => {
       />
     );
 
-    const pesoInput = screen.getByPlaceholderText('70.0');
-    const tallaInput = screen.getByPlaceholderText('170');
+    const pesoInput = await screen.findByPlaceholderText('70.0');
+    const tallaInput = await screen.findByPlaceholderText('170');
 
     fireEvent.change(pesoInput, { target: { value: '80' } });
     fireEvent.change(tallaInput, { target: { value: '180' } });
 
-    // 80 / (1.80 * 1.80) = 24.7 kg/m² (Normal)
-    expect(screen.getByText(/24.7 kg\/m²/i)).toBeInTheDocument();
+    // 80 / (1.80 * 1.80) = 24.7 (Peso normal)
+    await waitFor(() => {
+      expect(screen.getByText('24.7')).toBeInTheDocument();
+      expect(screen.getByText(/Peso normal/i)).toBeInTheDocument();
+    });
   });
 
   it('debe llamar a onSaveDraft cuando se hace clic en Guardar Borrador', async () => {
@@ -104,6 +109,10 @@ describe('HistoriaClinicaWorkbench Component', () => {
     const btnGuardarBorrador = screen.getByText('Guardar Borrador');
     fireEvent.click(btnGuardarBorrador);
 
-    expect(handleSaveDraft).toHaveBeenCalledTimes(1);
+    await waitFor(() => {
+      expect(handleSaveDraft).toHaveBeenCalledTimes(1);
+    });
+
+    await screen.findByText(/Guardado a las/i);
   });
 });
