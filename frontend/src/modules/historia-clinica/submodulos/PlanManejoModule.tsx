@@ -1,198 +1,334 @@
 import React from 'react';
+import { ClipboardList, FileText, AlertTriangle, FileHeart, CalendarRange } from 'lucide-react';
+import type {
+  IncapacidadMedicaData,
+  ModalidadServicio,
+  PlanManejoData,
+  TipoIncapacidad,
+} from '@/types/historiaClinica.types';
+import type { SubmoduloProps } from '../registry';
 import {
-  ClipboardList,
-  FileText,
-  AlertTriangle,
-  Calendar,
-  Clock,
-} from 'lucide-react';
-import { SubmoduloProps } from '../registry';
-import { PlanManejoData, IncapacidadMedicaData } from '@/types/historiaClinica.types';
+  ESTILO_CAMPO_ERROR,
+  ESTILO_ERROR_MSG,
+  ESTILO_INPUT,
+  ESTILO_LABEL,
+  ESTILO_SELECT,
+  ESTILO_TEXTAREA,
+  clasesCampo,
+} from '../components/common/campos';
+import {
+  CONDUCTA_MIN_CARACTERES,
+  DIAS_INCAPACIDAD_MAX,
+  erroresIncapacidad,
+  fechaFinIncapacidad,
+  hoyLocal,
+  type CampoIncapacidad,
+} from '../utils/validaciones';
+
+export type { PlanManejoData, IncapacidadMedicaData };
+
+export const TIPOS_INCAPACIDAD: { valor: TipoIncapacidad; etiqueta: string }[] = [
+  { valor: 'ENFERMEDAD_GENERAL', etiqueta: 'Enfermedad general' },
+  { valor: 'ENFERMEDAD_LABORAL', etiqueta: 'Enfermedad laboral' },
+  { valor: 'ACCIDENTE_TRABAJO', etiqueta: 'Accidente de trabajo' },
+  { valor: 'ACCIDENTE_TRANSITO', etiqueta: 'Accidente de tránsito' },
+  { valor: 'LICENCIA_MATERNIDAD', etiqueta: 'Licencia de maternidad' },
+  { valor: 'LICENCIA_PATERNIDAD', etiqueta: 'Licencia de paternidad' },
+];
+
+export const MODALIDADES_SERVICIO: { valor: ModalidadServicio; etiqueta: string }[] = [
+  { valor: 'INTRAMURAL', etiqueta: 'Intramural' },
+  { valor: 'EXTRAMURAL', etiqueta: 'Extramural' },
+  { valor: 'TELEMEDICINA', etiqueta: 'Telemedicina' },
+];
+
+const formatoFecha = (iso?: string) => (iso ? iso.split('-').reverse().join('/') : '—');
+const aEntero = (texto: string): number | undefined => (texto.trim() === '' ? undefined : Number(texto));
 
 export const PlanManejoModule: React.FC<SubmoduloProps<PlanManejoData>> = ({
   data = {},
   onChange,
   readOnly = false,
 }) => {
-  const handleFieldChange = (field: keyof Omit<PlanManejoData, 'incapacidad'>, value: string) => {
-    onChange({
-      ...data,
-      [field]: value,
-    });
+  const inc = data.incapacidad ?? {};
+  // Todo se deriva de `data` en cada render. Mientras se diligencia, un campo
+  // solo muestra su error si ya tiene valor: lo que falta se exige al cierre.
+  const errores = erroresIncapacidad(inc);
+  const errorVisible = (campo: CampoIncapacidad) => {
+    const valor = inc[campo];
+    return valor !== undefined && valor !== '' ? errores[campo] : undefined;
+  };
+  const conductaCorta =
+    (data.conducta ?? '').trim() !== '' && (data.conducta ?? '').trim().length < CONDUCTA_MIN_CARACTERES;
+
+  // La incapacidad se emite completa (clon con el cambio) dentro del objeto del plan.
+  const cambiarIncapacidad = (cambios: Partial<IncapacidadMedicaData>) => {
+    const siguiente = { ...inc, ...cambios };
+    onChange({ incapacidad: { ...siguiente, fechaFin: fechaFinIncapacidad(siguiente.fechaInicio, siguiente.dias) } });
   };
 
-  const handleIncapacidadChange = (patch: Partial<IncapacidadMedicaData>) => {
-    onChange({
-      ...data,
-      incapacidad: {
-        ...(data.incapacidad || {}),
-        ...patch,
-      },
-    });
+  const mensaje = (campo: CampoIncapacidad) => {
+    const error = errorVisible(campo);
+    return error ? <p role="alert" className={ESTILO_ERROR_MSG}>{error}</p> : null;
   };
 
-  const incapacidad = data.incapacidad || {};
-  const requiereIncapacidad = Boolean(incapacidad.requiere);
+  const radiosSiNo = (campo: 'esProrroga' | 'esRetroactiva', etiqueta: string) => (
+    <fieldset className="space-y-1 min-w-0 border-0 p-0 m-0">
+      <legend className={ESTILO_LABEL}>
+        {etiqueta} <span className="text-danger">*</span>
+      </legend>
+      <div className="flex items-center gap-4 h-10">
+        {([true, false] as const).map((valor) => (
+          <label key={String(valor)} className="flex items-center gap-1.5 text-sm text-secondary">
+            <input
+              type="radio"
+              name={`incap-${campo}`}
+              checked={inc[campo] === valor}
+              onChange={() => cambiarIncapacidad({ [campo]: valor })}
+              className="text-primary focus:ring-primary/40"
+            />
+            {valor ? 'Sí' : 'No'}
+          </label>
+        ))}
+      </div>
+      {mensaje(campo)}
+    </fieldset>
+  );
 
   return (
-    <div className="space-y-5">
-      {/* 1. Conducta Médica */}
+    <fieldset disabled={readOnly} className="space-y-5 min-w-0 border-0 p-0 m-0">
+      {/* 1. Conducta médica */}
       <div className="space-y-1.5">
-        <label htmlFor="pm-conducta" className="text-xs font-bold text-primary uppercase tracking-wider flex items-center gap-1.5">
-          <ClipboardList size={14} className="text-primary" />
-          <span>Conducta Médica / Plan de Acción</span>
+        <label htmlFor="pm-conducta" className={`${ESTILO_LABEL} flex items-center gap-1.5`}>
+          <ClipboardList size={14} className="text-primary" /> Conducta Médica / Plan de Acción{' '}
           <span className="text-danger">*</span>
         </label>
         <textarea
           id="pm-conducta"
-          aria-label="Conducta Médica"
-          value={data.conducta || ''}
-          onChange={(e) => handleFieldChange('conducta', e.target.value)}
-          disabled={readOnly}
+          value={data.conducta ?? ''}
+          onChange={(e) => onChange({ conducta: e.target.value })}
           rows={3}
-          className="w-full bg-subtle border border-border rounded-xl p-3 text-sm text-primary placeholder:text-muted focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/40 transition-all disabled:opacity-60 resize-y"
-          placeholder="Definir conducta terapéutica, plan farmacológico ambulatorio, solicitudes paraclínicas, remisiones o controles..."
+          aria-invalid={conductaCorta}
+          placeholder="Conducta terapéutica, plan farmacológico, solicitudes paraclínicas, remisiones o controles..."
+          className={clasesCampo(ESTILO_TEXTAREA, conductaCorta && ESTILO_CAMPO_ERROR)}
         />
+        {conductaCorta && (
+          <p role="alert" className={ESTILO_ERROR_MSG}>
+            Describa la conducta médica (mínimo {CONDUCTA_MIN_CARACTERES} caracteres).
+          </p>
+        )}
       </div>
 
-      {/* 2. Recomendaciones Generales */}
+      {/* 2. Recomendaciones */}
       <div className="space-y-1.5">
-        <label htmlFor="pm-recomendaciones" className="text-xs font-semibold text-secondary uppercase tracking-wider flex items-center gap-1.5">
-          <FileText size={14} className="text-primary" />
-          <span>Recomendaciones Generales</span>
+        <label htmlFor="pm-recomendaciones" className={`${ESTILO_LABEL} flex items-center gap-1.5`}>
+          <FileText size={14} className="text-primary" /> Recomendaciones Generales
         </label>
         <textarea
           id="pm-recomendaciones"
-          aria-label="Recomendaciones Generales"
-          value={data.recomendaciones || ''}
-          onChange={(e) => handleFieldChange('recomendaciones', e.target.value)}
-          disabled={readOnly}
+          value={data.recomendaciones ?? ''}
+          onChange={(e) => onChange({ recomendaciones: e.target.value })}
           rows={3}
-          className="w-full bg-subtle border border-border rounded-xl p-3 text-sm text-primary placeholder:text-muted focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/40 transition-all disabled:opacity-60 resize-y"
-          placeholder="Indicaciones higiénico-dietéticas, actividad física recomendada, pautas de estilo de vida y cuidados domiciliarios..."
+          placeholder="Indicaciones higiénico-dietéticas, actividad física, cuidados domiciliarios..."
+          className={ESTILO_TEXTAREA}
         />
       </div>
 
-      {/* 3. Signos de Alarma */}
+      {/* 3. Signos de alarma */}
       <div className="bg-warning/5 border border-warning/20 rounded-xl p-3.5 space-y-1.5">
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <label htmlFor="pm-signos-alarma" className="text-xs font-bold text-warning uppercase tracking-wider flex items-center gap-1.5">
-            <AlertTriangle size={14} className="text-warning" />
-            <span>Signos de Alarma / Cuándo acudir a urgencias</span>
-          </label>
-          <span className="text-[10px] font-semibold text-warning px-2 py-0.5 rounded-full bg-warning/10 border border-warning/20">
-            Educación al Paciente
-          </span>
-        </div>
+        <label htmlFor="pm-signos-alarma" className="text-xs font-bold text-warning uppercase tracking-wider flex items-center gap-1.5">
+          <AlertTriangle size={14} /> Signos de Alarma / Cuándo acudir a urgencias
+        </label>
         <textarea
           id="pm-signos-alarma"
-          aria-label="Signos de Alarma"
-          value={data.signosAlarma || ''}
-          onChange={(e) => handleFieldChange('signosAlarma', e.target.value)}
-          disabled={readOnly}
+          value={data.signosAlarma ?? ''}
+          onChange={(e) => onChange({ signosAlarma: e.target.value })}
           rows={2}
-          className="w-full bg-surface border border-warning/30 rounded-lg p-2.5 text-sm text-primary placeholder:text-muted focus:outline-none focus:border-warning focus:ring-1 focus:ring-warning/40 transition-all disabled:opacity-60 resize-y"
-          placeholder="Consultar inmediatamente al servicio de urgencias en caso de fiebre persistente >38.5°C, dificultad respiratoria, dolor torácico..."
+          placeholder="Consultar a urgencias en caso de fiebre persistente >38.5°C, dificultad respiratoria, dolor torácico..."
+          className={clasesCampo(ESTILO_TEXTAREA, '!border-warning/30 focus:!border-warning focus:!ring-warning/40')}
         />
       </div>
 
-      {/* 4. Bloque de Incapacidad Médica */}
+      {/* 4. Certificado de incapacidad */}
       <div className="bg-subtle/50 border border-border rounded-2xl p-4 space-y-4">
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-2">
-            <Clock size={16} className="text-primary" />
+            <FileHeart size={16} className="text-primary" />
             <div>
               <h4 className="text-xs font-bold text-primary uppercase tracking-wider">Incapacidad Médica</h4>
-              <p className="text-[11px] text-muted">¿La condición clínica del paciente amerita reposo laboral o escolar?</p>
+              <p className="text-[11px] text-muted">¿La condición clínica amerita reposo laboral o escolar?</p>
             </div>
           </div>
-
           <label className="inline-flex items-center gap-2 cursor-pointer select-none">
             <input
               type="checkbox"
               id="pm-incapacidad-requiere"
-              aria-label="¿Genera incapacidad médica?"
-              checked={requiereIncapacidad}
-              onChange={(e) => handleIncapacidadChange({ requiere: e.target.checked })}
-              disabled={readOnly}
-              className="w-4 h-4 rounded text-primary focus:ring-primary/40 border-border bg-surface cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
+              checked={Boolean(inc.requiere)}
+              onChange={(e) => cambiarIncapacidad({ requiere: e.target.checked })}
+              className="w-4 h-4 rounded border-border text-primary focus:ring-primary/40 cursor-pointer disabled:cursor-not-allowed"
             />
-            <span className="text-xs font-semibold text-primary">Generar Incapacidad</span>
+            <span className="text-xs font-semibold text-primary">Otorgar incapacidad</span>
           </label>
         </div>
 
-        {requiereIncapacidad && (
-          <div className="pt-3 border-t border-border/70 space-y-3 animate-in fade-in duration-200">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div>
-                <label htmlFor="pm-incapacidad-dias" className="block text-[11px] font-medium text-secondary mb-1">
-                  Días de Incapacidad
-                </label>
-                <input
-                  type="number"
-                  id="pm-incapacidad-dias"
-                  aria-label="Días de Incapacidad"
-                  min="1"
-                  placeholder="1"
-                  value={incapacidad.dias ?? ''}
-                  onChange={(e) => handleIncapacidadChange({ dias: e.target.value === '' ? undefined : parseInt(e.target.value, 10) })}
-                  disabled={readOnly}
-                  className="w-full bg-surface border border-border rounded-lg px-2.5 py-1.5 text-xs font-mono text-primary outline-none focus:border-primary disabled:opacity-60"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="pm-incapacidad-inicio" className="block text-[11px] font-medium text-secondary mb-1 flex items-center gap-1">
-                  <Calendar size={12} className="text-muted" />
-                  <span>Fecha de Inicio</span>
-                </label>
-                <input
-                  type="date"
-                  id="pm-incapacidad-inicio"
-                  aria-label="Fecha de Inicio"
-                  value={incapacidad.fechaInicio || ''}
-                  onChange={(e) => handleIncapacidadChange({ fechaInicio: e.target.value })}
-                  disabled={readOnly}
-                  className="w-full bg-surface border border-border rounded-lg px-2 py-1.5 text-xs text-primary outline-none focus:border-primary disabled:opacity-60"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="pm-incapacidad-fin" className="block text-[11px] font-medium text-secondary mb-1 flex items-center gap-1">
-                  <Calendar size={12} className="text-muted" />
-                  <span>Fecha de Fin</span>
-                </label>
-                <input
-                  type="date"
-                  id="pm-incapacidad-fin"
-                  aria-label="Fecha de Fin"
-                  value={incapacidad.fechaFin || ''}
-                  onChange={(e) => handleIncapacidadChange({ fechaFin: e.target.value })}
-                  disabled={readOnly}
-                  className="w-full bg-surface border border-border rounded-lg px-2 py-1.5 text-xs text-primary outline-none focus:border-primary disabled:opacity-60"
-                />
-              </div>
+        {inc.requiere && (
+          <div className="pt-3 border-t border-border/70 grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="space-y-1 md:col-span-2">
+              <label htmlFor="incap-tipo" className={ESTILO_LABEL}>
+                Tipo de incapacidad <span className="text-danger">*</span>
+              </label>
+              <select
+                id="incap-tipo"
+                value={inc.tipoIncapacidad ?? ''}
+                onChange={(e) => cambiarIncapacidad({ tipoIncapacidad: (e.target.value || undefined) as TipoIncapacidad | undefined })}
+                className={ESTILO_SELECT}
+              >
+                <option value="">Seleccione…</option>
+                {TIPOS_INCAPACIDAD.map((t) => (
+                  <option key={t.valor} value={t.valor}>{t.etiqueta}</option>
+                ))}
+              </select>
             </div>
 
-            <div>
-              <label htmlFor="pm-incapacidad-observaciones" className="block text-[11px] font-medium text-secondary mb-1">
-                Observaciones / Recomendaciones de Incapacidad
+            <div className="space-y-1">
+              <label htmlFor="incap-modalidad" className={ESTILO_LABEL}>
+                Modalidad del servicio <span className="text-danger">*</span>
+              </label>
+              <select
+                id="incap-modalidad"
+                value={inc.modalidadServicio ?? ''}
+                onChange={(e) =>
+                  cambiarIncapacidad({ modalidadServicio: (e.target.value || undefined) as ModalidadServicio | undefined })
+                }
+                className={ESTILO_SELECT}
+              >
+                <option value="">Seleccione…</option>
+                {MODALIDADES_SERVICIO.map((m) => (
+                  <option key={m.valor} value={m.valor}>{m.etiqueta}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-1">
+              <label htmlFor="incap-inicio" className={ESTILO_LABEL}>
+                Fecha de inicio <span className="text-danger">*</span>
+              </label>
+              <input
+                id="incap-inicio"
+                type="date"
+                value={inc.fechaInicio ?? ''}
+                // Sugiere retroactiva si inicia antes de hoy; el médico puede corregirla.
+                onChange={(e) =>
+                  cambiarIncapacidad({
+                    fechaInicio: e.target.value || undefined,
+                    esRetroactiva: e.target.value ? e.target.value < hoyLocal() : inc.esRetroactiva,
+                  })
+                }
+                aria-invalid={Boolean(errorVisible('fechaInicio'))}
+                className={clasesCampo(ESTILO_INPUT, errorVisible('fechaInicio') && ESTILO_CAMPO_ERROR)}
+              />
+              {mensaje('fechaInicio')}
+            </div>
+
+            <div className="space-y-1">
+              <label htmlFor="incap-dias" className={ESTILO_LABEL}>
+                Número de días <span className="text-danger">*</span>
+              </label>
+              <input
+                id="incap-dias"
+                type="number"
+                min={1}
+                max={DIAS_INCAPACIDAD_MAX}
+                step={1}
+                inputMode="numeric"
+                value={inc.dias ?? ''}
+                onChange={(e) => cambiarIncapacidad({ dias: aEntero(e.target.value) })}
+                aria-invalid={Boolean(errorVisible('dias'))}
+                className={clasesCampo(ESTILO_INPUT, errorVisible('dias') && ESTILO_CAMPO_ERROR)}
+              />
+              {mensaje('dias')}
+            </div>
+
+            <div className="space-y-1">
+              <span className={ESTILO_LABEL}>Fecha de finalización</span>
+              <p data-testid="incap-fecha-fin" className="h-10 flex items-center gap-1.5 text-sm text-secondary">
+                <CalendarRange size={14} className="text-primary" />
+                {formatoFecha(fechaFinIncapacidad(inc.fechaInicio, inc.dias))}
+              </p>
+            </div>
+
+            {radiosSiNo('esProrroga', 'Prórroga')}
+            {radiosSiNo('esRetroactiva', 'Incapacidad retroactiva')}
+
+            <div className="space-y-1">
+              <label htmlFor="incap-cie" className={ESTILO_LABEL}>
+                Diagnóstico CIE-10 <span className="text-danger">*</span>
+              </label>
+              <input
+                id="incap-cie"
+                value={inc.codigoCie10 ?? ''}
+                onChange={(e) => cambiarIncapacidad({ codigoCie10: e.target.value.toUpperCase() })}
+                maxLength={6}
+                placeholder="Ej: J06.9"
+                aria-invalid={Boolean(errorVisible('codigoCie10'))}
+                className={clasesCampo(ESTILO_INPUT, 'font-mono', errorVisible('codigoCie10') && ESTILO_CAMPO_ERROR)}
+              />
+              {mensaje('codigoCie10')}
+            </div>
+
+            <div className="space-y-1 md:col-span-2">
+              <label htmlFor="incap-cie-desc" className={ESTILO_LABEL}>
+                Descripción del diagnóstico
+              </label>
+              <input
+                id="incap-cie-desc"
+                value={inc.descripcionDiagnostico ?? ''}
+                onChange={(e) => cambiarIncapacidad({ descripcionDiagnostico: e.target.value })}
+                placeholder="Ej: Infección aguda de las vías respiratorias superiores"
+                className={ESTILO_INPUT}
+              />
+            </div>
+
+            <div className="space-y-1 md:col-span-3">
+              <label htmlFor="incap-obs" className={ESTILO_LABEL}>
+                Observación de la incapacidad <span className="text-danger">*</span>
               </label>
               <textarea
-                id="pm-incapacidad-observaciones"
-                aria-label="Observaciones de Incapacidad"
-                value={incapacidad.observaciones || ''}
-                onChange={(e) => handleIncapacidadChange({ observaciones: e.target.value })}
-                disabled={readOnly}
-                rows={2}
-                className="w-full bg-surface border border-border rounded-lg p-2.5 text-xs text-primary placeholder:text-muted focus:outline-none focus:border-primary transition-all disabled:opacity-60 resize-y"
-                placeholder="Motivo clínico justificado, limitaciones físicas o prescripciones laborales específicas..."
+                id="incap-obs"
+                rows={3}
+                value={inc.observaciones ?? ''}
+                onChange={(e) => cambiarIncapacidad({ observaciones: e.target.value })}
+                placeholder="Justificación clínica y recomendaciones durante la incapacidad"
+                className={ESTILO_TEXTAREA}
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label htmlFor="incap-ciudad" className={ESTILO_LABEL}>Ciudad donde labora</label>
+              <input
+                id="incap-ciudad"
+                value={inc.ciudadLabora ?? ''}
+                onChange={(e) => cambiarIncapacidad({ ciudadLabora: e.target.value })}
+                maxLength={120}
+                className={ESTILO_INPUT}
+              />
+            </div>
+
+            <div className="space-y-1 md:col-span-2">
+              <label htmlFor="incap-dependencia" className={ESTILO_LABEL}>Dependencia</label>
+              <input
+                id="incap-dependencia"
+                value={inc.dependencia ?? ''}
+                onChange={(e) => cambiarIncapacidad({ dependencia: e.target.value })}
+                maxLength={120}
+                placeholder="Área o dependencia donde labora el paciente"
+                className={ESTILO_INPUT}
               />
             </div>
           </div>
         )}
       </div>
-    </div>
+    </fieldset>
   );
 };
 

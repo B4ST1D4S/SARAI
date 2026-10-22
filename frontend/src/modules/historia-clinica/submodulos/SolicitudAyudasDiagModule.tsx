@@ -1,212 +1,209 @@
 import React from 'react';
-import { Plus, Trash2, FlaskConical, FileText } from 'lucide-react';
-import { SubmoduloProps } from '../registry';
-import { SolicitudAyudasDiagData, AyudaDiagnosticaItem } from '@/types/historiaClinica.types';
+import { Plus, Trash2, FlaskConical, type LucideIcon } from 'lucide-react';
+import type { AyudaDiagnosticaItem, SolicitudAyudasDiagData } from '@/types/historiaClinica.types';
+import type { SubmoduloProps } from '../registry';
+import { ESTILO_INPUT, ESTILO_LABEL, ESTILO_TEXTAREA, clasesCampo } from '../components/common/campos';
 
-export const SolicitudAyudasDiagModule: React.FC<SubmoduloProps<SolicitudAyudasDiagData>> = ({
+export type { AyudaDiagnosticaItem, SolicitudAyudasDiagData };
+
+/** Campos comunes a toda orden CUPS (ayuda diagnóstica o procedimiento). */
+export interface OrdenCups {
+  id: string;
+  codigoCups?: string;
+  descripcion: string;
+  /** 0 = sin cantidad (el campo se muestra vacío mientras se escribe). */
+  cantidad: number;
+  justificacion?: string;
+}
+
+export interface DatosOrdenesCups<T extends OrdenCups> {
+  items?: T[];
+  observacionesGenerales?: string;
+}
+
+export const nuevoIdOrden = (prefijo: string) =>
+  typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? `${prefijo}-${crypto.randomUUID()}`
+    : `${prefijo}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+interface ListaOrdenesCupsProps<T extends OrdenCups> extends SubmoduloProps<DatosOrdenesCups<T>> {
+  titulo: string;
+  icono: LucideIcon;
+  unidad: [singular: string, plural: string];
+  textoAgregar: string;
+  prefijoId: string;
+  ordenVacia: () => T;
+  placeholderCodigo: string;
+  placeholderDescripcion: string;
+  placeholderJustificacion: string;
+  placeholderObservaciones: string;
+  /** Campos propios del tipo de orden (p. ej. el ámbito de un procedimiento). */
+  camposExtra?: (orden: T, index: number, actualizar: (cambios: Partial<T>) => void) => React.ReactNode;
+}
+
+/**
+ * Base común de las solicitudes CUPS. Sin estado local: toda mutación clona
+ * `data.items` y emite el array completo por `onChange`.
+ */
+export function ListaOrdenesCups<T extends OrdenCups>({
   data = {},
   onChange,
   readOnly = false,
-}) => {
-  const items = data.items || [];
+  titulo,
+  icono: Icono,
+  unidad,
+  textoAgregar,
+  prefijoId,
+  ordenVacia,
+  placeholderCodigo,
+  placeholderDescripcion,
+  placeholderJustificacion,
+  placeholderObservaciones,
+  camposExtra,
+}: ListaOrdenesCupsProps<T>) {
+  const ordenes = data.items ?? [];
 
-  const handleAddItem = () => {
-    if (readOnly) return;
-    const newItem: AyudaDiagnosticaItem = {
-      id: `ayuda_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-      codigoCups: '',
-      descripcion: '',
-      cantidad: 1,
-      justificacion: '',
-    };
-    onChange({
-      ...data,
-      items: [...items, newItem],
-    });
-  };
-
-  const handleUpdateItem = (id: string, patch: Partial<AyudaDiagnosticaItem>) => {
-    if (readOnly) return;
-    const updated = items.map((item) =>
-      item.id === id ? { ...item, ...patch } : item
-    );
-    onChange({
-      ...data,
-      items: updated,
-    });
-  };
-
-  const handleRemoveItem = (id: string) => {
-    if (readOnly) return;
-    const updated = items.filter((item) => item.id !== id);
-    onChange({
-      ...data,
-      items: updated,
-    });
-  };
-
-  const handleObservacionesChange = (observacionesGenerales: string) => {
-    onChange({
-      ...data,
-      observacionesGenerales,
-    });
-  };
+  const actualizar = (index: number, cambios: Partial<T>) =>
+    onChange({ items: ordenes.map((o, i) => (i === index ? { ...o, ...cambios } : o)) });
+  const agregar = () => onChange({ items: [...ordenes, ordenVacia()] });
+  const quitar = (index: number) => onChange({ items: ordenes.filter((_, i) => i !== index) });
 
   return (
-    <div className="space-y-4">
-      {/* Cabecera y Botón de adición */}
+    <fieldset disabled={readOnly} className="space-y-4 min-w-0 border-0 p-0 m-0">
       <div className="flex items-center justify-between flex-wrap gap-2 pb-2 border-b border-border/60">
         <div className="flex items-center gap-2">
-          <FlaskConical size={16} className="text-primary" />
-          <h4 className="text-xs font-bold text-primary uppercase tracking-wider">
-            Órdenes de Laboratorio & Ayudas Diagnósticas
-          </h4>
-          <span className="text-[11px] text-muted">({items.length} {items.length === 1 ? 'estudio' : 'estudios'})</span>
+          <Icono size={16} className="text-primary" />
+          <h4 className="text-xs font-bold text-primary uppercase tracking-wider">{titulo}</h4>
+          <span className="text-[11px] text-muted">
+            ({ordenes.length} {ordenes.length === 1 ? unidad[0] : unidad[1]})
+          </span>
         </div>
-
         {!readOnly && (
           <button
             type="button"
-            onClick={handleAddItem}
+            onClick={agregar}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-primary text-primary-foreground hover:opacity-90 shadow-sm transition-all"
-            aria-label="Agregar Estudio / Paraclínico"
           >
-            <Plus size={14} />
-            <span>Agregar Estudio / Paraclínico</span>
+            <Plus size={14} /> {textoAgregar}
           </button>
         )}
       </div>
 
-      {/* Lista de estudios */}
-      {items.length === 0 ? (
-        <div className="p-6 rounded-xl border border-dashed border-border/80 bg-subtle/30 text-center space-y-1">
-          <p className="text-xs text-muted">
-            No se han ordenado paraclínicos o ayudas diagnósticas
-          </p>
-          {!readOnly && (
-            <p className="text-[11px] text-secondary">
-              Haga clic en &ldquo;Agregar Estudio / Paraclínico&rdquo; para ordenar pruebas complementarias.
-            </p>
-          )}
-        </div>
+      {ordenes.length === 0 ? (
+        <p className="p-4 rounded-xl border border-dashed border-border text-center text-xs text-muted">
+          Sin {unidad[1]} solicitados.
+        </p>
       ) : (
-        <div className="space-y-3">
-          {items.map((item, index) => (
-            <div
-              key={item.id}
-              className="bg-subtle/50 border border-border rounded-xl p-3.5 space-y-3 relative group transition-all hover:border-primary/30"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-[11px] font-bold text-secondary uppercase tracking-wider">
-                  Estudio #{index + 1}
-                </span>
-
-                {!readOnly && (
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveItem(item.id)}
-                    aria-label={`Eliminar estudio ${index + 1}`}
-                    title="Eliminar estudio"
-                    className="p-1 rounded-lg text-muted hover:text-danger hover:bg-danger/10 transition-colors"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                )}
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
-                {/* Código CUPS */}
-                <div className="sm:col-span-3">
-                  <label htmlFor={`cups-${item.id}`} className="block text-[11px] font-medium text-secondary mb-1">
-                    Código CUPS
-                  </label>
-                  <input
-                    type="text"
-                    id={`cups-${item.id}`}
-                    aria-label="Código CUPS"
-                    value={item.codigoCups || ''}
-                    onChange={(e) => handleUpdateItem(item.id, { codigoCups: e.target.value })}
-                    disabled={readOnly}
-                    placeholder="Ej: 903841"
-                    className="w-full bg-surface border border-border rounded-lg px-2.5 py-1.5 text-xs font-mono text-primary outline-none focus:border-primary disabled:opacity-60"
-                  />
-                </div>
-
-                {/* Descripción / Nombre del estudio */}
-                <div className="sm:col-span-7">
-                  <label htmlFor={`desc-${item.id}`} className="block text-[11px] font-medium text-secondary mb-1">
-                    Descripción del Estudio <span className="text-danger">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    id={`desc-${item.id}`}
-                    aria-label="Descripción del Estudio"
-                    value={item.descripcion || ''}
-                    onChange={(e) => handleUpdateItem(item.id, { descripcion: e.target.value })}
-                    disabled={readOnly}
-                    placeholder="Ej: Hemograma tipo IV, Radiografía de tórax..."
-                    className="w-full bg-surface border border-border rounded-lg px-2.5 py-1.5 text-xs text-primary outline-none focus:border-primary disabled:opacity-60"
-                  />
-                </div>
-
-                {/* Cantidad */}
-                <div className="sm:col-span-2">
-                  <label htmlFor={`cant-${item.id}`} className="block text-[11px] font-medium text-secondary mb-1">
-                    Cantidad
-                  </label>
-                  <input
-                    type="number"
-                    id={`cant-${item.id}`}
-                    aria-label="Cantidad"
-                    min="1"
-                    value={item.cantidad ?? 1}
-                    onChange={(e) => handleUpdateItem(item.id, { cantidad: e.target.value === '' ? 1 : parseInt(e.target.value, 10) })}
-                    disabled={readOnly}
-                    className="w-full bg-surface border border-border rounded-lg px-2.5 py-1.5 text-xs font-mono text-primary outline-none focus:border-primary disabled:opacity-60"
-                  />
-                </div>
-              </div>
-
-              {/* Justificación Clínica */}
-              <div>
-                <label htmlFor={`just-${item.id}`} className="block text-[11px] font-medium text-secondary mb-1">
-                  Justificación Clínica / Indicación
+        ordenes.map((orden, index) => (
+          <div key={orden.id} className="p-4 rounded-xl border border-border bg-subtle/40 space-y-3">
+            <div className="flex flex-col md:flex-row gap-3 items-start">
+              <div className="w-full md:w-36 space-y-1">
+                <label htmlFor={`${prefijoId}-cups-${index}`} className={ESTILO_LABEL}>
+                  Código CUPS
                 </label>
-                <textarea
-                  id={`just-${item.id}`}
-                  aria-label="Justificación Clínica"
-                  rows={2}
-                  value={item.justificacion || ''}
-                  onChange={(e) => handleUpdateItem(item.id, { justificacion: e.target.value })}
-                  disabled={readOnly}
-                  placeholder="Sospecha diagnóstica, seguimiento evolutivo, prequirúrgico..."
-                  className="w-full bg-surface border border-border rounded-lg p-2 text-xs text-primary placeholder:text-muted focus:outline-none focus:border-primary disabled:opacity-60 resize-y"
+                <input
+                  id={`${prefijoId}-cups-${index}`}
+                  value={orden.codigoCups ?? ''}
+                  onChange={(e) => actualizar(index, { codigoCups: e.target.value.trim().toUpperCase() } as Partial<T>)}
+                  placeholder={placeholderCodigo}
+                  className={clasesCampo(ESTILO_INPUT, 'font-mono')}
                 />
               </div>
+              <div className="flex-1 w-full space-y-1">
+                <label htmlFor={`${prefijoId}-descripcion-${index}`} className={ESTILO_LABEL}>
+                  Descripción <span className="text-danger">*</span>
+                </label>
+                <input
+                  id={`${prefijoId}-descripcion-${index}`}
+                  value={orden.descripcion}
+                  onChange={(e) => actualizar(index, { descripcion: e.target.value } as Partial<T>)}
+                  placeholder={placeholderDescripcion}
+                  className={ESTILO_INPUT}
+                />
+              </div>
+              <div className="w-full md:w-20 space-y-1">
+                <label htmlFor={`${prefijoId}-cantidad-${index}`} className={ESTILO_LABEL}>
+                  Cant.
+                </label>
+                <input
+                  id={`${prefijoId}-cantidad-${index}`}
+                  type="number"
+                  min={1}
+                  inputMode="numeric"
+                  value={orden.cantidad || ''}
+                  onChange={(e) => actualizar(index, { cantidad: Number.parseInt(e.target.value, 10) || 0 } as Partial<T>)}
+                  className={clasesCampo(ESTILO_INPUT, 'text-center font-bold')}
+                />
+              </div>
+              {camposExtra?.(orden, index, (cambios) => actualizar(index, cambios))}
+              {!readOnly && (
+                <button
+                  type="button"
+                  aria-label={`Quitar orden ${index + 1}`}
+                  onClick={() => quitar(index)}
+                  className="mt-5 h-10 w-10 shrink-0 flex items-center justify-center rounded-lg text-muted hover:text-danger hover:bg-danger/10 transition-colors"
+                >
+                  <Trash2 size={16} />
+                </button>
+              )}
             </div>
-          ))}
-        </div>
+            <div className="space-y-1">
+              <label htmlFor={`${prefijoId}-justificacion-${index}`} className={ESTILO_LABEL}>
+                Justificación clínica
+              </label>
+              <textarea
+                id={`${prefijoId}-justificacion-${index}`}
+                value={orden.justificacion ?? ''}
+                onChange={(e) => actualizar(index, { justificacion: e.target.value } as Partial<T>)}
+                rows={2}
+                placeholder={placeholderJustificacion}
+                className={ESTILO_TEXTAREA}
+              />
+            </div>
+          </div>
+        ))
       )}
 
-      {/* Observaciones Generales */}
-      <div className="pt-2">
-        <label htmlFor="ayudas-obs-gen" className="text-xs font-semibold text-secondary uppercase tracking-wider flex items-center gap-1.5 mb-1.5">
-          <FileText size={13} className="text-primary" />
-          <span>Observaciones Generales de Ayudas Diagnósticas</span>
+      <div className="space-y-1">
+        <label htmlFor={`${prefijoId}-observaciones`} className={ESTILO_LABEL}>
+          Observaciones generales
         </label>
         <textarea
-          id="ayudas-obs-gen"
-          aria-label="Observaciones Generales"
+          id={`${prefijoId}-observaciones`}
+          value={data.observacionesGenerales ?? ''}
+          onChange={(e) => onChange({ observacionesGenerales: e.target.value })}
           rows={2}
-          value={data.observacionesGenerales || ''}
-          onChange={(e) => handleObservacionesChange(e.target.value)}
-          disabled={readOnly}
-          placeholder="Instrucciones de preparación (ayuno, cita previa), indicaciones de entrega..."
-          className="w-full bg-subtle border border-border rounded-xl p-3 text-xs text-primary placeholder:text-muted focus:outline-none focus:border-primary disabled:opacity-60 resize-y"
+          placeholder={placeholderObservaciones}
+          className={ESTILO_TEXTAREA}
         />
       </div>
-    </div>
+    </fieldset>
   );
-};
+}
+
+const ayudaVacia = (): AyudaDiagnosticaItem => ({
+  id: nuevoIdOrden('ayuda'),
+  codigoCups: '',
+  descripcion: '',
+  cantidad: 1,
+  justificacion: '',
+});
+
+/** Solicitud de ayudas diagnósticas: laboratorios, imágenes, ecografías. */
+export const SolicitudAyudasDiagModule: React.FC<SubmoduloProps<SolicitudAyudasDiagData>> = (props) => (
+  <ListaOrdenesCups<AyudaDiagnosticaItem>
+    {...props}
+    titulo="Órdenes de Laboratorio & Ayudas Diagnósticas"
+    icono={FlaskConical}
+    unidad={['estudio', 'estudios']}
+    textoAgregar="Agregar estudio / paraclínico"
+    prefijoId="ayuda"
+    ordenVacia={ayudaVacia}
+    placeholderCodigo="Ej: 903841"
+    placeholderDescripcion="Ej: Hemograma tipo IV, Radiografía de tórax..."
+    placeholderJustificacion="Sospecha diagnóstica, seguimiento evolutivo, prequirúrgico..."
+    placeholderObservaciones="Instrucciones de preparación (ayuno, cita previa), indicaciones de entrega..."
+  />
+);
 
 export default SolicitudAyudasDiagModule;

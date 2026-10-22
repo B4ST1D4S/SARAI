@@ -1,17 +1,134 @@
 import React from 'react';
-import { Plus, Trash2 } from 'lucide-react';
-import { SubmoduloProps } from '../registry';
+import { Plus, Trash2, Star } from 'lucide-react';
+import type { SubmoduloProps } from '../registry';
+import {
+  ESTILO_CAMPO_ERROR,
+  ESTILO_ERROR_MSG,
+  ESTILO_INPUT,
+  ESTILO_LABEL,
+  ESTILO_SELECT,
+  clasesCampo,
+} from '../components/common/campos';
+
+export type TipoDiagnostico = 'IMPRESION_DIAGNOSTICA' | 'CONFIRMADO_NUEVO' | 'CONFIRMADO_REPETIDO';
 
 export interface DiagnosticoItem {
   id: string;
   codigoCie10: string;
+  /** Equivalencia CIE-11, opcional. */
+  codigoCie11?: string;
   descripcion: string;
-  tipo: 'IMPRESION_DIAGNOSTICA' | 'CONFIRMADO_NUEVO' | 'CONFIRMADO_REPETIDO';
+  tipo: TipoDiagnostico;
 }
 
+/** draft.datos.diagnosticos: un principal destacado y una lista de relacionados. */
 export interface DiagnosticosData {
   principal?: DiagnosticoItem;
   relacionados?: DiagnosticoItem[];
+}
+
+const TIPOS: { valor: TipoDiagnostico; etiqueta: string }[] = [
+  { valor: 'IMPRESION_DIAGNOSTICA', etiqueta: 'Impresión Diagnóstica' },
+  { valor: 'CONFIRMADO_NUEVO', etiqueta: 'Confirmado Nuevo' },
+  { valor: 'CONFIRMADO_REPETIDO', etiqueta: 'Confirmado Repetido' },
+];
+
+/** Código CIE-10 con o sin punto: J06, J069, J06.9 (misma regla que la incapacidad en validaciones.ts). */
+const CIE10 = /^[A-Z]\d{2}(\.?[0-9A-Z]{1,2})?$/;
+
+const nuevoId = () =>
+  typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? `diag-${crypto.randomUUID()}`
+    : `diag-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+export const diagnosticoVacio = (tipo: TipoDiagnostico = 'IMPRESION_DIAGNOSTICA'): DiagnosticoItem => ({
+  id: nuevoId(),
+  codigoCie10: '',
+  descripcion: '',
+  tipo,
+});
+
+/** Principal en blanco mientras el borrador no lo tenga (id fijo: no se remonta entre renders). */
+const PRINCIPAL_VACIO: DiagnosticoItem = { id: 'diag-principal', codigoCie10: '', descripcion: '', tipo: 'IMPRESION_DIAGNOSTICA' };
+
+/** '' sin error (se exige al cierre); un código escrito debe tener formato CIE-10. */
+const errorCodigo = (codigo: string) =>
+  codigo.trim() !== '' && !CIE10.test(codigo.trim()) ? 'Código CIE-10 inválido (ej. I10, J06.9).' : undefined;
+
+interface FilaProps {
+  diag: DiagnosticoItem;
+  prefijo: string;
+  onCambiar: (cambios: Partial<DiagnosticoItem>) => void;
+}
+
+/** Campos de un diagnóstico; comunes al principal y a los relacionados. */
+function CamposDiagnostico({ diag, prefijo, onCambiar }: FilaProps) {
+  const error = errorCodigo(diag.codigoCie10);
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-12 gap-3 w-full">
+      <div className="md:col-span-2 space-y-1">
+        <label htmlFor={`${prefijo}-cie10`} className={ESTILO_LABEL}>
+          CIE-10
+        </label>
+        <input
+          id={`${prefijo}-cie10`}
+          value={diag.codigoCie10}
+          onChange={(e) => onCambiar({ codigoCie10: e.target.value.trim().toUpperCase() })}
+          maxLength={6}
+          placeholder="Ej: I10"
+          aria-invalid={Boolean(error)}
+          aria-describedby={error ? `${prefijo}-cie10-error` : undefined}
+          className={clasesCampo(ESTILO_INPUT, 'font-mono', error && ESTILO_CAMPO_ERROR)}
+        />
+      </div>
+      <div className="md:col-span-5 space-y-1">
+        <label htmlFor={`${prefijo}-descripcion`} className={ESTILO_LABEL}>
+          Descripción
+        </label>
+        <input
+          id={`${prefijo}-descripcion`}
+          value={diag.descripcion}
+          onChange={(e) => onCambiar({ descripcion: e.target.value })}
+          placeholder="Ej: Hipertensión esencial (primaria)"
+          className={ESTILO_INPUT}
+        />
+      </div>
+      <div className="md:col-span-2 space-y-1">
+        <label htmlFor={`${prefijo}-cie11`} className={ESTILO_LABEL}>
+          CIE-11 Eq.
+        </label>
+        <input
+          id={`${prefijo}-cie11`}
+          value={diag.codigoCie11 ?? ''}
+          onChange={(e) => onCambiar({ codigoCie11: e.target.value.trim().toUpperCase() })}
+          placeholder="Ej: BA00"
+          className={clasesCampo(ESTILO_INPUT, 'font-mono')}
+        />
+      </div>
+      <div className="md:col-span-3 space-y-1">
+        <label htmlFor={`${prefijo}-tipo`} className={ESTILO_LABEL}>
+          Tipo
+        </label>
+        <select
+          id={`${prefijo}-tipo`}
+          value={diag.tipo}
+          onChange={(e) => onCambiar({ tipo: e.target.value as TipoDiagnostico })}
+          className={ESTILO_SELECT}
+        >
+          {TIPOS.map((t) => (
+            <option key={t.valor} value={t.valor}>
+              {t.etiqueta}
+            </option>
+          ))}
+        </select>
+      </div>
+      {error && (
+        <p id={`${prefijo}-cie10-error`} role="alert" className={`${ESTILO_ERROR_MSG} md:col-span-12`}>
+          {error}
+        </p>
+      )}
+    </div>
+  );
 }
 
 export const DiagnosticosModule: React.FC<SubmoduloProps<DiagnosticosData>> = ({
@@ -19,159 +136,70 @@ export const DiagnosticosModule: React.FC<SubmoduloProps<DiagnosticosData>> = ({
   onChange,
   readOnly = false,
 }) => {
-  const principal = data.principal || {
-    id: 'diag_p',
-    codigoCie10: '',
-    descripcion: '',
-    tipo: 'IMPRESION_DIAGNOSTICA',
-  };
-  const relacionados = data.relacionados || [];
+  const principal = data.principal ?? PRINCIPAL_VACIO;
+  const relacionados = data.relacionados ?? [];
 
-  const handlePrincipalChange = (field: keyof DiagnosticoItem, val: string) => {
-    onChange({ principal: { ...principal, [field]: val } });
-  };
-
-  const addRelacionado = () => {
-    const newItem: DiagnosticoItem = {
-      id: `diag_rel_${Date.now()}`,
-      codigoCie10: '',
-      descripcion: '',
-      tipo: 'CONFIRMADO_NUEVO',
-    };
-    onChange({ relacionados: [...relacionados, newItem] });
-  };
-
-  const removeRelacionado = (idx: number) => {
-    onChange({ relacionados: relacionados.filter((_, i) => i !== idx) });
-  };
-
-  const updateRelacionado = (idx: number, field: keyof DiagnosticoItem, val: string) => {
-    const next = [...relacionados];
-    next[idx] = { ...next[idx], [field]: val };
-    onChange({ relacionados: next });
-  };
+  // El principal se emite como objeto nuevo; los relacionados, como array clonado.
+  const cambiarPrincipal = (cambios: Partial<DiagnosticoItem>) => onChange({ principal: { ...principal, ...cambios } });
+  const cambiarRelacionado = (index: number, cambios: Partial<DiagnosticoItem>) =>
+    onChange({ relacionados: relacionados.map((d, i) => (i === index ? { ...d, ...cambios } : d)) });
+  const agregarRelacionado = () => onChange({ relacionados: [...relacionados, diagnosticoVacio('CONFIRMADO_NUEVO')] });
+  const quitarRelacionado = (index: number) => onChange({ relacionados: relacionados.filter((_, i) => i !== index) });
 
   return (
-    <div className="space-y-4">
-      {/* Diagnóstico Principal */}
-      <div className="p-4 rounded-xl bg-subtle/80 border border-primary/30 ring-1 ring-primary/20 space-y-3">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-bold text-primary uppercase tracking-wider">
-            Diagnóstico Principal <span className="text-danger">*</span>
-          </span>
-          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-primary/20 text-primary border border-primary/30">
-            CIE-10 Principal
-          </span>
-        </div>
+    <fieldset disabled={readOnly} className="space-y-4 min-w-0 border-0 p-0 m-0">
+      {/* Diagnóstico principal */}
+      <section aria-labelledby="diag-principal-titulo" className="p-4 rounded-xl bg-primary/5 border border-primary/30 space-y-3">
+        <h4 id="diag-principal-titulo" className="text-xs font-bold text-primary uppercase tracking-wider flex items-center gap-1.5">
+          <Star size={14} /> Diagnóstico Principal <span className="text-danger">*</span>
+        </h4>
+        <CamposDiagnostico diag={principal} prefijo="diag-principal" onCambiar={cambiarPrincipal} />
+      </section>
 
-        <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
-          <div className="sm:col-span-3">
-            <label className="block text-[11px] font-semibold text-secondary uppercase tracking-wider mb-1">
-              Código CIE-10
-            </label>
-            <input
-              type="text"
-              disabled={readOnly}
-              value={principal.codigoCie10}
-              onChange={(e) => handlePrincipalChange('codigoCie10', e.target.value.toUpperCase())}
-              placeholder="Ej. K35.8"
-              className="w-full bg-subtle border border-border rounded-lg px-3 py-2 text-xs font-mono font-bold text-primary placeholder:text-muted focus:outline-none focus:border-primary"
-            />
-          </div>
-          <div className="sm:col-span-6">
-            <label className="block text-[11px] font-semibold text-secondary uppercase tracking-wider mb-1">
-              Descripción Diagnóstica
-            </label>
-            <input
-              type="text"
-              disabled={readOnly}
-              value={principal.descripcion}
-              onChange={(e) => handlePrincipalChange('descripcion', e.target.value)}
-              placeholder="Nombre de la patología..."
-              className="w-full bg-subtle border border-border rounded-lg px-3 py-2 text-xs text-primary placeholder:text-muted focus:outline-none focus:border-primary"
-            />
-          </div>
-          <div className="sm:col-span-3">
-            <label className="block text-[11px] font-semibold text-secondary uppercase tracking-wider mb-1">
-              Tipo Diagnóstico
-            </label>
-            <select
-              disabled={readOnly}
-              value={principal.tipo}
-              onChange={(e) => handlePrincipalChange('tipo', e.target.value as any)}
-              className="w-full bg-subtle border border-border rounded-lg px-2.5 py-2 text-xs text-primary focus:outline-none focus:border-primary"
-            >
-              <option value="IMPRESION_DIAGNOSTICA">Impresión Diagnóstica</option>
-              <option value="CONFIRMADO_NUEVO">Confirmado Nuevo</option>
-              <option value="CONFIRMADO_REPETIDO">Confirmado Repetido</option>
-            </select>
-          </div>
-        </div>
-      </div>
-
-      {/* Diagnósticos Relacionados */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <label className="text-xs font-semibold text-secondary uppercase tracking-wider">
-            Diagnósticos Relacionados (Opcional)
-          </label>
+      {/* Diagnósticos relacionados */}
+      <section aria-labelledby="diag-relacionados-titulo" className="space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <h4 id="diag-relacionados-titulo" className="text-xs font-bold text-secondary uppercase tracking-wider">
+            Diagnósticos Relacionados ({relacionados.length})
+          </h4>
           {!readOnly && (
             <button
               type="button"
-              onClick={addRelacionado}
-              className="inline-flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-medium text-primary hover:bg-primary/10 border border-primary/30 transition-colors"
+              onClick={agregarRelacionado}
+              className="text-xs font-bold text-primary flex items-center gap-1.5 hover:underline px-2 py-1 rounded-lg hover:bg-primary/10 transition-colors"
             >
-              <Plus size={14} />
-              <span>Añadir Diagnóstico</span>
+              <Plus size={14} /> Agregar relacionado
             </button>
           )}
         </div>
 
-        {relacionados.map((item, idx) => (
-          <div
-            key={item.id || idx}
-            className="p-3 rounded-xl bg-subtle/40 border border-border flex flex-col sm:flex-row gap-2 items-start sm:items-center"
-          >
-            <input
-              type="text"
-              disabled={readOnly}
-              value={item.codigoCie10}
-              onChange={(e) => updateRelacionado(idx, 'codigoCie10', e.target.value.toUpperCase())}
-              placeholder="CIE-10"
-              className="w-24 bg-subtle border border-border rounded-lg px-2.5 py-1.5 text-xs font-mono font-semibold text-primary"
-            />
-            <input
-              type="text"
-              disabled={readOnly}
-              value={item.descripcion}
-              onChange={(e) => updateRelacionado(idx, 'descripcion', e.target.value)}
-              placeholder="Descripción del diagnóstico secundario..."
-              className="flex-1 bg-subtle border border-border rounded-lg px-3 py-1.5 text-xs text-primary"
-            />
-            <select
-              disabled={readOnly}
-              value={item.tipo}
-              onChange={(e) => updateRelacionado(idx, 'tipo', e.target.value as any)}
-              className="w-44 bg-subtle border border-border rounded-lg px-2.5 py-1.5 text-xs text-primary"
-            >
-              <option value="CONFIRMADO_NUEVO">Confirmado Nuevo</option>
-              <option value="CONFIRMADO_REPETIDO">Confirmado Repetido</option>
-              <option value="IMPRESION_DIAGNOSTICA">Impresión Diagnóstica</option>
-            </select>
-            {!readOnly && (
-              <button
-                type="button"
-                onClick={() => removeRelacionado(idx)}
-                className="p-1.5 text-danger hover:bg-danger/10 rounded-lg transition-colors"
-                title="Eliminar diagnóstico"
-              >
-                <Trash2 size={15} />
-              </button>
-            )}
-          </div>
-        ))}
-      </div>
-    </div>
+        {relacionados.length === 0 ? (
+          <p className="p-3 rounded-xl border border-dashed border-border text-center text-xs text-muted">
+            Sin diagnósticos relacionados.
+          </p>
+        ) : (
+          relacionados.map((diag, index) => (
+            <div key={diag.id} className="p-4 rounded-xl border border-border bg-subtle/40 flex gap-3 items-start">
+              <CamposDiagnostico
+                diag={diag}
+                prefijo={`diag-rel-${index}`}
+                onCambiar={(cambios) => cambiarRelacionado(index, cambios)}
+              />
+              {!readOnly && (
+                <button
+                  type="button"
+                  aria-label={`Quitar relacionado ${index + 1}`}
+                  onClick={() => quitarRelacionado(index)}
+                  className="mt-5 h-10 w-10 shrink-0 flex items-center justify-center rounded-lg text-muted hover:text-danger hover:bg-danger/10 transition-colors"
+                >
+                  <Trash2 size={15} />
+                </button>
+              )}
+            </div>
+          ))
+        )}
+      </section>
+    </fieldset>
   );
 };
 
