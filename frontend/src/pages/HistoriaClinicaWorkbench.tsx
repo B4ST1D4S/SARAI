@@ -42,6 +42,14 @@ import {
 } from '@/types/historiaClinica.types';
 import { useActiveSection } from '@/hooks/useActiveSection';
 import { RenderSubmodulo } from '@/modules/historia-clinica/registry';
+import {
+  REGLAS_EVOLUCION_NOTA,
+  REGLAS_MOTIVO_CONSULTA,
+  erroresCierreAlergias,
+  erroresCierrePlanManejo,
+  erroresDeCierre,
+} from '@/modules/historia-clinica/utils/validaciones';
+import { ClinicalAdmissionGuard } from '@/components/guards/ClinicalAdmissionGuard';
 
 // ============================================================================
 // MAPA DINÁMICO DE ICONOS LUCIDE PARA SECCIONES & SUBMÓDULOS
@@ -86,6 +94,10 @@ const SUBMODULO_TITULOS: Record<SubmoduloId, string> = {
   motivo_consulta: 'Motivo de Consulta & Anamnesis',
   signos_vitales: 'Signos Vitales & Biometría',
   antecedentes: 'Antecedentes Personales y Familiares',
+  alergias: 'Alergias e Intolerancias',
+  antecedentes_personales: 'Antecedentes Personales Patológicos',
+  antecedentes_familiares: 'Antecedentes Familiares',
+  factores_riesgo: 'Factores de Riesgo y Estilos de Vida',
   revision_sistemas: 'Revisión por Sistemas',
   examen_fisico: 'Examen Físico Segmentario',
   diagnosticos: 'Diagnósticos (CIE-10)',
@@ -120,7 +132,10 @@ export const DEFAULT_PLANTILLA_RESUELTA: PlantillaResueltaResponse = {
         icono: 'Stethoscope',
         submodulos: [
           { id: 'motivo_consulta', requerido: true, orden: 1 },
-          { id: 'antecedentes', requerido: false, orden: 2 },
+          { id: 'alergias', requerido: true, orden: 2 },
+          { id: 'antecedentes_personales', requerido: false, orden: 3 },
+          { id: 'antecedentes_familiares', requerido: false, orden: 4 },
+          { id: 'factores_riesgo', requerido: false, orden: 5 },
         ],
       },
       {
@@ -181,6 +196,7 @@ export interface HistoriaClinicaWorkbenchProps {
   plantillaResuelta?: PlantillaResueltaResponse;
   paciente?: PacienteInfo;
   citaId?: string;
+  citaEstado?: string;
   initialDraft?: DiligenciamientoDraft;
   onSaveDraft?: (draft: DiligenciamientoDraft) => Promise<void> | void;
   onFinalizarAtencion?: (draft: DiligenciamientoDraft) => Promise<void> | void;
@@ -195,6 +211,7 @@ export const HistoriaClinicaWorkbench: React.FC<HistoriaClinicaWorkbenchProps> =
   plantillaResuelta: plantillaProp,
   paciente: pacienteProp,
   citaId: citaIdProp,
+  citaEstado = 'ADMITIDO',
   initialDraft,
   onSaveDraft,
   onFinalizarAtencion,
@@ -243,41 +260,13 @@ export const HistoriaClinicaWorkbench: React.FC<HistoriaClinicaWorkbenchProps> =
       /* ignore */
     }
 
+    // Un folio nuevo nace en blanco: ningún signo vital, diagnóstico ni texto
+    // clínico que el médico no haya registrado. Cada submódulo arranca vacío.
     return {
       citaId: citaIdProp || plantilla.metadataAtencion?.citaId || 'cita_activa',
       pacienteId: paciente.id || plantilla.metadataAtencion?.pacienteId || 'pac_activo',
       plantillaId: plantilla.plantillaId,
-      datos: {
-        motivo_consulta: {
-          motivo: '',
-          enfermedadActual: '',
-        },
-        signos_vitales: {
-          fc: 74,
-          fr: 16,
-          paSistolica: 118,
-          paDiastolica: 78,
-          temp: 36.6,
-          spo2: 99,
-          pesoKg: 64,
-          tallaCm: 168,
-          imc: 22.7,
-        },
-        diagnosticos: {
-          principal: {
-            id: 'diag_p1',
-            codigoCie10: 'Z000',
-            descripcion: 'Examen médico general',
-            tipo: 'IMPRESION_DIAGNOSTICA',
-          },
-          relacionados: [],
-        },
-        plan_manejo: {
-          conducta: '',
-          recomendaciones: 'Hidratación adecuada, actividad física regular y control programado.',
-          diasIncapacidad: '',
-        },
-      },
+      datos: {},
       ultimaActualizacion: new Date().toISOString(),
     };
   });
@@ -345,14 +334,20 @@ export const HistoriaClinicaWorkbench: React.FC<HistoriaClinicaWorkbenchProps> =
           const subData = datos[sub.id] as any;
           if (!subData) {
             errs.push(`La sección "${sec.titulo}" tiene el submódulo requerido "${SUBMODULO_TITULOS[sub.id] || sub.id}" sin diligenciar.`);
-          } else if (sub.id === 'motivo_consulta' && (!subData.motivo || subData.motivo.trim().length === 0)) {
-            errs.push('Debe registrar el Motivo de Consulta.');
+          } else if (sub.id === 'motivo_consulta') {
+            // Mismas reglas que pinta el submódulo; aquí además el campo vacío es error.
+            errs.push(...erroresDeCierre(subData, REGLAS_MOTIVO_CONSULTA));
+          } else if (sub.id === 'evolucion_nota') {
+            errs.push(...erroresDeCierre(subData, REGLAS_EVOLUCION_NOTA));
           } else if (sub.id === 'signos_vitales' && (!subData.fc || !subData.paSistolica)) {
             errs.push('Debe registrar los signos vitales principales (FC y Presión Arterial).');
           } else if (sub.id === 'diagnosticos' && (!subData.principal?.codigoCie10 || !subData.principal?.descripcion)) {
             errs.push('Debe asignar el Diagnóstico Principal con su código CIE-10.');
-          } else if (sub.id === 'plan_manejo' && (!subData.conducta || subData.conducta.trim().length === 0)) {
-            errs.push('Debe registrar la Conducta y Plan Terapéutico.');
+          } else if (sub.id === 'plan_manejo') {
+            // Conducta mínima y, si se otorga incapacidad, el certificado completo.
+            errs.push(...erroresCierrePlanManejo(subData));
+          } else if (sub.id === 'alergias') {
+            errs.push(...erroresCierreAlergias(subData));
           }
         }
       });
@@ -425,7 +420,8 @@ export const HistoriaClinicaWorkbench: React.FC<HistoriaClinicaWorkbenchProps> =
   }, [plantilla.origenResolucion]);
 
   return (
-    <div className="h-[calc(100vh-4.5rem)] flex flex-col overflow-hidden bg-app text-primary antialiased selection:bg-primary/30 selection:text-primary">
+    <ClinicalAdmissionGuard citaEstado={citaEstado}>
+      <div className="h-[calc(100vh-4.5rem)] flex flex-col overflow-hidden bg-app text-primary antialiased selection:bg-primary/30 selection:text-primary">
       {/* ─────────────────────────────────────────────────────────────────── */}
       {/* BARRA SUPERIOR ASISTENCIAL (FIJA ARRIBA)                            */}
       {/* ─────────────────────────────────────────────────────────────────── */}
@@ -813,6 +809,7 @@ export const HistoriaClinicaWorkbench: React.FC<HistoriaClinicaWorkbenchProps> =
         </div>
       )}
     </div>
+    </ClinicalAdmissionGuard>
   );
 };
 
