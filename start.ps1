@@ -7,7 +7,7 @@ Write-Host ""
 Write-Host "============================================" -ForegroundColor Cyan
 Write-Host "  EstetIA - Iniciando todos los servicios  " -ForegroundColor Cyan
 Write-Host "============================================" -ForegroundColor Cyan
-Write-Host "  Backend  -> http://localhost:3001"
+Write-Host "  Backend  -> http://localhost:3000"
 Write-Host "  Frontend -> http://localhost:5173"
 Write-Host "  Whisper  -> http://localhost:8000"
 Write-Host "  Presiona Ctrl+C para detener todo"
@@ -18,12 +18,12 @@ Write-Host ""
 Get-Process -Name node -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 Start-Sleep -Milliseconds 500
 
-$pathBackend  = "$root\backend"
+$pathBackend  = "$root\his-core"
 $pathFrontend = "$root\frontend"
 $pathWhisper  = "$root\whisper_service"
 
 $job1 = Start-Job -Name "Backend" -ArgumentList $pathBackend -ScriptBlock {
-    param($p); Set-Location $p; npm run dev 2>&1
+    param($p); Set-Location $p; npm run start:dev 2>&1
 }
 $job2 = Start-Job -Name "Frontend" -ArgumentList $pathFrontend -ScriptBlock {
     param($p); Set-Location $p; npm run dev 2>&1
