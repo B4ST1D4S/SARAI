@@ -1,5 +1,5 @@
 // HD-02 – Gestión de Turnos de Hemodiálisis (datos dinámicos desde parametrización)
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTurnos, useInscripciones, useParametrizacion } from '../../hooks/useHemodialisis';
 import { useMaquinas } from '../../hooks/useDashboardRenal';
@@ -61,9 +61,20 @@ function AsignacionForm({
   const jornadasActivas = [...jornadas].filter((j) => j.activo).sort((a, b) => a.orden - b.orden);
   const esquemasActivos = esquemas.filter((e) => e.activo);
 
+  // La parametrización puede llegar después de abrir el formulario.
+  useEffect(() => {
+    setForm((f) => ({
+      ...f,
+      esquema: f.esquema || esquemasActivos[0]?.codigo || '',
+      jornada: f.jornada || jornadasActivas[0]?.codigo || '',
+    }));
+  }, [esquemasActivos[0]?.codigo, jornadasActivas[0]?.codigo]);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.inscripcionId) { setError('Selecciona un paciente'); return; }
+    if (!form.esquema) { setError('Selecciona un esquema de turno'); return; }
+    if (!form.jornada) { setError('Selecciona una jornada'); return; }
     setGuardando(true);
     setError(null);
     try {
@@ -105,6 +116,9 @@ function AsignacionForm({
       {/* Esquema */}
       <div>
         <label className="block text-xs text-white/50 mb-1.5">Esquema de turno *</label>
+        {esquemasActivos.length === 0 && (
+          <p className="text-xs text-amber-300/80">No hay esquemas activos — configúralos en Parametrización HD.</p>
+        )}
         <div className="grid grid-cols-2 gap-2">
           {esquemasActivos.map((esq) => (
             <button
@@ -129,6 +143,9 @@ function AsignacionForm({
       {/* Jornada */}
       <div>
         <label className="block text-xs text-white/50 mb-1.5">Jornada *</label>
+        {jornadasActivas.length === 0 && (
+          <p className="text-xs text-amber-300/80">No hay jornadas activas — configúralas en Parametrización HD.</p>
+        )}
         <div className="grid grid-cols-2 gap-2">
           {jornadasActivas.map((jor, idx) => {
             const c = COLORES_JORNADA[idx % COLORES_JORNADA.length];

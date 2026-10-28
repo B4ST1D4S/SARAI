@@ -88,4 +88,22 @@ describe('ProgramasEspecialesService', () => {
       JSON.stringify({ tipo: 'FAV_RADIOCEFÁLICA', estado: 'ACTIVO' }),
     ]);
   });
+  it('completa la parametrización HD con valores estándar cuando está vacía', async () => {
+    mockPool.query.mockResolvedValueOnce({
+      rows: [{ datos: { sillones: [], esquemas: [], jornadas: [] } }],
+    });
+
+    const param = (await service.getParametrizacion()) as Record<string, any[]>;
+    expect(param.esquemas.map((e) => e.codigo)).toEqual(['LMV', 'MJS']);
+    expect(param.jornadas.map((j) => j.codigo)).toEqual(['MADRUGADA', 'MANANA', 'TARDE', 'NOCHE']);
+    expect(param.sillones).toHaveLength(6);
+  });
+
+  it('rechaza asignar un turno con un esquema no configurado', async () => {
+    mockPool.query.mockResolvedValueOnce({ rows: [] });
+
+    await expect(
+      service.asignarTurno({ inscripcionId: 'inscription-id', esquema: 'XYZ', jornada: 'MANANA' }),
+    ).rejects.toThrow(BadRequestException);
+  });
 });

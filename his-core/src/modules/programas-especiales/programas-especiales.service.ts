@@ -32,6 +32,24 @@ const MARCADORES_SEROLOGICOS = [
   'AntiHBe',
 ];
 
+const PARAMETRIZACION_HD_DEFAULT: Record<ColeccionConfiguracion, JsonObject[]> = {
+  sillones: ['1', '2', '3', '4', '5', '6'].map((numero) => ({
+    id: `s${numero}`,
+    numero,
+    estado: 'ACTIVO',
+  })),
+  esquemas: [
+    { id: 'e1', codigo: 'LMV', nombre: 'Lunes – Miércoles – Viernes', dias: [1, 3, 5], activo: true },
+    { id: 'e2', codigo: 'MJS', nombre: 'Martes – Jueves – Sábado', dias: [2, 4, 6], activo: true },
+  ],
+  jornadas: [
+    { id: 'j1', codigo: 'MADRUGADA', nombre: 'Madrugada', horaInicio: '00:00', horaFin: '06:00', activo: true, orden: 1 },
+    { id: 'j2', codigo: 'MANANA', nombre: 'Mañana', horaInicio: '06:00', horaFin: '12:00', activo: true, orden: 2 },
+    { id: 'j3', codigo: 'TARDE', nombre: 'Tarde', horaInicio: '12:00', horaFin: '18:00', activo: true, orden: 3 },
+    { id: 'j4', codigo: 'NOCHE', nombre: 'Noche', horaInicio: '18:00', horaFin: '00:00', activo: true, orden: 4 },
+  ],
+};
+
 function assertObject(value: unknown, label = 'El cuerpo'): JsonObject {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     throw new BadRequestException(`${label} debe ser un objeto JSON`);
@@ -730,8 +748,17 @@ export class ProgramasEspecialesService {
   async asignarTurno(input: JsonObject) {
     const body = assertObject(input);
     const inscripcionId = requiredString(body.inscripcionId, 'inscripcionId');
-    requiredString(body.esquema, 'esquema');
-    requiredString(body.jornada, 'jornada');
+    const esquema = requiredString(body.esquema, 'esquema');
+    const jornada = requiredString(body.jornada, 'jornada');
+    const parametrizacion = await this.getParametrizacion();
+    const activo = (items: unknown, codigo: string) =>
+      (items as JsonObject[]).some((item) => item.codigo === codigo && item.activo !== false);
+    if (!activo(parametrizacion.esquemas, esquema)) {
+      throw new BadRequestException(`El esquema '${esquema}' no está configurado o está inactivo`);
+    }
+    if (!activo(parametrizacion.jornadas, jornada)) {
+      throw new BadRequestException(`La jornada '${jornada}' no está configurada o está inactiva`);
+    }
     const turno = await this.tenancyConnectionService.transaction(async (client) => {
       await this.getInscripcionPaciente(client, inscripcionId);
       await client.query(
@@ -799,11 +826,20 @@ export class ProgramasEspecialesService {
     return this.crearRegistro('SEROLOGIA', inscripcionId, body);
   }
 
+  // Una colección vacía se completa con los valores estándar de una unidad
+  // renal para que turnos y sesiones siempre tengan opciones; se persisten
+  // en cuanto la IPS edita cualquier elemento.
   async getParametrizacion() {
     const result = await this.pool().query(
       `SELECT datos FROM pe_configuracion WHERE clave = 'RENAL_HD'`,
     );
-    return result.rows[0]?.datos ?? { sillones: [], esquemas: [], jornadas: [] };
+    const stored = (result.rows[0]?.datos ?? {}) as JsonObject;
+    const defaults = PARAMETRIZACION_HD_DEFAULT;
+    const pick = (key: ColeccionConfiguracion) =>
+      Array.isArray(stored[key]) && (stored[key] as unknown[]).length
+        ? stored[key]
+        : defaults[key];
+    return { sillones: pick('sillones'), esquemas: pick('esquemas'), jornadas: pick('jornadas') };
   }
 
   async saveParametrizacion(input: JsonObject) {
