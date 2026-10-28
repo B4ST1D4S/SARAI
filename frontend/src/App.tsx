@@ -46,6 +46,7 @@ import UsuariosPage from './pages/admin/UsuariosPage';
 import SeguridadPage from './pages/admin/SeguridadPage';
 import PlantillasPage from './pages/admin/PlantillasPage';
 import ManualPage from './pages/admin/ManualPage';
+import ProgramasEspecialesModule from './modules/programas-especiales';
 
 export type NavMode = 'hub' | 'sidebar';
 
@@ -84,6 +85,12 @@ export const MACRO_MODULES_NAV: Record<string, { label: string; items: { id: str
       { id: 'pacientes',         label: 'Pacientes',          sym: 'P' },
       { id: 'historia',          label: 'Historia Clínica',   sym: 'H' },
       { id: 'followup',          label: 'Seguimiento',        sym: 'W' },
+    ],
+  },
+  PROGRAMAS_ESPECIALES: {
+    label: 'PROGRAMAS ESPECIALIZADOS',
+    items: [
+      { id: 'programas-especiales', label: 'Programas Especializados', sym: 'R' },
     ],
   },
   CIRUGIA: {
@@ -643,6 +650,7 @@ function App() {
                 {currentPage === 'admin'               && <AdminPage />}
                 {currentPage === 'seguridad'           && <SeguridadPage />}
                 {currentPage === 'manual'              && <ManualPage />}
+                {currentPage === 'programas-especiales' && <ProgramasEspecialesModule />}
               </>
             )}
           </div>
