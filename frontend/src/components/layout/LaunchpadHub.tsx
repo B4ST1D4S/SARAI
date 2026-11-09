@@ -164,6 +164,14 @@ export const SARAI_DEFAULT_TILES: MacroTile[] = [
     defaultPageId: "pacientes",
   },
   {
+    id: "PROGRAMAS_ESPECIALES",
+    title: "Programas Especializados",
+    subtitle: "Atención integral de programas renales, VIH y alto costo",
+    iconName: "HeartPulse",
+    accentColor: "purple",
+    defaultPageId: "programas-especiales",
+  },
+  {
     id: "CIRUGIA",
     title: "Cirugía & Quirófano",
     subtitle: "Programación quirúrgica, vista cirujano y consentimientos informados",
