@@ -183,16 +183,25 @@ export async function authFetch<T = any>(
   options: RequestInit = {},
   _reintentado = false,
 ): Promise<T> {
-  const response = await fetch(url, {
-    ...options,
-    credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-tenant-id': getSubdomain(),
-      Authorization: `Bearer ${localStorage.getItem('accessToken') || ''}`,
-      ...options.headers,
-    },
-  });
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      ...options,
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-tenant-id': getSubdomain(),
+        Authorization: `Bearer ${localStorage.getItem('accessToken') || ''}`,
+        ...options.headers,
+      },
+    });
+  } catch {
+    // fetch solo falla así cuando no hay respuesta: servidor apagado, sin red o CORS.
+    throw new Error(
+      `No se pudo conectar con el servidor (${new URL(API_URL, window.location.origin).origin}). ` +
+        'Verifique que el backend his-core esté encendido y que tenga conexión a la red.',
+    );
+  }
 
   if (response.status === 401 && !_reintentado) {
     const refrescado = await refrescarTokenDirect();
@@ -201,9 +210,32 @@ export async function authFetch<T = any>(
 
   const data = await response.json().catch(() => null);
   if (!response.ok) {
-    throw new Error((data as any)?.message || (data as any)?.error || `Error HTTP ${response.status}`);
+    throw new Error(describirErrorHttp(response.status, data));
   }
   return data as T;
+}
+
+// Convierte la respuesta de error del backend en un mensaje que el usuario pueda entender.
+function describirErrorHttp(status: number, data: any): string {
+  const raw = data?.message ?? data?.error;
+  const detalle = Array.isArray(raw) ? raw.join('. ') : raw;
+
+  switch (status) {
+    case 401:
+      return 'Su sesión expiró o no ha iniciado sesión. Inicie sesión nuevamente.';
+    case 403:
+      return `No tiene permisos para esta acción.${detalle ? ` (${detalle})` : ''} Solicite acceso al administrador.`;
+    case 404:
+      return `El servidor no encontró el recurso solicitado.${detalle ? ` (${detalle})` : ''} Puede que el backend esté desactualizado o falte correr migraciones.`;
+    case 400:
+    case 422:
+      return `Datos inválidos: ${detalle || 'revise la información enviada.'}`;
+    default:
+      if (status >= 500) {
+        return `Error interno del servidor (${status}).${detalle ? ` ${detalle}.` : ''} Revise los logs de his-core.`;
+      }
+      return detalle || `Error HTTP ${status}`;
+  }
 }
 
 // ============================================

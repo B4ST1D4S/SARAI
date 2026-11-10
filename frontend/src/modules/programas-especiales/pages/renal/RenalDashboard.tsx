@@ -23,9 +23,10 @@ export function RenalDashboard({ onNavegarPacientes, onNavegarHemodialisis }: Pr
 
   if (error) {
     return (
-      <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-xl text-red-300 text-sm">
-        Error al cargar el dashboard: {error}
-        <button onClick={refetch} className="ml-3 underline text-red-400">Reintentar</button>
+      <div role="alert" className="p-4 bg-red-500/10 border border-red-500/30 rounded-xl text-red-300 text-sm">
+        <p className="font-semibold text-red-200">No se pudo cargar el dashboard renal</p>
+        <p className="mt-1">{error}</p>
+        <button onClick={refetch} className="mt-2 underline text-red-400">Reintentar</button>
       </div>
     );
   }
